@@ -1,4 +1,4 @@
-name: CI
+name: Validation Pipeline
 
 on:
   push:
@@ -24,8 +24,8 @@ env:
   STEP_TIMEOUT_MINUTES: 60
 
 jobs:
-  quality:
-    name: Quality
+  build:
+    name: Build
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -53,6 +53,8 @@ jobs:
     name: Unit Tests
     runs-on: windows-latest
     timeout-minutes: 60
+    needs:
+      - build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,6 +72,8 @@ jobs:
     name: Coverage
     runs-on: windows-latest
     timeout-minutes: 60
+    needs:
+      - build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,6 +91,8 @@ jobs:
     name: UI Tests
     runs-on: windows-latest
     timeout-minutes: 60
+    needs:
+      - build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +110,11 @@ jobs:
     name: Desktop Artifact (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    needs:
+      - build
+      - unit_tests
+      - coverage
+      - ui_tests
     strategy:
       fail-fast: false
       matrix:

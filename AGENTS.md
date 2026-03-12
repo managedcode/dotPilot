@@ -131,13 +131,14 @@ For this app:
 - UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - `format` uses `dotnet format --verify-no-changes`
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
-- desktop artifact validation uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591` so publish-time analyzer plumbing stays green without weakening the normal `analyze` gate, and the CI workflow must upload publish outputs for macOS, Windows, and Linux
+- desktop artifact validation uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`, and the GitHub Actions validation pipeline must run in the order `build -> tests -> desktop artifacts` while uploading publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
+- GitHub Actions validation workflows should use a descriptive workflow name instead of the generic `CI`
 
 ### Project AGENTS Policy
 
@@ -314,6 +315,7 @@ Ask first:
 - Keep one `.NET` test framework active in the solution at a time unless a documented migration is in progress.
 - Validate UI changes through runnable `DotPilot.UITests` on every relevant verification pass, instead of relying only on manual browser inspection or conditional local setup.
 - Keep the UI-test execution path minimal: one normal test command should produce a real result without extra harness indirection or side-effect-heavy setup.
+- Keep the main GitHub Actions workflow name descriptive and keep its job order readable: `Build`, then tests, then desktop artifact publishing.
 
 ### Dislikes
 

@@ -81,12 +81,18 @@ public class TestBase
 
         _app = null;
 
-        _browserApp?.Dispose();
-        _browserApp = null;
-
-        if (Constants.CurrentPlatform == Platform.Browser)
+        try
         {
-            BrowserTestHost.Stop();
+            _browserApp?.Dispose();
+        }
+        finally
+        {
+            _browserApp = null;
+
+            if (Constants.CurrentPlatform == Platform.Browser)
+            {
+                BrowserTestHost.Stop();
+            }
         }
     }
 

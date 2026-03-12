@@ -21,6 +21,7 @@ internal static class BrowserTestHost
     private const string BuildFailureMessage = "Failed to build the WebAssembly test host.";
     private static readonly TimeSpan BuildTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan HostStartupTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan HostShutdownTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HostProbeInterval = TimeSpan.FromMilliseconds(250);
     private static readonly HttpClient HttpClient = new()
     {
@@ -210,12 +211,19 @@ internal static class BrowserTestHost
                 return;
             }
 
+            var hostProcess = _hostProcess;
+            _hostProcess = null;
+            _startedHost = false;
+            _lastOutput = string.Empty;
+
             try
             {
-                if (!_hostProcess.HasExited)
+                CancelOutputReaders(hostProcess);
+
+                if (!hostProcess.HasExited)
                 {
-                    _hostProcess.Kill(entireProcessTree: true);
-                    _hostProcess.WaitForExit();
+                    hostProcess.Kill(entireProcessTree: true);
+                    hostProcess.WaitForExit((int)HostShutdownTimeout.TotalMilliseconds);
                 }
             }
             catch
@@ -224,10 +232,29 @@ internal static class BrowserTestHost
             }
             finally
             {
-                _hostProcess.Dispose();
-                _hostProcess = null;
-                _startedHost = false;
+                hostProcess.Dispose();
             }
+        }
+    }
+
+    private static void CancelOutputReaders(Process process)
+    {
+        try
+        {
+            process.CancelOutputRead();
+        }
+        catch
+        {
+            // Best-effort cleanup only.
+        }
+
+        try
+        {
+            process.CancelErrorRead();
+        }
+        catch
+        {
+            // Best-effort cleanup only.
         }
     }
 }

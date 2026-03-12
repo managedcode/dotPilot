@@ -2,7 +2,7 @@
 
 ## Goal
 
-Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with the current `.NET 10` toolchain, runs the real repository verification flow, includes the mandatory `DotPilot.UITests` suite, publishes desktop app artifacts for macOS, Windows, and Linux, and blocks pull requests when those checks fail.
+Fix the GitHub Actions validation pipeline used by `managedcode/dotPilot` so it builds with the current `.NET 10` toolchain, runs the real repository verification flow in the order `build -> tests -> desktop artifacts`, includes the mandatory `DotPilot.UITests` suite, publishes desktop app artifacts for macOS, Windows, and Linux, and blocks pull requests when those checks fail.
 
 ## Scope
 
@@ -109,6 +109,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - Even after the stale Windows SDK bootstrap was disabled, Windows validation jobs still spent minutes inside `uno-check`, which the current repo does not need for its dotnet-based build, unit, coverage, or browserwasm UI-test path.
 - Once the setup path was reduced to the real dotnet prerequisites, the Windows test jobs exposed another Roslyn requirement: the test projects also need `GenerateDocumentationFile=true` to keep `IDE0005` analyzers enabled during `dotnet test`.
 - GitHub PR run `23015016932` exposed the last shared Windows blocker: the production `DotPilot.csproj` also needs the same Roslyn documentation-file configuration during normal `build`, `test`, and coverage flows, not only during publish.
+- GitHub PR run `23015474274` exposed a remaining UI-test teardown problem on Windows GitHub runners: every other validation and artifact job finished green, but the `UI Tests` job stayed in `Run UI Tests` long after the expected execution window, which points to a harness shutdown hang rather than a functional test failure.
 
 ## Failing Tests And Checks Tracker
 
@@ -171,6 +172,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
   Suspected cause: the repository had only fixed the Roslyn documentation-file requirement in publish commands and test projects, but not in the production Uno app project used by the normal build and test graph.
   Intended fix path: enable `GenerateDocumentationFile` directly in `DotPilot.csproj` and suppress `CS1591` there as a documented project-local exception so the standard repo commands work unchanged on CI runners.
   Status: fixed by the `DotPilot.csproj` configuration and the matching governance updates in the root and project-local `AGENTS.md` files.
+
+- [ ] `Windows CI UI Tests job: teardown hang after real browser execution`
+  Failure symptom: GitHub PR run `23015474274` completed `Build`, `Unit Tests`, `Coverage`, and all three desktop artifact jobs, but `UI Tests` stayed in `Run UI Tests` for more than ten minutes with no failure transition.
+  Suspected cause: `BrowserTestHost.Stop()` waits forever after killing the browserwasm host process tree, and that shutdown path is also used during fixture teardown and process exit on Windows.
+  Intended fix path: make browserwasm host shutdown bounded and best-effort, cancel async output readers before disposal, and ensure host cleanup runs from `finally` even if browser-app disposal throws.
+  Status: in progress.
 
 ## Validation Notes
 
