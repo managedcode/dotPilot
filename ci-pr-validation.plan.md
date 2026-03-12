@@ -107,6 +107,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - After the first valid PR run started, the desktop artifact jobs failed during `dotnet publish` because Roslyn enforced `IDE0005` on build without `GenerateDocumentationFile=true`, while enabling that property globally also surfaced repo-wide `CS1591` documentation warnings as errors.
 - The next PR run showed that the shared `install_dependencies` step was still trying to fetch a Windows SDK ISO from a stale Microsoft redirect, which broke Windows-based CI jobs before tests or analysis even started.
 - Even after the stale Windows SDK bootstrap was disabled, Windows validation jobs still spent minutes inside `uno-check`, which the current repo does not need for its dotnet-based build, unit, coverage, or browserwasm UI-test path.
+- Once the setup path was reduced to the real dotnet prerequisites, the Windows test jobs exposed another Roslyn requirement: the test projects also need `GenerateDocumentationFile=true` to keep `IDE0005` analyzers enabled during `dotnet test`.
 
 ## Failing Tests And Checks Tracker
 
@@ -152,6 +153,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
   Intended fix path: make `uno-check` opt-in in the composite action so PR validation defaults to the lighter pinned-SDK setup and future workflows can explicitly opt in when a real workload bootstrap is needed.
   Status: fixed by the `run-uno-check` input defaulting to `false`.
 
+- [x] `Windows test execution: Roslyn documentation-file requirement in test projects`
+  Failure symptom: after CI setup was reduced to the real dependencies, the Windows `UI Tests` job failed inside `dotnet test` before running any test cases.
+  Suspected cause: the `DotPilot.Tests` and `DotPilot.UITests` projects were hitting the same Roslyn `IDE0005` analyzer path that requires `GenerateDocumentationFile=true`, but unlike the publish workflow they had no scoped project-level configuration for that requirement.
+  Intended fix path: enable `GenerateDocumentationFile` in the test csproj files and suppress `CS1591` there only, since XML documentation is not part of the quality bar for test-only code.
+  Status: fixed by the test-project property updates in `DotPilot.Tests.csproj` and `DotPilot.UITests.csproj`.
+
 - [x] `Desktop publish on macOS and Linux: Roslyn IDE0005 failure`
   Failure symptom: the PR workflow created the desktop artifact jobs, but the macOS and Linux publish steps failed before artifact upload.
   Suspected cause: publish invoked code-style analysis with `IDE0005`, and the repo did not set `GenerateDocumentationFile=true`, which Roslyn now requires for that analyzer path on those runners; once that path was enabled, redundant global and file-level `using` directives in the app shell were also exposed.
@@ -173,6 +180,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - After removing redundant `using` directives surfaced by the publish path, the final local validation reran successfully with `format`, `build`, `analyze`, unit tests, coverage, UI tests, full solution tests, and the scoped `publish-desktop` command.
 - GitHub PR run `23014302895` exposed a second CI-only blocker: the shared Windows setup step still tried to fetch a stale SDK ISO, so the composite action was tightened to skip that bootstrap unless a workflow explicitly opts in.
 - GitHub PR run `23014432448` then showed that `uno-check` was still the dominant source of latency in Windows validation jobs, so the composite action was further tightened to make `uno-check` opt-in instead of the default PR path.
+- GitHub PR run `23014737231` then exposed the final Windows-specific blocker in the actual `dotnet test` phase, which was resolved by scoping the documentation-file requirement to the two test csproj files.
 - GitHub repository ruleset `Require Full CI Validation` was created in active mode and initially required `Quality`, `Unit Tests`, `Coverage`, and `UI Tests` on the default branch and `refs/heads/release/*`; it now also needs the new desktop artifact checks after the workflow is pushed and verified.
 
 ## Final Validation Skills
