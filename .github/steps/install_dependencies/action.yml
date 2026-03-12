@@ -10,6 +10,10 @@ inputs:
     description: 'Whether to install the Windows SDK ISO bootstrap step. Leave false for normal dotnet-based CI validation.'
     required: false
     default: 'false'
+  run-uno-check:
+    description: 'Whether to run uno-check and install Uno workloads. Leave false for normal dotnet-based CI validation.'
+    required: false
+    default: 'false'
   sdkVersion:
     description: 'The version of the Windows Sdk'
     required: false
@@ -33,6 +37,7 @@ runs:
     # Run Uno.Check
     - name: Install ${{ inputs.target-platform }} Workloads
       shell: pwsh
+      if: ${{ inputs.run-uno-check == 'true' }}
       run: |
         dotnet tool install -g uno.check
         ("${{ inputs.target-platform }} ".Split(' ') | ForEach-Object {

@@ -106,6 +106,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - After the first PR push, GitHub rejected the new workflow before any jobs started because `timeout-minutes` used `fromJSON(env.STEP_TIMEOUT_MINUTES)` at the job level, where the `env` context is not available during workflow validation.
 - After the first valid PR run started, the desktop artifact jobs failed during `dotnet publish` because Roslyn enforced `IDE0005` on build without `GenerateDocumentationFile=true`, while enabling that property globally also surfaced repo-wide `CS1591` documentation warnings as errors.
 - The next PR run showed that the shared `install_dependencies` step was still trying to fetch a Windows SDK ISO from a stale Microsoft redirect, which broke Windows-based CI jobs before tests or analysis even started.
+- Even after the stale Windows SDK bootstrap was disabled, Windows validation jobs still spent minutes inside `uno-check`, which the current repo does not need for its dotnet-based build, unit, coverage, or browserwasm UI-test path.
 
 ## Failing Tests And Checks Tracker
 
@@ -145,6 +146,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
   Intended fix path: make Windows SDK installation opt-in in the composite action and leave it disabled for the current validation workflow.
   Status: fixed by the `install-windows-sdk` input defaulting to `false`.
 
+- [x] `Windows CI setup: unnecessary uno-check bootstrap`
+  Failure symptom: after removing the stale SDK ISO install, the Windows validation jobs still sat in `Install Dependencies` for minutes before reaching the actual build and test commands.
+  Suspected cause: the composite action still ran `uno-check` for every PR validation job even though this repo's current dotnet-based build, coverage, and browserwasm UI-test paths already run without it locally.
+  Intended fix path: make `uno-check` opt-in in the composite action so PR validation defaults to the lighter pinned-SDK setup and future workflows can explicitly opt in when a real workload bootstrap is needed.
+  Status: fixed by the `run-uno-check` input defaulting to `false`.
+
 - [x] `Desktop publish on macOS and Linux: Roslyn IDE0005 failure`
   Failure symptom: the PR workflow created the desktop artifact jobs, but the macOS and Linux publish steps failed before artifact upload.
   Suspected cause: publish invoked code-style analysis with `IDE0005`, and the repo did not set `GenerateDocumentationFile=true`, which Roslyn now requires for that analyzer path on those runners; once that path was enabled, redundant global and file-level `using` directives in the app shell were also exposed.
@@ -165,6 +172,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - GitHub PR run `23013702026` exposed a publish-time analyzer failure on desktop artifact jobs; the final fix kept `GenerateDocumentationFile` and `CS1591` handling scoped to the publish command so the normal analyzer gate remains strict.
 - After removing redundant `using` directives surfaced by the publish path, the final local validation reran successfully with `format`, `build`, `analyze`, unit tests, coverage, UI tests, full solution tests, and the scoped `publish-desktop` command.
 - GitHub PR run `23014302895` exposed a second CI-only blocker: the shared Windows setup step still tried to fetch a stale SDK ISO, so the composite action was tightened to skip that bootstrap unless a workflow explicitly opts in.
+- GitHub PR run `23014432448` then showed that `uno-check` was still the dominant source of latency in Windows validation jobs, so the composite action was further tightened to make `uno-check` opt-in instead of the default PR path.
 - GitHub repository ruleset `Require Full CI Validation` was created in active mode and initially required `Quality`, `Unit Tests`, `Coverage`, and `UI Tests` on the default branch and `refs/heads/release/*`; it now also needs the new desktop artifact checks after the workflow is pushed and verified.
 
 ## Final Validation Skills
