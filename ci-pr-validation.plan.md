@@ -103,6 +103,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - Local `dotnet build DotPilot.slnx` and `dotnet test DotPilot.Tests/DotPilot.Tests.csproj` already passed, which confirmed the primary CI break was the workflow toolchain path rather than product code.
 - Local `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"` reproduced a second blocker: coverage did not crash, but `coverlet.collector` spent minutes instrumenting generated Uno artifacts before test execution began, which was not acceptable for PR validation.
 - The workflow also lacked any desktop publish stage, so pull requests produced no downloadable app artifacts for human verification across macOS, Windows, and Linux.
+- After the first PR push, GitHub rejected the new workflow before any jobs started because `timeout-minutes` used `fromJSON(env.STEP_TIMEOUT_MINUTES)` at the job level, where the `env` context is not available during workflow validation.
 
 ## Failing Tests And Checks Tracker
 
@@ -130,6 +131,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
   Intended fix path: add a stable matrix job that publishes `net10.0-desktop` on `macos-latest`, `windows-latest`, and `ubuntu-latest`, then uploads the publish directories as artifacts.
   Status: fixed by the `Desktop Artifact` matrix job in `.github/workflows/ci.yml`.
 
+- [x] `Workflow validation: instant failure before any CI jobs were created`
+  Failure symptom: the first pushed branch run failed in `0s` with no jobs or logs.
+  Suspected cause: GitHub Actions rejected the workflow because job-level `timeout-minutes` referenced `env`, which is not an allowed context at workflow-validation time.
+  Intended fix path: replace the dynamic timeout expression with literal timeout values and lint the workflow locally before pushing again.
+  Status: fixed by the literal `timeout-minutes: 60` update and local `actionlint` validation.
+
 ## Validation Notes
 
 - `dotnet format DotPilot.slnx --verify-no-changes` passed.
@@ -140,6 +147,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - `dotnet test DotPilot.UITests/DotPilot.UITests.csproj` passed with `6` UI tests green and `0` skipped.
 - `dotnet test DotPilot.slnx` passed and included both the unit and UI suites.
 - `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop` passed locally on macOS and produced a publish directory under `artifacts/local-macos-publish`.
+- `actionlint .github/workflows/ci.yml` initially failed on invalid job-level `env` usage for `timeout-minutes`; after the fix it passed locally.
 - GitHub repository ruleset `Require Full CI Validation` was created in active mode and initially required `Quality`, `Unit Tests`, `Coverage`, and `UI Tests` on the default branch and `refs/heads/release/*`; it now also needs the new desktop artifact checks after the workflow is pushed and verified.
 
 ## Final Validation Skills

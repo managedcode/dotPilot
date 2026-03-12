@@ -27,14 +27,14 @@ jobs:
   quality:
     name: Quality
     runs-on: windows-latest
-    timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Dependencies
-        timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+        timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
       - name: Format
@@ -52,14 +52,14 @@ jobs:
   unit_tests:
     name: Unit Tests
     runs-on: windows-latest
-    timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Dependencies
-        timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+        timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
       - name: Run Unit Tests
@@ -69,14 +69,14 @@ jobs:
   coverage:
     name: Coverage
     runs-on: windows-latest
-    timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Dependencies
-        timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+        timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
       - name: Run Coverage
@@ -86,14 +86,14 @@ jobs:
   ui_tests:
     name: UI Tests
     runs-on: windows-latest
-    timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Dependencies
-        timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+        timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
       - name: Run UI Tests
@@ -103,7 +103,7 @@ jobs:
   desktop_artifacts:
     name: Desktop Artifact (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ fromJSON(env.STEP_TIMEOUT_MINUTES) }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

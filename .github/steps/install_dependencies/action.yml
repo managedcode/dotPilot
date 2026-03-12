@@ -1,5 +1,5 @@
 name: Install Dependencies
-description: ""
+description: "Install the pinned .NET SDK, required host prerequisites, and Uno workloads for CI validation."
 
 inputs:
   target-platform:
