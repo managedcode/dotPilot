@@ -6,6 +6,10 @@ inputs:
     description: 'The platform to install dependencies for. #See available values at https://platform.uno/docs/articles/external/uno.check/doc/using-uno-check.html'
     required: false
     default: 'all'
+  install-windows-sdk:
+    description: 'Whether to install the Windows SDK ISO bootstrap step. Leave false for normal dotnet-based CI validation.'
+    required: false
+    default: 'false'
   sdkVersion:
     description: 'The version of the Windows Sdk'
     required: false
@@ -23,7 +27,7 @@ runs:
     # Install Windows SDK
     - name: Install Windows SDK ${{ inputs.sdkVersion }}
       shell: pwsh
-      if: ${{ runner.os == 'Windows' }}
+      if: ${{ runner.os == 'Windows' && inputs.install-windows-sdk == 'true' }}
       run: .\.github\Install-WindowsSdkISO.ps1 ${{ inputs.sdkVersion }}
 
     # Run Uno.Check
