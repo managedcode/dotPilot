@@ -123,7 +123,7 @@ Skill-management rules for this `.NET` solution:
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
 - `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
 
 For this app:
 
@@ -137,6 +137,7 @@ For this app:
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
+- `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 
 ### Project AGENTS Policy
 
@@ -279,6 +280,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Never commit secrets, keys, or connection strings.
 - Never skip tests to make a branch green.
 - Never weaken a test or analyzer without explicit justification.
+- Do not remove the `DotPilot/DotPilot.csproj` XML-doc and `CS1591` configuration unless the repo adopts full public API documentation coverage or a different documented fix for Roslyn `IDE0005`.
 - Never introduce mocks, fakes, stubs, or service doubles to hide real behaviour in tests or local flows.
 - Never introduce a non-SOLID design unless the exception is explicitly documented under `exception_policy`.
 - Never force-push to `main`.

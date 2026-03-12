@@ -132,7 +132,7 @@ jobs:
 
       - name: Publish Desktop App
         shell: pwsh
-        run: dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591 -o ./${{ matrix.output_path }}
+        run: dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -o ./${{ matrix.output_path }}
 
       - name: Upload Desktop Artifact
         uses: actions/upload-artifact@v4

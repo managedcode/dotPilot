@@ -4,6 +4,8 @@
 
         <OutputType>Exe</OutputType>
         <UnoSingleProject>true</UnoSingleProject>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
 
         <!-- Display name -->
         <ApplicationTitle>DotPilot</ApplicationTitle>

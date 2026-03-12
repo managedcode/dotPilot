@@ -32,7 +32,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 ## Local Commands
 
 - `build-app`: `dotnet build DotPilot/DotPilot.csproj`
-- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
 - `run-desktop`: `dotnet run --project DotPilot/DotPilot.csproj -f net10.0-desktop`
 - `run-wasm`: `dotnet run --project DotPilot/DotPilot.csproj -f net10.0-browserwasm`
 - `test-unit`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
@@ -51,3 +51,4 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - `App.xaml` and `Styles/*` are shared styling roots; careless edits can regress the whole app.
 - `Presentation/*Page.xaml` files can grow quickly; split repeated sections before they violate maintainability limits.
 - This project is currently the visible product surface, so every visual change should preserve desktop responsiveness and accessibility-minded structure.
+- `DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so Roslyn `IDE0005` stays active in CI across desktop, core, and browserwasm targets; do not remove that exception unless full XML documentation becomes part of the enforced quality bar.

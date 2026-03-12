@@ -108,6 +108,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - The next PR run showed that the shared `install_dependencies` step was still trying to fetch a Windows SDK ISO from a stale Microsoft redirect, which broke Windows-based CI jobs before tests or analysis even started.
 - Even after the stale Windows SDK bootstrap was disabled, Windows validation jobs still spent minutes inside `uno-check`, which the current repo does not need for its dotnet-based build, unit, coverage, or browserwasm UI-test path.
 - Once the setup path was reduced to the real dotnet prerequisites, the Windows test jobs exposed another Roslyn requirement: the test projects also need `GenerateDocumentationFile=true` to keep `IDE0005` analyzers enabled during `dotnet test`.
+- GitHub PR run `23015016932` exposed the last shared Windows blocker: the production `DotPilot.csproj` also needs the same Roslyn documentation-file configuration during normal `build`, `test`, and coverage flows, not only during publish.
 
 ## Failing Tests And Checks Tracker
 
@@ -162,8 +163,14 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - [x] `Desktop publish on macOS and Linux: Roslyn IDE0005 failure`
   Failure symptom: the PR workflow created the desktop artifact jobs, but the macOS and Linux publish steps failed before artifact upload.
   Suspected cause: publish invoked code-style analysis with `IDE0005`, and the repo did not set `GenerateDocumentationFile=true`, which Roslyn now requires for that analyzer path on those runners; once that path was enabled, redundant global and file-level `using` directives in the app shell were also exposed.
-  Intended fix path: scope the publish fix to the artifact command by passing `GenerateDocumentationFile=true` and suppressing `CS1591` only for publish-time artifact generation, while keeping the normal `analyze` gate unchanged and removing the redundant `using` directives that publish surfaced.
-  Status: fixed by the scoped publish properties in `.github/workflows/ci.yml`, the documented `publish-desktop` command, and the `App.xaml.cs`/`GlobalUsings.cs` cleanup.
+  Intended fix path: keep the publish job aligned with the normal repo command path and move the Roslyn configuration into `DotPilot.csproj`, while still removing the redundant `using` directives that publish surfaced.
+  Status: fixed by the `DotPilot.csproj` configuration, the documented `publish-desktop` command, and the `App.xaml.cs`/`GlobalUsings.cs` cleanup.
+
+- [x] `Windows CI build, unit-test, and coverage jobs: Roslyn IDE0005 failure in DotPilot.csproj`
+  Failure symptom: GitHub PR run `23015016932` still failed in `Quality`, `Unit Tests`, and `Coverage` because `DotPilot.csproj` hit `EnableGenerateDocumentationFile` on `net10.0-desktop`, `net10.0-browserwasm`, and `net10.0`.
+  Suspected cause: the repository had only fixed the Roslyn documentation-file requirement in publish commands and test projects, but not in the production Uno app project used by the normal build and test graph.
+  Intended fix path: enable `GenerateDocumentationFile` directly in `DotPilot.csproj` and suppress `CS1591` there as a documented project-local exception so the standard repo commands work unchanged on CI runners.
+  Status: fixed by the `DotPilot.csproj` configuration and the matching governance updates in the root and project-local `AGENTS.md` files.
 
 ## Validation Notes
 
@@ -176,11 +183,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - `dotnet test DotPilot.slnx` passed and included both the unit and UI suites.
 - `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop` passed locally on macOS and produced a publish directory under `artifacts/local-macos-publish`.
 - `actionlint .github/workflows/ci.yml` initially failed on invalid job-level `env` usage for `timeout-minutes`; after the fix it passed locally.
-- GitHub PR run `23013702026` exposed a publish-time analyzer failure on desktop artifact jobs; the final fix kept `GenerateDocumentationFile` and `CS1591` handling scoped to the publish command so the normal analyzer gate remains strict.
+- GitHub PR run `23013702026` exposed a publish-time analyzer failure on desktop artifact jobs; the final fix moved the required Roslyn configuration into `DotPilot.csproj` so publish, build, unit-test, and coverage commands now all use the same project-defined behavior.
 - After removing redundant `using` directives surfaced by the publish path, the final local validation reran successfully with `format`, `build`, `analyze`, unit tests, coverage, UI tests, full solution tests, and the scoped `publish-desktop` command.
 - GitHub PR run `23014302895` exposed a second CI-only blocker: the shared Windows setup step still tried to fetch a stale SDK ISO, so the composite action was tightened to skip that bootstrap unless a workflow explicitly opts in.
 - GitHub PR run `23014432448` then showed that `uno-check` was still the dominant source of latency in Windows validation jobs, so the composite action was further tightened to make `uno-check` opt-in instead of the default PR path.
 - GitHub PR run `23014737231` then exposed the final Windows-specific blocker in the actual `dotnet test` phase, which was resolved by scoping the documentation-file requirement to the two test csproj files.
+- After moving the Roslyn documentation-file configuration into `DotPilot.csproj`, the full local validation stack reran green: workflow lint, `build`, `analyze`, unit tests, coverage, UI tests, full solution tests, and desktop publish.
 - GitHub repository ruleset `Require Full CI Validation` was created in active mode and initially required `Quality`, `Unit Tests`, `Coverage`, and `UI Tests` on the default branch and `refs/heads/release/*`; it now also needs the new desktop artifact checks after the workflow is pushed and verified.
 
 ## Final Validation Skills
