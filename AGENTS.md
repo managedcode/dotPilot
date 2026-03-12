@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Project: dotPilot
-Stack: .NET 10 `Uno Platform` desktop app with central package management, `NUnit` unit tests, and `Uno.UITest` smoke coverage
+Stack: .NET 10 `Uno Platform` desktop app with central package management, `NUnit` unit tests, and `Uno.UITest` browser UI coverage
 
 Follows [MCAF](https://mcaf.managed-code.com/)
 
@@ -122,14 +122,16 @@ Skill-management rules for this `.NET` solution:
 - `test`: `dotnet test DotPilot.slnx`
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
-- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"`
+- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
 
 For this app:
 
 - unit tests currently use `NUnit` through the default `VSTest` runner
-- UI smoke tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
+- UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - `format` uses `dotnet format --verify-no-changes`
-- coverage uses the `coverlet.collector` integration on `DotPilot.Tests`
+- coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
+- desktop artifact validation uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop` and the CI workflow must upload publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
@@ -250,7 +252,10 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Repository or module coverage must not decrease without an explicit written exception. Coverage after the change must stay at least at the previous baseline or improve.
 - Coverage is for finding gaps, not gaming a number. Coverage numbers do not replace scenario coverage or user-flow verification.
 - The task is not done until the full relevant test suite is green, not only the newly added tests.
-- UI smoke tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
+- UI tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
+- GitHub Actions PR validation is mandatory for every PR and must enforce the real repo verification path so test failures are caught in CI, not only locally.
+- GitHub Actions PR validation must run full automated test verification, especially the real UI suite; build-only or smoke-only checks are not an acceptable substitute for pull-request gating.
+- GitHub Actions validation must also produce downloadable app artifacts for macOS, Windows, and Linux so every PR and mainline run has test results plus installable build outputs.
 - For `.NET`, keep the active framework and runner model explicit so agents do not mix `TUnit`, `Microsoft.Testing.Platform`, and legacy `VSTest` assumptions.
 - After changing production code, run the repo-defined quality pass: format, build, analyze, focused tests, broader tests, coverage, and any configured extra gates.
 
@@ -306,6 +311,7 @@ Ask first:
 - Use central package management for shared test and tooling packages.
 - Keep one `.NET` test framework active in the solution at a time unless a documented migration is in progress.
 - Validate UI changes through runnable `DotPilot.UITests` on every relevant verification pass, instead of relying only on manual browser inspection or conditional local setup.
+- Keep the UI-test execution path minimal: one normal test command should produce a real result without extra harness indirection or side-effect-heavy setup.
 
 ### Dislikes
 
@@ -313,3 +319,4 @@ Ask first:
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
+- Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.

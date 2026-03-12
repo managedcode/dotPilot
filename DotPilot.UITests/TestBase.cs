@@ -8,6 +8,7 @@ namespace DotPilot.UITests;
 public class TestBase
 {
     private const string ShowBrowserEnvironmentVariableName = "DOTPILOT_UITEST_SHOW_BROWSER";
+    private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
     private static readonly object BrowserAppSyncRoot = new();
@@ -149,12 +150,10 @@ public class TestBase
                 .BrowserBinaryPath(browserAutomation.BrowserBinaryPath)
                 .ScreenShotsPath(AppContext.BaseDirectory)
                 .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
+                .SeleniumArgument($"{BrowserWindowSizeArgumentPrefix}{BrowserWindowWidth},{BrowserWindowHeight}")
                 .Headless(_browserHeadless);
 
-            if (!string.IsNullOrWhiteSpace(browserAutomation.DriverPath))
-            {
-                configurator = configurator.DriverPath(browserAutomation.DriverPath);
-            }
+            configurator = configurator.DriverPath(browserAutomation.DriverPath);
 
             if (!_browserHeadless)
             {

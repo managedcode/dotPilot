@@ -1,11 +1,11 @@
 # AGENTS.md
 
 Project: `DotPilot.UITests`
-Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven smoke tests
+Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 
 ## Purpose
 
-- This project owns UI smoke coverage for `DotPilot` through the `Uno.UITest` harness.
+- This project owns browser-driven UI coverage for `DotPilot` through the `Uno.UITest` harness.
 - It is intended for app-launch and visible-flow verification once the external test prerequisites are satisfied.
 
 ## Entry Points
@@ -17,10 +17,11 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven smoke tests
 
 ## Boundaries
 
-- Keep this project focused on end-to-end or smoke-level verification only.
+- Keep this project focused on end-to-end browser verification only.
 - Do not add app business logic or test-only production hooks here unless they are required for stable automation.
 - Treat browser-driver setup and app-launch prerequisites as part of the harness, not as assumptions inside individual tests.
 - The harness must make `dotnet test DotPilot.UITests/DotPilot.UITests.csproj` runnable without manual driver-path export and must fail loudly instead of silently skipping coverage.
+- Keep the harness direct and minimal; prefer the smallest deterministic setup needed to run the suite and return a real result.
 
 ## Local Commands
 

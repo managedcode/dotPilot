@@ -8,13 +8,13 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 - **System:** `DotPilot` is a `.NET 10` `Uno Platform` application with desktop and `WebAssembly` heads, shared app styling, and two current presentation routes.
 - **Production app:** [../DotPilot/](../DotPilot/) contains the `Uno` startup path, route registration, window behavior, and XAML presentation.
-- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, and [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` smoke coverage.
+- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` UI coverage, and GitHub Actions publishes desktop app artifacts for macOS, Windows, and Linux from the same repo state.
 - **Primary entry points:** [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs), [../DotPilot/Platforms/Desktop/Program.cs](../DotPilot/Platforms/Desktop/Program.cs), [../DotPilot/Platforms/WebAssembly/Program.cs](../DotPilot/Platforms/WebAssembly/Program.cs), [../DotPilot/Presentation/Shell.xaml](../DotPilot/Presentation/Shell.xaml), [../DotPilot/Presentation/MainPage.xaml](../DotPilot/Presentation/MainPage.xaml), and [../DotPilot/Presentation/SecondPage.xaml](../DotPilot/Presentation/SecondPage.xaml).
 
 ## Scoping
 
-- **In scope:** app startup, route registration, desktop window behavior, shared UI resources, XAML presentation, unit tests, and UI smoke tests.
-- **Out of scope:** backend services, persistence, agent runtime protocols, and any platform-specific packaging flow that is not directly needed by the current app shell.
+- **In scope:** app startup, route registration, desktop window behavior, shared UI resources, XAML presentation, unit tests, and UI tests.
+- **Out of scope:** backend services, persistence, agent runtime protocols, and store-specific packaging flows beyond the CI desktop publish artifacts already required for pull requests and mainline validation.
 - Start from the diagram that matches the area you will edit, then open only the linked files for that boundary.
 
 ## Diagrams
@@ -96,7 +96,8 @@ flowchart LR
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
 - `Production Uno app` — [../DotPilot/](../DotPilot/)
 - `Unit tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
-- `UI smoke tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
+- `UI tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
+- `CI desktop artifacts` — [../.github/workflows/ci.yml](../.github/workflows/ci.yml)
 - `Shared build and analyzer policy` — [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
 - `Architecture map` — [Architecture.md](./Architecture.md)
 
@@ -110,14 +111,15 @@ flowchart LR
 - `Chat screen` — [../DotPilot/Presentation/MainPage.xaml](../DotPilot/Presentation/MainPage.xaml)
 - `Create-agent screen` — [../DotPilot/Presentation/SecondPage.xaml](../DotPilot/Presentation/SecondPage.xaml)
 - `Unit test project` — [../DotPilot.Tests/DotPilot.Tests.csproj](../DotPilot.Tests/DotPilot.Tests.csproj)
-- `UI smoke harness` — [../DotPilot.UITests/TestBase.cs](../DotPilot.UITests/TestBase.cs) and [../DotPilot.UITests/Constants.cs](../DotPilot.UITests/Constants.cs)
-- `UI smoke browser host bootstrap` — [../DotPilot.UITests/BrowserTestHost.cs](../DotPilot.UITests/BrowserTestHost.cs)
+- `UI test harness` — [../DotPilot.UITests/TestBase.cs](../DotPilot.UITests/TestBase.cs) and [../DotPilot.UITests/Constants.cs](../DotPilot.UITests/Constants.cs)
+- `UI test browser host bootstrap` — [../DotPilot.UITests/BrowserTestHost.cs](../DotPilot.UITests/BrowserTestHost.cs)
 
 ## Dependency Rules
 
 - `DotPilot` owns app composition and presentation; keep browser-platform bootstrapping isolated under `Platforms/WebAssembly` and do not bleed browser-only concerns into shared XAML.
 - `DotPilot.Tests` may reference `DotPilot` and test-only packages, but should stay in-process and behavior-focused.
-- `DotPilot.UITests` owns smoke automation and must not become a dumping ground for product logic or environment assumptions hidden inside test bodies.
+- `DotPilot.UITests` owns browser UI automation and must not become a dumping ground for product logic or environment assumptions hidden inside test bodies.
+- GitHub Actions must publish `net10.0-desktop` outputs for macOS, Windows, and Linux so pull requests always expose installable desktop artifacts alongside test results.
 - Shared build defaults, analyzer policy, and package versions remain owned by the repo root.
 
 ## Key Decisions
@@ -126,12 +128,12 @@ flowchart LR
 - Root governance is supplemented by one local `AGENTS.md` file per active project root.
 - Navigation is registered centrally in [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs) and should remain declarative at the page level where possible.
 - Desktop window behavior is configured during app startup, before navigation host activation, when desktop-specific behavior is required.
-- `DotPilot.Tests` is the default runnable automated test surface; `DotPilot.UITests` depends on a ChromeDriver path and auto-starts the local `browserwasm` head for smoke coverage.
+- `DotPilot.Tests` is the default in-process test surface; `DotPilot.UITests` auto-starts the local `browserwasm` head and resolves the Chrome browser plus a cached matching ChromeDriver automatically for browser UI coverage.
 
 ## Where To Go Next
 
 - Editing the Uno app shell: [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
 - Editing unit tests: [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md)
-- Editing UI smoke tests: [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
+- Editing UI tests: [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
 - Editing startup and routes: [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
 - Editing screen XAML: [../DotPilot/Presentation/](../DotPilot/Presentation/)

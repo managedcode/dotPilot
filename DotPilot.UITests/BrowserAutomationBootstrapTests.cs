@@ -9,6 +9,25 @@ public sealed class BrowserAutomationBootstrapTests
     private const string ChromeDriverExecutableName = "chromedriver";
     private const string ChromeDriverExecutableNameWindows = "chromedriver.exe";
     private const string BrowserBinaryExecutableName = "chrome-under-test";
+    private string? _originalBrowserDriverPath;
+    private string? _originalBrowserBinaryPath;
+    private string? _originalBrowserPath;
+
+    [SetUp]
+    public void CaptureOriginalEnvironment()
+    {
+        _originalBrowserDriverPath = Environment.GetEnvironmentVariable(BrowserDriverEnvironmentVariableName);
+        _originalBrowserBinaryPath = Environment.GetEnvironmentVariable(BrowserBinaryEnvironmentVariableName);
+        _originalBrowserPath = Environment.GetEnvironmentVariable(BrowserPathEnvironmentVariableName);
+    }
+
+    [TearDown]
+    public void RestoreOriginalEnvironment()
+    {
+        Environment.SetEnvironmentVariable(BrowserDriverEnvironmentVariableName, _originalBrowserDriverPath);
+        Environment.SetEnvironmentVariable(BrowserBinaryEnvironmentVariableName, _originalBrowserBinaryPath);
+        Environment.SetEnvironmentVariable(BrowserPathEnvironmentVariableName, _originalBrowserPath);
+    }
 
     [Test]
     public void WhenDriverPathPointsToBinaryThenResolverNormalizesToContainingDirectory()
@@ -32,17 +51,18 @@ public sealed class BrowserAutomationBootstrapTests
     public void WhenBrowserBinaryEnvironmentVariableIsMissingThenResolverFallsBackToCandidatePaths()
     {
         using var sandbox = new BrowserAutomationSandbox();
+        var driverFilePath = sandbox.CreateFile(GetChromeDriverExecutableFileName());
         var browserBinaryPath = sandbox.CreateFile(BrowserBinaryExecutableName);
         var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
-            [BrowserDriverEnvironmentVariableName] = null,
+            [BrowserDriverEnvironmentVariableName] = driverFilePath,
             [BrowserBinaryEnvironmentVariableName] = null,
             [BrowserPathEnvironmentVariableName] = null,
         };
 
         var settings = BrowserAutomationBootstrap.Resolve(environment, [browserBinaryPath]);
 
-        Assert.That(settings.DriverPath, Is.Null);
+        Assert.That(settings.DriverPath, Is.EqualTo(Path.GetDirectoryName(driverFilePath)));
         Assert.That(settings.BrowserBinaryPath, Is.EqualTo(browserBinaryPath));
     }
 
