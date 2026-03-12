@@ -123,7 +123,7 @@ Skill-management rules for this `.NET` solution:
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
 - `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591`
 
 For this app:
 
@@ -131,7 +131,7 @@ For this app:
 - UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - `format` uses `dotnet format --verify-no-changes`
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
-- desktop artifact validation uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop` and the CI workflow must upload publish outputs for macOS, Windows, and Linux
+- desktop artifact validation uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591` so publish-time analyzer plumbing stays green without weakening the normal `analyze` gate, and the CI workflow must upload publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects

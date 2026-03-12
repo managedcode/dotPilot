@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace DotPilot.Services.Endpoints;
 
 internal sealed class DebugHttpHandler : DelegatingHandler

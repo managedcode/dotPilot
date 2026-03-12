@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace DotPilot;
 
@@ -81,7 +83,8 @@ public partial class App : Application
                 {
 #if DEBUG
                     // DelegatingHandler will be automatically injected
-                    services.AddTransient<DelegatingHandler, DebugHttpHandler>();
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddTransient<DelegatingHandler, Services.Endpoints.DebugHttpHandler>(services);
 #endif
 
                 })

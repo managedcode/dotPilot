@@ -104,6 +104,7 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - Local `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"` reproduced a second blocker: coverage did not crash, but `coverlet.collector` spent minutes instrumenting generated Uno artifacts before test execution began, which was not acceptable for PR validation.
 - The workflow also lacked any desktop publish stage, so pull requests produced no downloadable app artifacts for human verification across macOS, Windows, and Linux.
 - After the first PR push, GitHub rejected the new workflow before any jobs started because `timeout-minutes` used `fromJSON(env.STEP_TIMEOUT_MINUTES)` at the job level, where the `env` context is not available during workflow validation.
+- After the first valid PR run started, the desktop artifact jobs failed during `dotnet publish` because Roslyn enforced `IDE0005` on build without `GenerateDocumentationFile=true`, while enabling that property globally also surfaced repo-wide `CS1591` documentation warnings as errors.
 
 ## Failing Tests And Checks Tracker
 
@@ -137,6 +138,12 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
   Intended fix path: replace the dynamic timeout expression with literal timeout values and lint the workflow locally before pushing again.
   Status: fixed by the literal `timeout-minutes: 60` update and local `actionlint` validation.
 
+- [x] `Desktop publish on macOS and Linux: Roslyn IDE0005 failure`
+  Failure symptom: the PR workflow created the desktop artifact jobs, but the macOS and Linux publish steps failed before artifact upload.
+  Suspected cause: publish invoked code-style analysis with `IDE0005`, and the repo did not set `GenerateDocumentationFile=true`, which Roslyn now requires for that analyzer path on those runners; once that path was enabled, redundant global and file-level `using` directives in the app shell were also exposed.
+  Intended fix path: scope the publish fix to the artifact command by passing `GenerateDocumentationFile=true` and suppressing `CS1591` only for publish-time artifact generation, while keeping the normal `analyze` gate unchanged and removing the redundant `using` directives that publish surfaced.
+  Status: fixed by the scoped publish properties in `.github/workflows/ci.yml`, the documented `publish-desktop` command, and the `App.xaml.cs`/`GlobalUsings.cs` cleanup.
+
 ## Validation Notes
 
 - `dotnet format DotPilot.slnx --verify-no-changes` passed.
@@ -148,6 +155,8 @@ Fix the GitHub Actions CI path used by `managedcode/dotPilot` so it builds with 
 - `dotnet test DotPilot.slnx` passed and included both the unit and UI suites.
 - `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop` passed locally on macOS and produced a publish directory under `artifacts/local-macos-publish`.
 - `actionlint .github/workflows/ci.yml` initially failed on invalid job-level `env` usage for `timeout-minutes`; after the fix it passed locally.
+- GitHub PR run `23013702026` exposed a publish-time analyzer failure on desktop artifact jobs; the final fix kept `GenerateDocumentationFile` and `CS1591` handling scoped to the publish command so the normal analyzer gate remains strict.
+- After removing redundant `using` directives surfaced by the publish path, the final local validation reran successfully with `format`, `build`, `analyze`, unit tests, coverage, UI tests, full solution tests, and the scoped `publish-desktop` command.
 - GitHub repository ruleset `Require Full CI Validation` was created in active mode and initially required `Quality`, `Unit Tests`, `Coverage`, and `UI Tests` on the default branch and `refs/heads/release/*`; it now also needs the new desktop artifact checks after the workflow is pushed and verified.
 
 ## Final Validation Skills

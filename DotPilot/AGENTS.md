@@ -32,7 +32,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 ## Local Commands
 
 - `build-app`: `dotnet build DotPilot/DotPilot.csproj`
-- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -p:GenerateDocumentationFile=true -p:NoWarn=CS1591`
 - `run-desktop`: `dotnet run --project DotPilot/DotPilot.csproj -f net10.0-desktop`
 - `run-wasm`: `dotnet run --project DotPilot/DotPilot.csproj -f net10.0-browserwasm`
 - `test-unit`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
