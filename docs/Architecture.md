@@ -1,140 +1,137 @@
 # Architecture Overview
 
-Goal: in a few minutes, understand what exists in this repository today, where the production and test projects live, and which repo-level artifacts agents must trust first.
+Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` app boundaries, and the test surfaces that matter before changing code.
 
-This file is the primary start-here card for humans and AI agents.
-
-Single source of truth: keep this doc navigational and coarse. Detailed behavior belongs in `docs/Features/*`, and durable architectural decisions belong in `docs/ADR/*` once those documents exist.
+This file is the required start-here architecture map for non-trivial tasks.
 
 ## Summary
 
-- **System:** `dotPilot` is an agent-facing UI solution scaffold built on `.NET 10`, with one production class library and one TUnit-based test project.
-- **Where is the code:** production code lives in [../src/Pilot.Core/](../src/Pilot.Core/), and tests live in [../tests/Pilot.Tests/](../tests/Pilot.Tests/).
-- **Entry points:** [../AGENTS.md](../AGENTS.md), [../DotPilot.slnx](../DotPilot.slnx), [../src/Pilot.Core/PilotCoreMarker.cs](../src/Pilot.Core/PilotCoreMarker.cs), and [../tests/Pilot.Tests/PilotCoreBootstrapTests.cs](../tests/Pilot.Tests/PilotCoreBootstrapTests.cs).
-- **Dependencies:** `.NET SDK 10`, the repo-root [../.editorconfig](../.editorconfig), [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), `TUnit 1.19.16`, and `Microsoft.Testing.Platform`.
+- **System:** `DotPilot` is a `.NET 10` `Uno Platform` application with desktop and `WebAssembly` heads, shared app styling, and two current presentation routes.
+- **Production app:** [../DotPilot/](../DotPilot/) contains the `Uno` startup path, route registration, window behavior, and XAML presentation.
+- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, and [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` smoke coverage.
+- **Primary entry points:** [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs), [../DotPilot/Platforms/Desktop/Program.cs](../DotPilot/Platforms/Desktop/Program.cs), [../DotPilot/Platforms/WebAssembly/Program.cs](../DotPilot/Platforms/WebAssembly/Program.cs), [../DotPilot/Presentation/Shell.xaml](../DotPilot/Presentation/Shell.xaml), [../DotPilot/Presentation/MainPage.xaml](../DotPilot/Presentation/MainPage.xaml), and [../DotPilot/Presentation/SecondPage.xaml](../DotPilot/Presentation/SecondPage.xaml).
 
 ## Scoping
 
-- **In scope:** repository bootstrap, root governance, shared .NET policy, solution layout, and the minimum docs future agents need before editing code.
-- **Out of scope:** runtime agent protocol details, UI feature behavior, deployment topology, and any project-specific architecture that does not exist yet.
-- Pick impacted repo artifact(s) from the diagrams and navigation index below.
-- Read only the linked files that define the affected behavior.
-- If the task cannot be mapped to this doc, update it first.
+- **In scope:** app startup, route registration, desktop window behavior, shared UI resources, XAML presentation, unit tests, and UI smoke tests.
+- **Out of scope:** backend services, persistence, agent runtime protocols, and any platform-specific packaging flow that is not directly needed by the current app shell.
+- Start from the diagram that matches the area you will edit, then open only the linked files for that boundary.
 
 ## Diagrams
-
-These diagrams model the current bootstrap topology that future UI projects will extend.
 
 ### System / module map
 
 ```mermaid
 flowchart LR
   Root["dotPilot repository root"]
-  Agents["AGENTS.md"]
-  Sln["DotPilot.slnx"]
-  Build["Directory.Build.props + Directory.Packages.props + global.json + .editorconfig"]
-  Skills[".codex/skills/mcaf-*"]
-  Core["src/Pilot.Core"]
-  Tests["tests/Pilot.Tests"]
+  RootAgents["AGENTS.md"]
+  Plan["*.plan.md"]
   Docs["docs/Architecture.md"]
+  Build["Directory.Build.props + Directory.Packages.props + global.json + .editorconfig"]
+  App["DotPilot Uno app"]
+  BrowserHead["DotPilot browserwasm head"]
+  Unit["DotPilot.Tests"]
+  Ui["DotPilot.UITests"]
 
-  Root --> Agents
-  Root --> Sln
-  Root --> Build
-  Root --> Skills
-  Root --> Core
-  Root --> Tests
+  Root --> RootAgents
+  Root --> Plan
   Root --> Docs
+  Root --> Build
+  Root --> App
+  App --> BrowserHead
+  Root --> Unit
+  Root --> Ui
 ```
 
 ### Interfaces / contracts map
 
 ```mermaid
 flowchart LR
-  Agents["AGENTS.md"]
-  Build["Shared .NET policy"]
-  Sln["DotPilot.slnx"]
-  Core["Pilot.Core"]
-  Tests["Pilot.Tests"]
-  LocalAgents["Project-local AGENTS.md files"]
+  RootAgents["Root AGENTS.md"]
+  AppAgents["DotPilot/AGENTS.md"]
+  TestAgents["DotPilot.Tests/AGENTS.md"]
+  UiAgents["DotPilot.UITests/AGENTS.md"]
+  App["DotPilot"]
+  AppTests["DotPilot.Tests"]
+  UiTests["DotPilot.UITests"]
 
-  Agents --routes tasks through--> LocalAgents
-  Agents --defines commands for--> Sln
-  Build --applies analyzer, package, and language policy to--> Core
-  Build --applies analyzer, package, and language policy to--> Tests
-  Tests --references--> Core
-  Sln --aggregates--> Core
-  Sln --aggregates--> Tests
+  RootAgents --routes rules to--> AppAgents
+  RootAgents --routes rules to--> TestAgents
+  RootAgents --routes rules to--> UiAgents
+  AppTests --references--> App
+  UiTests --automates--> App
+  App --exposes automation ids and visible flows to--> UiTests
 ```
 
-### Key repository artifacts map
+### Key classes / types for the current UI shell
 
 ```mermaid
 flowchart LR
-  EditorConfig[".editorconfig"]
-  Props["Directory.Build.props"]
-  Packages["Directory.Packages.props"]
-  Sln["DotPilot.slnx"]
-  Agents["AGENTS.md"]
-  Marker["PilotCoreMarker"]
-  BootstrapTest["PilotCoreBootstrapTests"]
+  DesktopProgram["Platforms/Desktop/Program"]
+  BrowserProgram["Platforms/WebAssembly/Program"]
+  App["App"]
+  Shell["Presentation/Shell"]
+  ShellVm["ShellViewModel"]
+  MainPage["MainPage"]
+  MainVm["MainViewModel"]
+  SecondPage["SecondPage"]
+  SecondVm["SecondViewModel"]
+  Config["AppConfig"]
 
-  Props --> Marker
-  Packages --> BootstrapTest
-  EditorConfig --> Marker
-  EditorConfig --> BootstrapTest
-  Sln --> Marker
-  Sln --> BootstrapTest
-  BootstrapTest --> Marker
+  DesktopProgram --> App
+  BrowserProgram --> App
+  App --> Shell
+  App --> MainPage
+  App --> SecondPage
+  Shell --> ShellVm
+  MainPage --> MainVm
+  SecondPage --> SecondVm
+  App --> Config
 ```
 
 ## Navigation Index
 
 ### Modules
 
-- `Solution governance` — code and policy: [../AGENTS.md](../AGENTS.md)
-- `Solution file` — root .NET solution scaffold: [../DotPilot.slnx](../DotPilot.slnx)
-- `Production library` — reusable production code: [../src/Pilot.Core/](../src/Pilot.Core/)
-- `Test project` — TUnit verification: [../tests/Pilot.Tests/](../tests/Pilot.Tests/)
-- `Shared build policy` — analyzer, language, and warning defaults: [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
-- `Shared package policy` — centrally managed package versions: [../Directory.Packages.props](../Directory.Packages.props)
-- `Repo-local skill catalog` — installed MCAF skills for Codex: [../.codex/skills/](../.codex/skills/)
-- `Architecture overview` — this file: [Architecture.md](./Architecture.md)
+- `Solution governance` — [../AGENTS.md](../AGENTS.md)
+- `Production Uno app` — [../DotPilot/](../DotPilot/)
+- `Unit tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
+- `UI smoke tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
+- `Shared build and analyzer policy` — [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
+- `Architecture map` — [Architecture.md](./Architecture.md)
 
-### Interfaces / contracts
+### High-signal code paths
 
-- `Agent workflow contract` — source of truth: [../AGENTS.md](../AGENTS.md); producer: repository governance; consumer: any human or AI agent working in this repo
-- `Shared .NET policy contract` — source of truth: [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig); producer: solution root; consumer: all current and future .NET projects
-- `Solution membership contract` — source of truth: [../DotPilot.slnx](../DotPilot.slnx); producer: solution root; consumer: the `Pilot.Core` and `Pilot.Tests` project roots
-- `Test-to-core contract` — source of truth: [../tests/Pilot.Tests/Pilot.Tests.csproj](../tests/Pilot.Tests/Pilot.Tests.csproj); producer: `Pilot.Tests`; consumer: `Pilot.Core`
-
-### Key classes / types
-
-- `PilotCoreMarker` — defined in: [../src/Pilot.Core/PilotCoreMarker.cs](../src/Pilot.Core/PilotCoreMarker.cs); used by: `Pilot.Tests`
-- `PilotCoreBootstrapTests` — defined in: [../tests/Pilot.Tests/PilotCoreBootstrapTests.cs](../tests/Pilot.Tests/PilotCoreBootstrapTests.cs); uses: `Pilot.Core`
+- `Desktop startup host` — [../DotPilot/Platforms/Desktop/Program.cs](../DotPilot/Platforms/Desktop/Program.cs)
+- `WebAssembly startup host` — [../DotPilot/Platforms/WebAssembly/Program.cs](../DotPilot/Platforms/WebAssembly/Program.cs)
+- `Application startup and route registration` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
+- `Shared app resources` — [../DotPilot/App.xaml](../DotPilot/App.xaml) and [../DotPilot/Styles/ColorPaletteOverride.xaml](../DotPilot/Styles/ColorPaletteOverride.xaml)
+- `Shell` — [../DotPilot/Presentation/Shell.xaml](../DotPilot/Presentation/Shell.xaml)
+- `Chat screen` — [../DotPilot/Presentation/MainPage.xaml](../DotPilot/Presentation/MainPage.xaml)
+- `Create-agent screen` — [../DotPilot/Presentation/SecondPage.xaml](../DotPilot/Presentation/SecondPage.xaml)
+- `Unit test project` — [../DotPilot.Tests/DotPilot.Tests.csproj](../DotPilot.Tests/DotPilot.Tests.csproj)
+- `UI smoke harness` — [../DotPilot.UITests/TestBase.cs](../DotPilot.UITests/TestBase.cs) and [../DotPilot.UITests/Constants.cs](../DotPilot.UITests/Constants.cs)
+- `UI smoke browser host bootstrap` — [../DotPilot.UITests/BrowserTestHost.cs](../DotPilot.UITests/BrowserTestHost.cs)
 
 ## Dependency Rules
 
-- Allowed dependencies: `Pilot.Core` may depend on repo-root .NET policy only; `Pilot.Tests` may depend on `Pilot.Core`, `TUnit`, and test-only extensions managed through `Directory.Packages.props`.
-- Forbidden dependencies: do not add UI-specific frameworks to `Pilot.Core`, and do not add additional test frameworks beside `TUnit`.
-- Integration style: root governance drives future code changes through documented commands, local `AGENTS.md` files, and centrally managed packages.
-- Shared code policy: shared .NET defaults belong in repo-root policy files, while project-specific overrides belong in local `AGENTS.md` files or project files.
+- `DotPilot` owns app composition and presentation; keep browser-platform bootstrapping isolated under `Platforms/WebAssembly` and do not bleed browser-only concerns into shared XAML.
+- `DotPilot.Tests` may reference `DotPilot` and test-only packages, but should stay in-process and behavior-focused.
+- `DotPilot.UITests` owns smoke automation and must not become a dumping ground for product logic or environment assumptions hidden inside test bodies.
+- Shared build defaults, analyzer policy, and package versions remain owned by the repo root.
 
 ## Key Decisions
 
-- The repository uses one root `AGENTS.md` and will add local `AGENTS.md` files per project or module once those roots exist.
-- The repo-local agent skill directory is `.codex/skills/` and must contain only current `mcaf-*` skills.
-- The root `.editorconfig` remains the source of truth for formatting, naming, style, and analyzer severity.
-- `Directory.Build.props` carries shared analyzer, warning, and language policy for future `.NET` projects.
-- `Directory.Packages.props` carries centrally managed package versions.
-- `global.json` opts the solution into the `.NET 10` Microsoft.Testing.Platform test runner experience.
-- `TUnit` is the only test framework in this repository and runs on `Microsoft.Testing.Platform`.
+- The live product surface is the `DotPilot` `Uno Platform` app, not the older `Pilot.Core` bootstrap.
+- Root governance is supplemented by one local `AGENTS.md` file per active project root.
+- Navigation is registered centrally in [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs) and should remain declarative at the page level where possible.
+- Desktop window behavior is configured during app startup, before navigation host activation, when desktop-specific behavior is required.
+- `DotPilot.Tests` is the default runnable automated test surface; `DotPilot.UITests` depends on a ChromeDriver path and auto-starts the local `browserwasm` head for smoke coverage.
 
 ## Where To Go Next
 
-- Root workflow and commands: [../AGENTS.md](../AGENTS.md)
-- Shared .NET policy: [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
-- Skill catalog: [../.codex/skills/](../.codex/skills/)
-- Solution scaffold: [../DotPilot.slnx](../DotPilot.slnx)
-- Production code: [../src/Pilot.Core/](../src/Pilot.Core/)
-- Tests: [../tests/Pilot.Tests/](../tests/Pilot.Tests/)
+- Editing the Uno app shell: [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
+- Editing unit tests: [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md)
+- Editing UI smoke tests: [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
+- Editing startup and routes: [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
+- Editing screen XAML: [../DotPilot/Presentation/](../DotPilot/Presentation/)

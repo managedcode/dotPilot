@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Project: dotPilot
-Stack: .NET 10 solution bootstrap for an agent-facing UI with central package management and TUnit
+Stack: .NET 10 `Uno Platform` desktop app with central package management, `NUnit` unit tests, and `Uno.UITest` smoke coverage
 
 Follows [MCAF](https://mcaf.managed-code.com/)
 
@@ -19,9 +19,10 @@ This file defines how AI agents work in this solution.
 
 - Solution root: `.` (`DotPilot.slnx`)
 - Projects or modules with local `AGENTS.md` files:
-  - `src/Pilot.Core`
-  - `tests/Pilot.Tests`
-- Shared bootstrap artifacts:
+  - `DotPilot`
+  - `DotPilot.Tests`
+  - `DotPilot.UITests`
+- Shared solution artifacts:
   - `.editorconfig`
   - `Directory.Build.props`
   - `Directory.Packages.props`
@@ -97,18 +98,18 @@ List only the skills this solution actually uses.
 - `mcaf-dotnet-features` — decide which modern C# and .NET 10 features are safe for the active project.
 - `mcaf-solution-governance` — create or refine the root and project-local `AGENTS.md` files.
 - `mcaf-testing` — plan test scope, layering, and regression coverage.
-- `mcaf-dotnet-tunit` — use for TUnit-based test mechanics in this solution.
 - `mcaf-dotnet-quality-ci` — align `.editorconfig`, analyzers, formatting, and CI-quality gates.
 - `mcaf-dotnet-complexity` — review or tighten complexity limits and complexity tooling.
 - `mcaf-solid-maintainability` — enforce SOLID, SRP, maintainability limits, and exception handling.
 - `mcaf-architecture-overview` — create or maintain `docs/Architecture.md`.
 - `mcaf-ci-cd` — design or review CI and deployment gates.
 - `mcaf-ui-ux` — handle UI architecture, accessibility, and design-handoff rules for the agent-facing UI.
+- `figma-implement-design` — translate Figma handoff into `Uno Platform` desktop XAML without drifting into web-specific implementation patterns.
 
 Skill-management rules for this `.NET` solution:
 
 - `mcaf-dotnet` is the entry skill and routes to specialized `.NET` skills.
-- Keep exactly one framework skill: `mcaf-dotnet-tunit`.
+- Route test planning through `mcaf-testing`; the current repo uses `NUnit` on the `VSTest` runner, so do not apply `TUnit` or `Microsoft.Testing.Platform` assumptions.
 - Add tool-specific `.NET` skills only when the repository actually uses those tools in CI or local verification.
 - Keep only `mcaf-*` skills in agent skill directories.
 - When upgrading skills, recheck `build`, `test`, `format`, `analyze`, and `coverage` commands against the repo toolchain.
@@ -118,21 +119,22 @@ Skill-management rules for this `.NET` solution:
 ### Commands
 
 - `build`: `dotnet build DotPilot.slnx`
-- `test`: `dotnet test --solution DotPilot.slnx`
+- `test`: `dotnet test DotPilot.slnx`
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
-- `coverage`: `dotnet test --solution DotPilot.slnx --coverage`
+- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"`
 
-For this bootstrap:
+For this app:
 
-- tests use `Microsoft.Testing.Platform` through `TUnit`
+- unit tests currently use `NUnit` through the default `VSTest` runner
+- UI smoke tests live in `DotPilot.UITests` and currently require local browser-driver setup before they can run
 - `format` uses `dotnet format --verify-no-changes`
-- coverage uses the Microsoft.Testing.Platform `--coverage` option
+- coverage uses the `coverlet.collector` integration on `DotPilot.Tests`
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
-- `global.json` opts the solution into the Microsoft.Testing.Platform `dotnet test` experience on `.NET 10`
+- `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 
 ### Project AGENTS Policy
 
@@ -299,11 +301,14 @@ Ask first:
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
 - Keep the solution file name cased as `DotPilot.slnx`.
+- Treat `DotPilot` UI implementation as `Uno Platform` desktop XAML work, especially for Figma handoff, instead of translating designs into web stacks.
 - Use central package management for shared test and tooling packages.
-- Use `TUnit` as the only test framework in this repository.
+- Keep one `.NET` test framework active in the solution at a time unless a documented migration is in progress.
+- Validate UI changes through runnable `DotPilot.UITests` when the browser-driver path is available, instead of relying only on manual browser inspection.
 
 ### Dislikes
 
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
 - Moving root governance out of the repository root.
-- Introducing additional test frameworks when `TUnit` is the repo standard.
+- Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
+- Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.

@@ -1,0 +1,55 @@
+<Project Sdk="Uno.Sdk">
+    <PropertyGroup>
+        <TargetFrameworks>net10.0-desktop;net10.0;net10.0-browserwasm</TargetFrameworks>
+
+        <OutputType>Exe</OutputType>
+        <UnoSingleProject>true</UnoSingleProject>
+
+        <!-- Display name -->
+        <ApplicationTitle>DotPilot</ApplicationTitle>
+        <!-- App Identifier -->
+        <ApplicationId>com.companyname.DotPilot</ApplicationId>
+        <!-- Versions -->
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
+        <!-- Package Publisher -->
+        <ApplicationPublisher>O=DotPilot</ApplicationPublisher>
+        <!-- Package Description -->
+        <Description>DotPilot powered by Uno Platform.</Description>
+
+        <!--
+          UnoFeatures are used to quickly add and manage features enabled for your app.
+          https://aka.platform.uno/singleproject-features
+        -->
+        <UnoFeatures>
+            Material;
+            Dsp;
+            Hosting;
+            Toolkit;
+            Logging;
+            Mvvm;
+            Configuration;
+            Http;
+            Serialization;
+            Localization;
+            Navigation;
+            ThemeService;
+        </UnoFeatures>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-desktop'">
+        <UnoFeatures>$(UnoFeatures);SkiaRenderer;</UnoFeatures>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-browserwasm'">
+        <UnoSkipWasmToolsWorkloadValidation>true</UnoSkipWasmToolsWorkloadValidation>
+        <UnoDisableHotDesign>true</UnoDisableHotDesign>
+        <MonoRuntimeDebuggerEnabled>false</MonoRuntimeDebuggerEnabled>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(IsUiAutomationMappingEnabled)'=='True'">
+        <IsUiAutomationMappingEnabled>True</IsUiAutomationMappingEnabled>
+        <DefineConstants>$(DefineConstants);USE_UITESTS</DefineConstants>
+    </PropertyGroup>
+
+</Project>

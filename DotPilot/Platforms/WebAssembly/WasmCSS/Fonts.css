@@ -1,0 +1,40 @@
+/**
+  When adding fonts here, prefer embedded or local fallbacks to avoid delayed text rendering.
+*/
+
+@font-face {
+  font-family: "Segoe UI";
+  src: local("Segoe UI"), local("-apple-system"), local("BlinkMacSystemFont"), local("Inter"), local("Cantarell"), local("Ubuntu"), local("Roboto"), local("Open Sans"), local("Noto Sans"), local("Helvetica Neue"), local("sans-serif");
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: local("Poppins"), local("Segoe UI"), local("-apple-system"), local("BlinkMacSystemFont"), local("Inter"), local("sans-serif");
+}
+
+@font-face {
+  font-family: "Kodchasan";
+  src: local("Kodchasan"), local("Segoe UI"), local("-apple-system"), local("BlinkMacSystemFont"), local("Inter"), local("sans-serif");
+}
+
+:root {
+  --dotpilot-desktop-width-min: 1360px;
+  --dotpilot-desktop-height-min: 900px;
+  --dotpilot-host-background: #FFE9EEEA;
+}
+
+html,
+body {
+  overflow: auto;
+}
+
+body {
+  background: var(--dotpilot-host-background);
+}
+
+#uno-body {
+  width: max(100vw, var(--dotpilot-desktop-width-min));
+  min-width: var(--dotpilot-desktop-width-min);
+  height: max(100vh, var(--dotpilot-desktop-height-min));
+  min-height: var(--dotpilot-desktop-height-min);
+}

@@ -1,0 +1,154 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <FontFamily x:Key="AppBodyFontFamily">Poppins</FontFamily>
+  <FontFamily x:Key="AppAccentFontFamily">Kodchasan</FontFamily>
+
+  <Color x:Key="AppShellBackgroundColor">#FFE9EEEA</Color>
+  <Color x:Key="AppGlassPanelColor">#66FFFFFF</Color>
+  <Color x:Key="AppGlassBorderColor">#A6FFFFFF</Color>
+  <Color x:Key="AppPrimaryTextColor">#FF1C1C1C</Color>
+  <Color x:Key="AppMutedTextColor">#61999999</Color>
+  <Color x:Key="AppSecondaryTextColor">#61555555</Color>
+  <Color x:Key="AppOutlineColor">#14000000</Color>
+  <Color x:Key="AppSoftSurfaceColor">#99FFFFFF</Color>
+  <Color x:Key="AppInputSurfaceColor">#CCFFFFFF</Color>
+  <Color x:Key="AppSelectionColor">#FFE2E6E3</Color>
+  <Color x:Key="AppBadgeSurfaceColor">#FFDDE0DE</Color>
+  <Color x:Key="AppDarkSurfaceColor">#FF2C2C2C</Color>
+  <Color x:Key="AppAccentColor">#FFECFF8C</Color>
+  <Color x:Key="AppSuccessColor">#FF4CAF50</Color>
+  <Color x:Key="AppShadowColor">#0F000000</Color>
+
+  <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="{StaticResource AppShellBackgroundColor}" />
+  <SolidColorBrush x:Key="AppGlassPanelBrush" Color="{StaticResource AppGlassPanelColor}" />
+  <SolidColorBrush x:Key="AppGlassBorderBrush" Color="{StaticResource AppGlassBorderColor}" />
+  <SolidColorBrush x:Key="AppPrimaryTextBrush" Color="{StaticResource AppPrimaryTextColor}" />
+  <SolidColorBrush x:Key="AppMutedTextBrush" Color="{StaticResource AppMutedTextColor}" />
+  <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="{StaticResource AppSecondaryTextColor}" />
+  <SolidColorBrush x:Key="AppOutlineBrush" Color="{StaticResource AppOutlineColor}" />
+  <SolidColorBrush x:Key="AppSoftSurfaceBrush" Color="{StaticResource AppSoftSurfaceColor}" />
+  <SolidColorBrush x:Key="AppInputSurfaceBrush" Color="{StaticResource AppInputSurfaceColor}" />
+  <SolidColorBrush x:Key="AppSelectionBrush" Color="{StaticResource AppSelectionColor}" />
+  <SolidColorBrush x:Key="AppBadgeSurfaceBrush" Color="{StaticResource AppBadgeSurfaceColor}" />
+  <SolidColorBrush x:Key="AppDarkSurfaceBrush" Color="{StaticResource AppDarkSurfaceColor}" />
+  <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppAccentColor}" />
+  <SolidColorBrush x:Key="AppSuccessBrush" Color="{StaticResource AppSuccessColor}" />
+
+  <LinearGradientBrush x:Key="UserAvatarBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FF667EEA" Offset="0" />
+    <GradientStop Color="#FF764BA2" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="DesignAvatarBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFFFA283" Offset="0" />
+    <GradientStop Color="#FF76E7D1" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="CodeAvatarBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFFFF583" Offset="0" />
+    <GradientStop Color="#FF769EE7" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="AnalyticsAvatarBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFF69DFE" Offset="0" />
+    <GradientStop Color="#FFF0C8A4" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="AvatarVariantDanishBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFFFAC88" Offset="0" />
+    <GradientStop Color="#FF8EADFD" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="AvatarVariantEmilyBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFFF94B5" Offset="0" />
+    <GradientStop Color="#FFFEE973" Offset="1" />
+  </LinearGradientBrush>
+
+  <LinearGradientBrush x:Key="AvatarVariantFrankBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FFA18CD1" Offset="0" />
+    <GradientStop Color="#FFFBC2EB" Offset="1" />
+  </LinearGradientBrush>
+
+  <Style x:Key="GlassPanelStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppGlassPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppGlassBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Padding" Value="20" />
+    <Setter Property="Translation" Value="0,0,16" />
+    <Setter Property="Shadow">
+      <Setter.Value>
+        <ThemeShadow />
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="SectionCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
+    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="Padding" Value="20" />
+    <Setter Property="Margin" Value="0,0,0,16" />
+  </Style>
+
+  <Style x:Key="SidebarButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="FontFamily" Value="{StaticResource AppBodyFontFamily}" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+
+  <Style x:Key="SidebarButtonSelectedStyle" TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource AppAccentBrush}" />
+  </Style>
+
+  <Style x:Key="SearchSurfaceStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+
+  <Style x:Key="InputSurfaceStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppInputSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+
+  <Style x:Key="LargeInputSurfaceStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppInputSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+
+  <Style x:Key="PrimaryCapsuleStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppDarkSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="Padding" Value="20,10" />
+  </Style>
+
+  <Style x:Key="SecondaryCapsuleStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="Padding" Value="20,10" />
+  </Style>
+
+  <Style x:Key="SectionDividerStyle" TargetType="Rectangle">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Fill" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="Opacity" Value="0.7" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+</ResourceDictionary>

@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "DotPilot powered by Uno Platform.",
+  "display": "standalone",
+  "name": "DotPilot",
+  "short_name": "DotPilot",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}
