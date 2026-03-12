@@ -4,6 +4,6 @@ public sealed partial class ChatComposer : UserControl
 {
     public ChatComposer()
     {
-        this.InitializeComponent();
+        InitializeComponent();
     }
 }

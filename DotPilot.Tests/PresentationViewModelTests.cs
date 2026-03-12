@@ -5,7 +5,7 @@ namespace DotPilot.Tests;
 public class PresentationViewModelTests
 {
     [Test]
-    public void MainViewModel_ExposesChatScreenState()
+    public void MainViewModelExposesChatScreenState()
     {
         var viewModel = new MainViewModel();
 
@@ -20,7 +20,7 @@ public class PresentationViewModelTests
     }
 
     [Test]
-    public void SecondViewModel_ExposesAgentBuilderState()
+    public void SecondViewModelExposesAgentBuilderState()
     {
         var viewModel = new SecondViewModel();
 

@@ -1,6 +1,6 @@
 namespace DotPilot.UITests;
 
-public class Given_MainPage : TestBase
+public class GivenMainPage : TestBase
 {
     private static readonly TimeSpan InitialScreenProbeTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ScreenTransitionTimeout = TimeSpan.FromSeconds(20);
@@ -22,7 +22,7 @@ public class Given_MainPage : TestBase
         "The browser smoke host dropped below the desktop layout width threshold.";
 
     [Test]
-    public async Task When_OpeningTheApp_ThenChatShellSectionsAreVisible()
+    public async Task WhenOpeningTheAppThenChatShellSectionsAreVisible()
     {
         await Task.CompletedTask;
 
@@ -34,7 +34,7 @@ public class Given_MainPage : TestBase
     }
 
     [Test]
-    public async Task When_NavigatingToAgentBuilder_ThenKeySectionsAreVisible()
+    public async Task WhenNavigatingToAgentBuilderThenKeySectionsAreVisible()
     {
         await Task.CompletedTask;
 
@@ -49,7 +49,7 @@ public class Given_MainPage : TestBase
     }
 
     [Test]
-    public async Task When_ReturningToChatFromAgentBuilder_ThenChatShellSectionsAreVisible()
+    public async Task WhenReturningToChatFromAgentBuilderThenChatShellSectionsAreVisible()
     {
         await Task.CompletedTask;
 
@@ -63,7 +63,7 @@ public class Given_MainPage : TestBase
     }
 
     [Test]
-    public async Task When_OpeningAgentBuilder_ThenDesktopSectionWidthIsPreserved()
+    public async Task WhenOpeningAgentBuilderThenDesktopSectionWidthIsPreserved()
     {
         await Task.CompletedTask;
 

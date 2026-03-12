@@ -127,7 +127,7 @@ Skill-management rules for this `.NET` solution:
 For this app:
 
 - unit tests currently use `NUnit` through the default `VSTest` runner
-- UI smoke tests live in `DotPilot.UITests` and currently require local browser-driver setup before they can run
+- UI smoke tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - `format` uses `dotnet format --verify-no-changes`
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests`
 - `LangVersion` is pinned to `latest` at the root
@@ -250,6 +250,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Repository or module coverage must not decrease without an explicit written exception. Coverage after the change must stay at least at the previous baseline or improve.
 - Coverage is for finding gaps, not gaming a number. Coverage numbers do not replace scenario coverage or user-flow verification.
 - The task is not done until the full relevant test suite is green, not only the newly added tests.
+- UI smoke tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
 - For `.NET`, keep the active framework and runner model explicit so agents do not mix `TUnit`, `Microsoft.Testing.Platform`, and legacy `VSTest` assumptions.
 - After changing production code, run the repo-defined quality pass: format, build, analyze, focused tests, broader tests, coverage, and any configured extra gates.
 
@@ -304,7 +305,7 @@ Ask first:
 - Treat `DotPilot` UI implementation as `Uno Platform` desktop XAML work, especially for Figma handoff, instead of translating designs into web stacks.
 - Use central package management for shared test and tooling packages.
 - Keep one `.NET` test framework active in the solution at a time unless a documented migration is in progress.
-- Validate UI changes through runnable `DotPilot.UITests` when the browser-driver path is available, instead of relying only on manual browser inspection.
+- Validate UI changes through runnable `DotPilot.UITests` on every relevant verification pass, instead of relying only on manual browser inspection or conditional local setup.
 
 ### Dislikes
 

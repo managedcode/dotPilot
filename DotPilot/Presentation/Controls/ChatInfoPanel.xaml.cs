@@ -4,6 +4,6 @@ public sealed partial class ChatInfoPanel : UserControl
 {
     public ChatInfoPanel()
     {
-        this.InitializeComponent();
+        InitializeComponent();
     }
 }

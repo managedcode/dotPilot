@@ -4,7 +4,7 @@ public sealed partial class ChatConversationView : UserControl
 {
     public ChatConversationView()
     {
-        this.InitializeComponent();
+        InitializeComponent();
     }
 }
 
@@ -25,6 +25,6 @@ public sealed class ChatMessageTemplateSelector : DataTemplateSelector
 
     protected override DataTemplate SelectTemplateCore(object item, DependencyObject container)
     {
-        return this.SelectTemplateCore(item);
+        return SelectTemplateCore(item);
     }
 }

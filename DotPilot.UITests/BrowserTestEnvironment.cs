@@ -8,6 +8,7 @@ internal static class BrowserTestEnvironment
     private const string BrowserBaseUriEnvironmentVariableName = "DOTPILOT_UITEST_BASE_URI";
     private const string DefaultScheme = "http";
     private const string DefaultHost = "127.0.0.1";
+    private const char TrailingSlash = '/';
 
     public static string WebAssemblyUri { get; } = ResolveWebAssemblyUri();
 
@@ -47,8 +48,10 @@ internal static class BrowserTestEnvironment
 
     private static string NormalizeUri(Uri uri)
     {
-        return uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
-            ? uri.AbsoluteUri
-            : $"{uri.AbsoluteUri}/";
+        var absoluteUri = uri.AbsoluteUri;
+
+        return absoluteUri.EndsWith(TrailingSlash)
+            ? absoluteUri
+            : string.Concat(absoluteUri, TrailingSlash);
     }
 }

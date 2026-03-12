@@ -4,6 +4,6 @@ public sealed partial class AgentSkillsSection : UserControl
 {
     public AgentSkillsSection()
     {
-        this.InitializeComponent();
+        InitializeComponent();
     }
 }

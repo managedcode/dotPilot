@@ -7,24 +7,22 @@ namespace DotPilot.UITests;
     Justification = "UI smoke tests need one-time browser host and driver bootstrap before test execution.")]
 public class TestBase
 {
-    private const string BrowserDriverEnvironmentVariableName = "UNO_UITEST_DRIVER_PATH";
-    private const string BrowserDriverFileName = "chromedriver";
     private const string ShowBrowserEnvironmentVariableName = "DOTPILOT_UITEST_SHOW_BROWSER";
-    private const string MissingBrowserDriverMessage =
-        "Browser UI smoke requires UNO_UITEST_DRIVER_PATH to point to a ChromeDriver binary.";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
     private static readonly object BrowserAppSyncRoot = new();
 
     private static IApp? _browserApp;
+    private static readonly BrowserAutomationSettings? _browserAutomation =
+        Constants.CurrentPlatform == Platform.Browser
+            ? BrowserAutomationBootstrap.Resolve()
+            : null;
     private static readonly bool _browserHeadless = ResolveBrowserHeadless();
     private IApp? _app;
 
     static TestBase()
     {
-        var browserDriverPath = NormalizeBrowserDriverPath();
-        if (Constants.CurrentPlatform == Platform.Browser &&
-            !string.IsNullOrWhiteSpace(browserDriverPath))
+        if (Constants.CurrentPlatform == Platform.Browser)
         {
             BrowserTestHost.EnsureStarted(Constants.WebAssemblyDefaultUri);
         }
@@ -58,15 +56,8 @@ public class TestBase
     [SetUp]
     public void SetUpTest()
     {
-        var browserDriverPath = NormalizeBrowserDriverPath();
-        if (Constants.CurrentPlatform == Platform.Browser &&
-            string.IsNullOrWhiteSpace(browserDriverPath))
-        {
-            Assert.Ignore(MissingBrowserDriverMessage);
-        }
-
         App = Constants.CurrentPlatform == Platform.Browser
-            ? EnsureBrowserApp(browserDriverPath!)
+            ? EnsureBrowserApp(_browserAutomation!)
             : AppInitializer.AttachToApp();
     }
 
@@ -131,33 +122,6 @@ public class TestBase
         return fileInfo;
     }
 
-    private static string? NormalizeBrowserDriverPath()
-    {
-        var configuredPath = Environment.GetEnvironmentVariable(BrowserDriverEnvironmentVariableName);
-        if (string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return null;
-        }
-
-        if (File.Exists(configuredPath))
-        {
-            var directory = Path.GetDirectoryName(configuredPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Environment.SetEnvironmentVariable(BrowserDriverEnvironmentVariableName, directory);
-                return directory;
-            }
-        }
-
-        if (Directory.Exists(configuredPath) &&
-            File.Exists(Path.Combine(configuredPath, BrowserDriverFileName)))
-        {
-            return configuredPath;
-        }
-
-        return null;
-    }
-
     private static bool ResolveBrowserHeadless()
     {
 #if DEBUG
@@ -170,7 +134,7 @@ public class TestBase
 #endif
     }
 
-    private static IApp EnsureBrowserApp(string browserDriverPath)
+    private static IApp EnsureBrowserApp(BrowserAutomationSettings browserAutomation)
     {
         lock (BrowserAppSyncRoot)
         {
@@ -182,10 +146,15 @@ public class TestBase
             var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
                 .Uri(new Uri(Constants.WebAssemblyDefaultUri))
                 .UsingBrowser(Constants.WebAssemblyBrowser.ToString())
-                .DriverPath(browserDriverPath)
+                .BrowserBinaryPath(browserAutomation.BrowserBinaryPath)
                 .ScreenShotsPath(AppContext.BaseDirectory)
-                .SeleniumArgument($"--window-size={BrowserWindowWidth},{BrowserWindowHeight}")
+                .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
                 .Headless(_browserHeadless);
+
+            if (!string.IsNullOrWhiteSpace(browserAutomation.DriverPath))
+            {
+                configurator = configurator.DriverPath(browserAutomation.DriverPath);
+            }
 
             if (!_browserHeadless)
             {

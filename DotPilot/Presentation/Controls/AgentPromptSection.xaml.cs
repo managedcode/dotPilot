@@ -4,6 +4,6 @@ public sealed partial class AgentPromptSection : UserControl
 {
     public AgentPromptSection()
     {
-        this.InitializeComponent();
+        InitializeComponent();
     }
 }

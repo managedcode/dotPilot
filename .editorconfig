@@ -16,7 +16,10 @@ insert_final_newline = true
 
 [*.cs]
 indent_size = 4
+tab_width = 4
+end_of_line = unset
 dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:silent
 
 # Don't use this. qualifier
 dotnet_style_qualification_for_field = false:warning
@@ -79,6 +82,7 @@ csharp_space_between_square_brackets = false
 # Wrapping settings
 csharp_preserve_single_line_statements = false
 csharp_preserve_single_line_blocks = true
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
 
 # Namespace settings - C# 10+ file-scoped namespaces
 csharp_style_namespace_declarations = file_scoped:warning
@@ -122,9 +126,20 @@ csharp_style_prefer_utf8_string_literals = true:suggestion
 csharp_style_prefer_readonly_struct = true:warning
 csharp_style_prefer_readonly_struct_member = true:warning
 
-[**/Tests/**/*.cs]
+[**/*Tests*/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1861.severity = none
+
+[DotPilot.Tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+[DotPilot.UITests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+[*.xaml.cs]
+dotnet_diagnostic.CA1010.severity = none
 
 # Use collection expressions (C# 12+)
 dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion
@@ -205,8 +220,31 @@ indent_size = 2
 [*.{props,targets,ruleset,config,nuspec,resx,vsixmanifest,vsct}]
 indent_size = 2
 
-[*.json]
+[.vsconfig]
 indent_size = 2
+end_of_line = lf
+
+[*.{csproj,projitems,shproj}]
+indent_size = 4
+
+[*.xaml]
+indent_size = 2
+
+[*.{manifest,appxmanifest}]
+indent_size = 2
+end_of_line = lf
+
+[web.config]
+indent_size = 2
+end_of_line = lf
+
+[*.{json,css,webmanifest,slnf}]
+indent_size = 2
+end_of_line = lf
+
+[*.{yml,yaml}]
+indent_size = 2
+end_of_line = lf
 
 [*.{ps1,psm1}]
 indent_size = 4
