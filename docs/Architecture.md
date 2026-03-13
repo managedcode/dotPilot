@@ -10,7 +10,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Current product shell:** [../DotPilot/](../DotPilot/) already contains the visual workbench concepts that future work must preserve: a left navigation shell, a central session surface, a right-side inspector, and a separate agent-builder surface.
 - **Target runtime direction:** the planned product architecture uses an embedded `Orleans` silo, `Microsoft Agent Framework` orchestration, provider adapters for external agent runtimes, local runtime adapters, `MCPGateway` for tool federation, `RagSharp` for repo intelligence, and OpenTelemetry-first observability.
 - **Planning artifacts:** the control-plane direction is captured in [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md), the CI/release workflow split is captured in [ADR-0002](./ADR/ADR-0002-split-github-actions-build-and-release.md), and the operator experience is captured in [agent-control-plane-experience.md](./Features/agent-control-plane-experience.md).
-- **Automated verification today:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` UI coverage, GitHub Actions `Build Validation` gates normal changes, and `Desktop Release` owns version bumping, desktop publishing, and GitHub Release publication.
+- **Automated verification today:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` UI coverage, GitHub Actions `Build Validation` gates normal changes, and `Desktop Release` runs automatically on pushes to `main` to publish desktop artifacts and create the GitHub Release.
 
 ## Scoping
 
@@ -161,7 +161,8 @@ flowchart TD
 - The preferred runtime direction is an embedded `Orleans` host with `Microsoft Agent Framework`.
 - Provider integrations are SDK-first where viable.
 - Evaluation should use `Microsoft.Extensions.AI.Evaluation*`, and observability should be OpenTelemetry-first.
-- GitHub Actions now separates validation from release so normal CI stays fast and side-effect free while release automation owns versioning, desktop publishing, and GitHub Release publication.
+- GitHub Actions now separates validation from release so normal CI stays fast and side-effect free while release automation owns desktop publishing and GitHub Release publication on `main`.
+- Desktop release versions are derived from the two-segment `ApplicationDisplayVersion` prefix in `DotPilot.csproj` plus the CI build number as the final segment.
 
 ## Known Repository Risks
 

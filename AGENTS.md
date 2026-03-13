@@ -21,6 +21,7 @@ This file defines how AI agents work in this solution.
 - Solution root: `.` (`DotPilot.slnx`)
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
+  - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
 - Shared solution artifacts:
@@ -141,7 +142,11 @@ For this app:
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
-- GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for version bumping, release-note generation, desktop publishing, and GitHub Release publication
+- GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
+- the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
+- desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
+- the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
+- for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks
 - prefer MIT-licensed GitHub and NuGet dependencies when they materially accelerate delivery and align with the current architecture
 - prefer official `.NET` AI evaluation libraries under `Microsoft.Extensions.AI.Evaluation*` for response-quality, tool-usage, and safety evaluation instead of custom or third-party evaluation stacks by default
 - prefer `Microsoft Agent Framework` telemetry and observability patterns with OpenTelemetry-first instrumentation and optional Azure Monitor or Foundry export later
@@ -313,6 +318,7 @@ Ask first:
 ### Likes
 
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
+- Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
 - Keep the solution file name cased as `DotPilot.slnx`.
