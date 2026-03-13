@@ -1,22 +1,10 @@
 name: Desktop Release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: Version bump type for DotPilot desktop releases
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      prerelease:
-        description: Publish the GitHub Release as a prerelease
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -33,11 +21,11 @@ jobs:
       - name: Enforce Supported Release Branches
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_NAME}" == "main" || "${GITHUB_REF_NAME}" == release/* ]]; then
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
             exit 0
           fi
 
-          echo "Desktop releases may only run from main or release/* branches." >&2
+          echo "Desktop releases may only run from main." >&2
           exit 1
 
   prepare_release:
@@ -46,20 +34,17 @@ jobs:
     needs:
       - validate_release_ref
     outputs:
-      application_version: ${{ steps.bump_version.outputs.application_version }}
+      application_version: ${{ steps.resolve_version.outputs.application_version }}
       previous_tag: ${{ steps.previous_tag.outputs.value }}
-      release_tag: ${{ steps.bump_version.outputs.release_tag }}
-      release_version: ${{ steps.bump_version.outputs.display_version }}
+      release_tag: ${{ steps.resolve_version.outputs.release_tag }}
+      release_version: ${{ steps.resolve_version.outputs.display_version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure Git Identity
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Install Dependencies
+        uses: "./.github/steps/install_dependencies"
 
       - name: Fetch Tags
         shell: bash
@@ -72,30 +57,22 @@ jobs:
           previous_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
           echo "value=${previous_tag}" >> "$GITHUB_OUTPUT"
 
-      - name: Bump App Version
-        id: bump_version
+      - name: Resolve Release Version
+        id: resolve_version
         shell: bash
         run: |
-          python3 ./scripts/release/update_app_version.py \
-            --project-file ./DotPilot/DotPilot.csproj \
-            --bump-type '${{ inputs.version_bump }}' \
-            --github-output "$GITHUB_OUTPUT"
+          version_prefix="$(dotnet msbuild ./DotPilot/DotPilot.csproj -getProperty:ApplicationDisplayVersion | tail -n 1 | tr -d '\r')"
+          if [[ ! "${version_prefix}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "ApplicationDisplayVersion must be a two-segment numeric prefix. Found: '${version_prefix}'." >&2
+            exit 1
+          fi
 
-      - name: Commit Version Bump
-        shell: bash
-        run: |
-          git add DotPilot/DotPilot.csproj
-          git commit -m "chore(release): v${{ steps.bump_version.outputs.display_version }}"
-
-      - name: Create Release Tag
-        shell: bash
-        run: git tag "${{ steps.bump_version.outputs.release_tag }}"
-
-      - name: Push Release Commit And Tag
-        shell: bash
-        run: |
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-          git push origin "${{ steps.bump_version.outputs.release_tag }}"
+          display_version="${version_prefix}.${{ github.run_number }}"
+          {
+            echo "display_version=${display_version}"
+            echo "application_version=${{ github.run_number }}"
+            echo "release_tag=v${display_version}"
+          } >> "$GITHUB_OUTPUT"
 
   publish_desktop:
     name: Publish Desktop (${{ matrix.name }})
@@ -125,7 +102,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ needs.prepare_release.outputs.release_tag }}
+          ref: ${{ github.sha }}
 
       - name: Install Dependencies
         timeout-minutes: 60
@@ -133,7 +110,11 @@ jobs:
 
       - name: Publish Desktop App
         shell: pwsh
-        run: dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -o ./${{ matrix.output_path }}
+        run: >
+          dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop
+          -o ./${{ matrix.output_path }}
+          -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }}
+          -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
 
       - name: Archive Desktop Publish Output
         shell: pwsh
@@ -164,7 +145,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ needs.prepare_release.outputs.release_tag }}
+          ref: ${{ github.sha }}
 
       - name: Fetch Tags
         shell: bash
@@ -177,12 +158,63 @@ jobs:
 
       - name: Generate Feature Summary
         shell: bash
+        env:
+          PREVIOUS_TAG: ${{ needs.prepare_release.outputs.previous_tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          python3 ./scripts/release/get_release_summary.py \
-            --repository '${{ github.repository }}' \
-            --release-tag '${{ needs.prepare_release.outputs.release_tag }}' \
-            --previous-tag '${{ needs.prepare_release.outputs.previous_tag }}' \
-            --output-path ./artifacts/release-summary.md
+          mkdir -p ./artifacts
+
+          commit_range="HEAD"
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            commit_range="${PREVIOUS_TAG}..HEAD"
+          fi
+
+          git log --no-merges --pretty=format:%s "${commit_range}" |
+            awk 'NF && tolower($0) !~ /^chore\(release\):/ && !seen[$0]++' > ./artifacts/release-commits.txt
+          if [[ ! -s ./artifacts/release-commits.txt ]]; then
+            printf '%s\n' "Maintenance and release preparation changes." > ./artifacts/release-commits.txt
+          fi
+
+          : > ./artifacts/release-feature-docs.txt
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            git diff --name-only "${PREVIOUS_TAG}..HEAD" -- 'docs/Features/*.md' |
+              awk '/^docs\/Features\// && !seen[$0]++' > ./artifacts/release-feature-docs.txt
+          elif [[ -d ./docs/Features ]]; then
+            find ./docs/Features -maxdepth 1 -type f -name '*.md' | sed 's#^\./##' | sort > ./artifacts/release-feature-docs.txt
+          fi
+
+          {
+            echo "## Feature Summary"
+            while IFS= read -r subject; do
+              if [[ -n "${subject}" ]]; then
+                echo "- ${subject}"
+              fi
+            done < ./artifacts/release-commits.txt
+          } > ./artifacts/release-summary.md
+
+          if [[ -s ./artifacts/release-feature-docs.txt ]]; then
+            {
+              echo
+              echo "## Feature Specs"
+              while IFS= read -r feature_doc; do
+                if [[ -z "${feature_doc}" ]]; then
+                  continue
+                fi
+
+                title="$(sed -n 's/^# //p' "${feature_doc}" | head -n 1)"
+                if [[ -z "${title}" ]]; then
+                  title="$(basename "${feature_doc}" .md)"
+                fi
+
+                printf -- '- [%s](https://github.com/%s/blob/%s/%s)\n' \
+                  "${title}" \
+                  "${REPOSITORY}" \
+                  "${RELEASE_TAG}" \
+                  "${feature_doc}"
+              done < ./artifacts/release-feature-docs.txt
+            } >> ./artifacts/release-summary.md
+          fi
 
       - name: Publish GitHub Release
         shell: bash
@@ -190,9 +222,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PREVIOUS_TAG: ${{ needs.prepare_release.outputs.previous_tag }}
           RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          RELEASE_TARGET_SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ needs.prepare_release.outputs.release_version }}
           REPOSITORY: ${{ github.repository }}
-          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           mapfile -t release_assets < <(find ./artifacts/release-assets -type f -name '*.zip' | sort)
           if [[ ${#release_assets[@]} -eq 0 ]]; then
@@ -205,7 +237,7 @@ jobs:
             gh release create "${RELEASE_TAG}"
             "${release_assets[@]}"
             --repo "${REPOSITORY}"
-            --verify-tag
+            --target "${RELEASE_TARGET_SHA}"
             --title "DotPilot ${RELEASE_VERSION}"
             --generate-notes
             --notes "${release_notes}"
@@ -213,10 +245,6 @@ jobs:
 
           if [[ -n "${PREVIOUS_TAG}" ]]; then
             release_command+=(--notes-start-tag "${PREVIOUS_TAG}")
-          fi
-
-          if [[ "${PRERELEASE}" == "true" ]]; then
-            release_command+=(--prerelease)
           fi
 
           "${release_command[@]}"
