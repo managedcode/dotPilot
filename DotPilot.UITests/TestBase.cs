@@ -29,7 +29,12 @@ public class TestBase
     {
         if (Constants.CurrentPlatform == Platform.Browser)
         {
+            HarnessLog.Write($"Browser test target URI is '{Constants.WebAssemblyDefaultUri}'.");
+            HarnessLog.Write($"Browser binary path is '{_browserAutomation!.BrowserBinaryPath}'.");
+            HarnessLog.Write($"Browser driver directory is '{_browserAutomation.DriverPath}'.");
+            HarnessLog.Write("Ensuring browser test host is started.");
             BrowserTestHost.EnsureStarted(Constants.WebAssemblyDefaultUri);
+            HarnessLog.Write("Browser test host is reachable.");
         }
 
         AppInitializer.TestEnvironment.AndroidAppName = Constants.AndroidAppName;
@@ -61,23 +66,29 @@ public class TestBase
     [SetUp]
     public void SetUpTest()
     {
+        HarnessLog.Write($"Starting setup for '{TestContext.CurrentContext.Test.Name}'.");
         App = Constants.CurrentPlatform == Platform.Browser
             ? EnsureBrowserApp(_browserAutomation!)
             : AppInitializer.AttachToApp();
+        HarnessLog.Write($"Setup completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
 
     [TearDown]
     public void TearDownTest()
     {
+        HarnessLog.Write($"Starting teardown for '{TestContext.CurrentContext.Test.Name}'.");
         if (_app is not null)
         {
             TakeScreenshot("teardown");
         }
+
+        HarnessLog.Write($"Teardown completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
 
     [OneTimeTearDown]
     public void TearDownFixture()
     {
+        HarnessLog.Write("Starting fixture cleanup.");
         List<Exception> cleanupFailures = [];
 
         if (_app is not null && !ReferenceEquals(_app, _browserApp))
@@ -115,13 +126,17 @@ public class TestBase
 
         if (cleanupFailures.Count == 1)
         {
+            HarnessLog.Write("Fixture cleanup failed with a single cleanup exception.");
             throw cleanupFailures[0];
         }
 
         if (cleanupFailures.Count > 1)
         {
+            HarnessLog.Write("Fixture cleanup failed with multiple cleanup exceptions.");
             throw new AggregateException(cleanupFailures);
         }
+
+        HarnessLog.Write("Fixture cleanup completed.");
     }
 
     public FileInfo TakeScreenshot(string stepName)
@@ -175,9 +190,11 @@ public class TestBase
         {
             if (_browserApp is not null)
             {
+                HarnessLog.Write("Reusing browser app instance.");
                 return _browserApp;
             }
 
+            HarnessLog.Write("Starting browser app instance.");
             var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
                 .Uri(new Uri(Constants.WebAssemblyDefaultUri))
                 .UsingBrowser(Constants.WebAssemblyBrowser.ToString())
@@ -195,6 +212,7 @@ public class TestBase
             }
 
             _browserApp = configurator.StartApp();
+            HarnessLog.Write("Browser app instance started.");
             return _browserApp;
         }
     }
@@ -203,10 +221,13 @@ public class TestBase
     {
         try
         {
+            HarnessLog.Write($"Running cleanup for '{operationName}'.");
             BoundedCleanup.Run(cleanupAction, AppCleanupTimeout, operationName);
+            HarnessLog.Write($"Cleanup completed for '{operationName}'.");
         }
         catch (Exception exception)
         {
+            HarnessLog.Write($"Cleanup failed for '{operationName}': {exception.Message}");
             cleanupFailures.Add(exception);
         }
     }

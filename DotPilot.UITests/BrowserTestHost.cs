@@ -44,11 +44,13 @@ internal static class BrowserTestHost
         {
             if (IsReachable(hostUri))
             {
+                HarnessLog.Write("Browser host is already reachable.");
                 return;
             }
 
             if (_hostProcess is { HasExited: false })
             {
+                HarnessLog.Write("Browser host process already exists. Waiting for readiness.");
                 WaitForHost(hostUri);
                 return;
             }
@@ -56,7 +58,9 @@ internal static class BrowserTestHost
             var repoRoot = FindRepositoryRoot();
             var projectPath = Path.Combine(repoRoot, ProjectRelativePath);
 
+            HarnessLog.Write("Building browser host.");
             EnsureBuilt(repoRoot, projectPath);
+            HarnessLog.Write("Starting browser host process.");
             StartHostProcess(repoRoot, projectPath);
             WaitForHost(hostUri);
         }
@@ -78,6 +82,8 @@ internal static class BrowserTestHost
         {
             throw new InvalidOperationException($"{BuildFailureMessage} {result.Output}");
         }
+
+        HarnessLog.Write("Browser host build completed.");
     }
 
     private static void StartHostProcess(string repoRoot, string projectPath)
@@ -101,6 +107,7 @@ internal static class BrowserTestHost
         _hostProcess.BeginOutputReadLine();
         _hostProcess.BeginErrorReadLine();
         _startedHost = true;
+        HarnessLog.Write($"Browser host process started with PID {_hostProcess.Id}.");
     }
 
     private static void CaptureOutput(string? line)
@@ -118,6 +125,7 @@ internal static class BrowserTestHost
         {
             if (IsReachable(hostUri))
             {
+                HarnessLog.Write("Browser host responded to readiness probe.");
                 return;
             }
 
@@ -208,6 +216,7 @@ internal static class BrowserTestHost
         {
             if (!_startedHost || _hostProcess is null)
             {
+                HarnessLog.Write("Browser host stop requested, but no owned host process is active.");
                 return;
             }
 
@@ -218,6 +227,7 @@ internal static class BrowserTestHost
 
             try
             {
+                HarnessLog.Write($"Stopping browser host process {hostProcess.Id}.");
                 CancelOutputReaders(hostProcess);
 
                 if (!hostProcess.HasExited)
@@ -225,6 +235,8 @@ internal static class BrowserTestHost
                     hostProcess.Kill(entireProcessTree: true);
                     hostProcess.WaitForExit((int)HostShutdownTimeout.TotalMilliseconds);
                 }
+
+                HarnessLog.Write("Browser host process stopped.");
             }
             catch
             {

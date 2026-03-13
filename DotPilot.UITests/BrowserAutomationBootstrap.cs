@@ -64,6 +64,7 @@ internal static partial class BrowserAutomationBootstrap
         IReadOnlyList<string> browserBinaryCandidates,
         bool applyEnvironmentVariables = false)
     {
+        HarnessLog.Write("Resolving browser automation settings.");
         var browserBinaryPath = ResolveBrowserBinaryPath(environment, browserBinaryCandidates);
         var driverPath = ResolveBrowserDriverPath(environment, browserBinaryPath);
 
@@ -74,6 +75,8 @@ internal static partial class BrowserAutomationBootstrap
             SetEnvironmentVariableIfMissing(BrowserDriverEnvironmentVariableName, driverPath, environment);
         }
 
+        HarnessLog.Write($"Resolved browser binary path '{browserBinaryPath}'.");
+        HarnessLog.Write($"Resolved browser driver directory '{driverPath}'.");
         return new BrowserAutomationSettings(driverPath, browserBinaryPath);
     }
 
@@ -125,13 +128,18 @@ internal static partial class BrowserAutomationBootstrap
         var driverDirectory = Path.Combine(cacheRootPath, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
         var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
 
+        HarnessLog.Write($"Browser version '{browserVersion}' resolved for '{browserBinaryPath}'.");
+        HarnessLog.Write($"Matching ChromeDriver version '{driverVersion}' on platform '{driverPlatform}'.");
+
         if (File.Exists(driverExecutablePath))
         {
             EnsureDriverExecutablePermissions(driverExecutablePath);
+            HarnessLog.Write($"Reusing cached ChromeDriver at '{driverExecutablePath}'.");
             return driverDirectory;
         }
 
         Directory.CreateDirectory(cacheRootPath);
+        HarnessLog.Write($"Downloading ChromeDriver to '{cacheRootPath}'.");
         DownloadChromeDriverArchive(driverVersion, driverPlatform, cacheRootPath);
         EnsureDriverExecutablePermissions(driverExecutablePath);
 
@@ -155,9 +163,11 @@ internal static partial class BrowserAutomationBootstrap
         }
 
         var downloadUrl = BuildChromeDriverDownloadUrl(driverVersion, driverPlatform, archiveName);
+        HarnessLog.Write($"Fetching ChromeDriver archive '{downloadUrl}'.");
         var archiveBytes = GetResponseBytes(downloadUrl, DriverDownloadFailedMessage);
         File.WriteAllBytes(archivePath, archiveBytes);
         ZipFile.ExtractToDirectory(archivePath, cacheRootPath, overwriteFiles: true);
+        HarnessLog.Write($"Extracted ChromeDriver archive to '{driverDirectory}'.");
     }
 
     private static byte[] GetResponseBytes(string requestUri, string failureMessage)
@@ -287,6 +297,7 @@ internal static partial class BrowserAutomationBootstrap
                 !string.IsNullOrWhiteSpace(configuredPath) &&
                 File.Exists(configuredPath))
             {
+                HarnessLog.Write($"Using browser binary from environment variable '{environmentVariableName}'.");
                 return configuredPath;
             }
         }
@@ -295,6 +306,7 @@ internal static partial class BrowserAutomationBootstrap
         {
             if (File.Exists(candidatePath))
             {
+                HarnessLog.Write($"Using browser binary candidate '{candidatePath}'.");
                 return candidatePath;
             }
         }
