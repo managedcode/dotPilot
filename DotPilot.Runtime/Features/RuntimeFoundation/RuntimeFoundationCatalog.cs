@@ -1,3 +1,4 @@
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeFoundation;
 
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
@@ -70,16 +71,19 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         ];
     }
 
-    private IReadOnlyList<ProviderToolchainStatus> CreateProviders()
+    private IReadOnlyList<ProviderDescriptor> CreateProviders()
     {
         return
         [
-            new(
-                ProviderToolchainNames.DeterministicClientDisplayName,
-                ProviderToolchainNames.DeterministicClientCommandName,
-                ProviderConnectionStatus.Available,
-                _deterministicClient.GetType().Name,
-                false),
+            new ProviderDescriptor
+            {
+                Id = ProviderId.New(),
+                DisplayName = ProviderToolchainNames.DeterministicClientDisplayName,
+                CommandName = ProviderToolchainNames.DeterministicClientCommandName,
+                Status = ProviderConnectionStatus.Available,
+                StatusSummary = _deterministicClient.GetType().Name,
+                RequiresExternalToolchain = false,
+            },
             ProviderToolchainProbe.Probe(
                 ProviderToolchainNames.CodexDisplayName,
                 ProviderToolchainNames.CodexCommandName,
