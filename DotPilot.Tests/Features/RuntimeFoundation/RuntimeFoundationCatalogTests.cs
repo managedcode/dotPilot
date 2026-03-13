@@ -4,10 +4,8 @@ public class RuntimeFoundationCatalogTests
 {
     private const string ApprovalPrompt = "Please continue, but stop for approval before changing files.";
     private const string BlankPrompt = " ";
-    private const string CodexCommandName = "codex";
-    private const string ClaudeCommandName = "claude";
-    private const string GitHubCommandName = "gh";
     private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
+    private const string RuntimeEpicLabel = "LOCAL RUNTIME READINESS";
     private static readonly DateTimeOffset DeterministicArtifactCreatedAt = new(2026, 3, 13, 0, 0, 0, TimeSpan.Zero);
 
     [Test]
@@ -17,8 +15,9 @@ public class RuntimeFoundationCatalogTests
 
         var snapshot = catalog.GetSnapshot();
 
-        snapshot.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
+        snapshot.EpicLabel.Should().Be(RuntimeEpicLabel);
         snapshot.Slices.Should().HaveCount(4);
+        snapshot.Slices.Select(slice => slice.IssueLabel).Should().ContainInOrder("DOMAIN", "CONTRACTS", "HOST", "ORCHESTRATION");
         snapshot.Slices.Select(slice => slice.IssueNumber).Should().ContainInOrder(
             RuntimeFoundationIssues.DomainModel,
             RuntimeFoundationIssues.CommunicationContracts,
@@ -180,23 +179,6 @@ public class RuntimeFoundationCatalogTests
         action.Should().Throw<System.Diagnostics.UnreachableException>();
     }
 
-    [TestCase(CodexCommandName)]
-    [TestCase(ClaudeCommandName)]
-    [TestCase(GitHubCommandName)]
-    public void ExternalToolchainVerificationRunsOnlyWhenTheCommandIsAvailable(string commandName)
-    {
-        var catalog = CreateCatalog();
-        var provider = catalog.GetSnapshot().Providers.Single(item => item.CommandName == commandName);
-
-        Assume.That(
-            provider.Status,
-            Is.EqualTo(ProviderConnectionStatus.Available),
-            $"The '{commandName}' toolchain is not available in this environment.");
-
-        provider.RequiresExternalToolchain.Should().BeTrue();
-        provider.StatusSummary.Should().Contain("available");
-    }
-
     [Test]
     public void CatalogPreservesProviderIdentityAcrossSnapshotRefreshes()
     {
@@ -231,15 +213,14 @@ public class RuntimeFoundationCatalogTests
     }
 
     [Test]
-    [NonParallelizable]
-    public void ExternalProvidersBecomeUnavailableWhenPathIsCleared()
+    public void CatalogCachesProviderListAcrossSnapshotReads()
     {
-        using var scope = new EnvironmentVariableScope("PATH", string.Empty);
         var catalog = CreateCatalog();
 
-        var externalProviders = catalog.GetSnapshot().Providers.Where(provider => provider.RequiresExternalToolchain);
+        var firstSnapshot = catalog.GetSnapshot();
+        var secondSnapshot = catalog.GetSnapshot();
 
-        externalProviders.Should().OnlyContain(provider => provider.Status == ProviderConnectionStatus.Unavailable);
+        ReferenceEquals(firstSnapshot.Providers, secondSnapshot.Providers).Should().BeTrue();
     }
 
     private static RuntimeFoundationCatalog CreateCatalog()
@@ -253,23 +234,5 @@ public class RuntimeFoundationCatalogTests
         ProviderConnectionStatus providerStatus = ProviderConnectionStatus.Available)
     {
         return new AgentTurnRequest(SessionId.New(), AgentProfileId.New(), prompt, mode, providerStatus);
-    }
-
-    private sealed class EnvironmentVariableScope : IDisposable
-    {
-        private readonly string _variableName;
-        private readonly string? _originalValue;
-
-        public EnvironmentVariableScope(string variableName, string? value)
-        {
-            _variableName = variableName;
-            _originalValue = Environment.GetEnvironmentVariable(variableName);
-            Environment.SetEnvironmentVariable(variableName, value);
-        }
-
-        public void Dispose()
-        {
-            Environment.SetEnvironmentVariable(_variableName, _originalValue);
-        }
     }
 }

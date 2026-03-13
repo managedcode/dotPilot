@@ -19,12 +19,16 @@ internal static class ToolchainProviderProfiles
     private const string GitHubTokenSummary = "GitHub token for Copilot and GitHub CLI authenticated flows.";
     private const string GitHubHostTokenSummary = "Alternative GitHub host token for CLI-authenticated Copilot flows.";
     private const string GitHubModelsApiKeySummary = "Optional BYOK key for GitHub Models-backed Copilot routing.";
+    private const string CodexSectionLabel = "CODEX";
+    private const string ClaudeSectionLabel = "CLAUDE";
+    private const string GitHubSectionLabel = "GITHUB";
     private static readonly string[] VersionArguments = ["--version"];
 
     public static IReadOnlyList<ToolchainProviderProfile> All { get; } =
     [
         new(
             ToolchainCenterIssues.CodexReadiness,
+            CodexSectionLabel,
             ProviderToolchainNames.CodexDisplayName,
             ProviderToolchainNames.CodexCommandName,
             VersionArguments,
@@ -40,6 +44,7 @@ internal static class ToolchainProviderProfiles
             ]),
         new(
             ToolchainCenterIssues.ClaudeCodeReadiness,
+            ClaudeSectionLabel,
             ProviderToolchainNames.ClaudeCodeDisplayName,
             ProviderToolchainNames.ClaudeCodeCommandName,
             VersionArguments,
@@ -55,6 +60,7 @@ internal static class ToolchainProviderProfiles
             ]),
         new(
             ToolchainCenterIssues.GitHubCopilotReadiness,
+            GitHubSectionLabel,
             ProviderToolchainNames.GitHubCopilotDisplayName,
             ProviderToolchainNames.GitHubCopilotCommandName,
             VersionArguments,

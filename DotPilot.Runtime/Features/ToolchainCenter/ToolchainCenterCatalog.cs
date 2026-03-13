@@ -4,25 +4,31 @@ namespace DotPilot.Runtime.Features.ToolchainCenter;
 
 public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposable
 {
+    private const string EpicLabelValue = "PRESESSION READINESS";
     private const string EpicSummary =
-        "Issue #14 keeps provider installation, auth, diagnostics, configuration, and polling visible before the first live session.";
+        "Provider installation, launch checks, authentication, configuration, and refresh state stay visible before the first live session.";
+    private const string UiWorkstreamLabel = "SURFACE";
     private const string UiWorkstreamName = "Toolchain Center UI";
     private const string UiWorkstreamSummary =
         "The settings shell exposes a first-class desktop Toolchain Center with provider cards, detail panes, and operator actions.";
+    private const string DiagnosticsWorkstreamLabel = "DIAGNOSTICS";
     private const string DiagnosticsWorkstreamName = "Connection diagnostics";
     private const string DiagnosticsWorkstreamSummary =
         "Launch, connection, resume, tool access, and auth diagnostics stay attributable before live work starts.";
+    private const string ConfigurationWorkstreamLabel = "CONFIGURATION";
     private const string ConfigurationWorkstreamName = "Secrets and environment";
     private const string ConfigurationWorkstreamSummary =
         "Provider secrets, local overrides, and non-secret environment configuration stay visible without leaking values.";
+    private const string PollingWorkstreamLabel = "POLLING";
     private const string PollingWorkstreamName = "Background polling";
     private const string PollingWorkstreamSummary =
-        "Version and auth readiness refresh in the background so the workbench can surface stale state early.";
+        "Version and auth readiness refresh in the background so the app can surface stale state early.";
     private readonly TimeProvider _timeProvider;
     private readonly CancellationTokenSource _disposeTokenSource = new();
     private readonly PeriodicTimer? _pollingTimer;
     private readonly Task _pollingTask;
     private ToolchainCenterSnapshot _snapshot;
+    private int _disposeState;
 
     public ToolchainCenterCatalog()
         : this(TimeProvider.System, startBackgroundPolling: true)
@@ -46,13 +52,29 @@ public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposabl
         }
     }
 
-    public ToolchainCenterSnapshot GetSnapshot() => _snapshot;
+    public ToolchainCenterSnapshot GetSnapshot() => Volatile.Read(ref _snapshot);
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+        {
+            return;
+        }
+
         _disposeTokenSource.Cancel();
         _pollingTimer?.Dispose();
+
+        try
+        {
+            _pollingTask.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown.
+        }
+
         _disposeTokenSource.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private async Task PollAsync()
@@ -66,12 +88,16 @@ public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposabl
         {
             while (await _pollingTimer.WaitForNextTickAsync(_disposeTokenSource.Token))
             {
-                _snapshot = EvaluateSnapshot();
+                Volatile.Write(ref _snapshot, EvaluateSnapshot());
             }
         }
         catch (OperationCanceledException)
         {
             // Expected during app shutdown.
+        }
+        catch (ObjectDisposedException) when (_disposeTokenSource.IsCancellationRequested)
+        {
+            // Expected when the timer is disposed during shutdown.
         }
     }
 
@@ -80,7 +106,7 @@ public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposabl
         var evaluatedAt = _timeProvider.GetUtcNow();
         var providers = ToolchainProviderSnapshotFactory.Create(evaluatedAt);
         return new(
-            ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.ToolchainCenterEpic),
+            EpicLabelValue,
             EpicSummary,
             CreateWorkstreams(),
             providers,
@@ -95,22 +121,22 @@ public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposabl
         [
             new(
                 ToolchainCenterIssues.ToolchainCenterUi,
-                ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.ToolchainCenterUi),
+                UiWorkstreamLabel,
                 UiWorkstreamName,
                 UiWorkstreamSummary),
             new(
                 ToolchainCenterIssues.ConnectionDiagnostics,
-                ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.ConnectionDiagnostics),
+                DiagnosticsWorkstreamLabel,
                 DiagnosticsWorkstreamName,
                 DiagnosticsWorkstreamSummary),
             new(
                 ToolchainCenterIssues.ProviderConfiguration,
-                ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.ProviderConfiguration),
+                ConfigurationWorkstreamLabel,
                 ConfigurationWorkstreamName,
                 ConfigurationWorkstreamSummary),
             new(
                 ToolchainCenterIssues.BackgroundPolling,
-                ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.BackgroundPolling),
+                PollingWorkstreamLabel,
                 PollingWorkstreamName,
                 PollingWorkstreamSummary),
         ];
