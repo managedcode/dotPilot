@@ -70,7 +70,7 @@ Adopt `ManagedCode.Communication` for the first public runtime success and failu
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
   Done when: the commands are green or any remaining blocker is explicitly documented here.
 
-- [ ] Step 7: Create the PR for issue `#23`, then continue from a fresh branch for the next slice.
+- [x] Step 7: Create the PR for issue `#23`, then continue from a fresh branch for the next slice.
   Verification: the branch and PR flow matches the enforced repo workflow.
   Done when: the issue `#23` PR exists and follow-up work no longer accumulates on its review branch.
 
@@ -88,6 +88,7 @@ Adopt `ManagedCode.Communication` for the first public runtime success and failu
 - `dotnet test DotPilot.slnx` passed with `0` failed, `49` passed, and `0` skipped.
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"` passed with `0` failed, `35` passed, and `0` skipped.
 - Coverage from `DotPilot.Tests/TestResults/57d524aa-22ea-4a88-acb2-3757c3eb671c/coverage.cobertura.xml` is `99.20%` line coverage and `86.66%` branch coverage across the covered production surface.
+- PR created: `https://github.com/managedcode/dotPilot/pull/75`.
 
 ## Failing Tests Tracker
 
