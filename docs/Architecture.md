@@ -10,6 +10,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
 - **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
 - **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
+- **Communication slice boundary:** issue [#23](https://github.com/managedcode/dotPilot/issues/23) lives in `DotPilot.Core/Features/RuntimeCommunication`, which defines the shared `ManagedCode.Communication` result/problem language for runtime public boundaries.
 - **First implementation slice:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) is represented locally through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface instead of mixing runtime work into the Uno app.
 - **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow and the runtime-foundation UI surface. Provider-independent flows must pass in CI through the deterministic test client, while provider-specific checks can run only when the matching toolchain is available.
 
@@ -66,6 +67,7 @@ flowchart TD
   Host["#24 Embedded Orleans host"]
   MAF["#25 Agent Framework runtime"]
   DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
+  CommunicationSlice["DotPilot.Core/Features/RuntimeCommunication"]
   CoreSlice["DotPilot.Core/Features/RuntimeFoundation"]
   RuntimeSlice["DotPilot.Runtime/Features/RuntimeFoundation"]
   UiSlice["DotPilot runtime panel + banner"]
@@ -75,8 +77,9 @@ flowchart TD
   Epic --> Host
   Epic --> MAF
   Domain --> DomainSlice
-  DomainSlice --> CoreSlice
-  Comm --> CoreSlice
+  DomainSlice --> CommunicationSlice
+  CommunicationSlice --> CoreSlice
+  Comm --> CommunicationSlice
   Host --> RuntimeSlice
   MAF --> RuntimeSlice
   CoreSlice --> UiSlice
@@ -116,6 +119,7 @@ flowchart LR
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
 - `Issue #22 feature doc` — [Control Plane Domain Model](./Features/control-plane-domain-model.md)
+- `Issue #23 feature doc` — [Runtime Communication Contracts](./Features/runtime-communication-contracts.md)
 
 ### Modules
 
@@ -134,6 +138,7 @@ flowchart LR
 - `Reusable runtime panel` — [../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml](../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml)
 - `Shell configuration contract` — [../DotPilot.Core/Features/ApplicationShell/AppConfig.cs](../DotPilot.Core/Features/ApplicationShell/AppConfig.cs)
 - `Runtime foundation contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs)
+- `Runtime communication problems` — [../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs](../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs)
 - `Control-plane domain contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs)
 - `Provider and tool contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs)
 - `Runtime issue catalog` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs)

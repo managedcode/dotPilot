@@ -182,6 +182,7 @@ stateDiagram-v2
 - `docs/Architecture.md` reflects the same boundaries described here.
 - `docs/ADR/ADR-0001-agent-control-plane-architecture.md` records the architectural choice and trade-offs.
 - `docs/Features/control-plane-domain-model.md` captures the reusable issue `#22` contract relationships for agents, sessions, fleets, providers, runtimes, approvals, artifacts, telemetry, and evaluations.
+- `docs/Features/runtime-communication-contracts.md` captures the shared result/problem language from issue `#23` for runtime public boundaries.
 - GitHub issues map back to the capabilities and flows in this spec.
 
 ### Future Product Verification
