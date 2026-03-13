@@ -43,10 +43,12 @@ public class RuntimeFoundationCatalogTests
         var client = new DeterministicAgentRuntimeClient();
 
         var result = await client.ExecuteAsync(CreateRequest(ApprovalPrompt, AgentExecutionMode.Execute), CancellationToken.None);
+        var outcome = result.Value!;
 
-        result.NextPhase.Should().Be(SessionPhase.Paused);
-        result.ApprovalState.Should().Be(ApprovalState.Pending);
-        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+        result.IsSuccess.Should().BeTrue();
+        outcome.NextPhase.Should().Be(SessionPhase.Paused);
+        outcome.ApprovalState.Should().Be(ApprovalState.Pending);
+        outcome.ProducedArtifacts.Should().ContainSingle(artifact =>
             artifact.Name == "runtime-foundation.snapshot.json" &&
             artifact.Kind == ArtifactKind.Snapshot);
     }
@@ -57,10 +59,12 @@ public class RuntimeFoundationCatalogTests
         var client = new DeterministicAgentRuntimeClient();
 
         var result = await client.ExecuteAsync(CreateRequest("Plan the runtime foundation rollout.", AgentExecutionMode.Plan), CancellationToken.None);
+        var outcome = result.Value!;
 
-        result.NextPhase.Should().Be(SessionPhase.Plan);
-        result.ApprovalState.Should().Be(ApprovalState.NotRequired);
-        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+        result.IsSuccess.Should().BeTrue();
+        outcome.NextPhase.Should().Be(SessionPhase.Plan);
+        outcome.ApprovalState.Should().Be(ApprovalState.NotRequired);
+        outcome.ProducedArtifacts.Should().ContainSingle(artifact =>
             artifact.Name == "runtime-foundation.plan.md" &&
             artifact.Kind == ArtifactKind.Plan);
     }
@@ -71,22 +75,28 @@ public class RuntimeFoundationCatalogTests
         var client = new DeterministicAgentRuntimeClient();
 
         var result = await client.ExecuteAsync(CreateRequest("Run the provider-independent runtime flow.", AgentExecutionMode.Execute), CancellationToken.None);
+        var outcome = result.Value!;
 
-        result.NextPhase.Should().Be(SessionPhase.Execute);
-        result.ApprovalState.Should().Be(ApprovalState.NotRequired);
-        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+        result.IsSuccess.Should().BeTrue();
+        outcome.NextPhase.Should().Be(SessionPhase.Execute);
+        outcome.ApprovalState.Should().Be(ApprovalState.NotRequired);
+        outcome.ProducedArtifacts.Should().ContainSingle(artifact =>
             artifact.Name == "runtime-foundation.snapshot.json" &&
             artifact.Kind == ArtifactKind.Snapshot);
     }
 
     [Test]
-    public async Task DeterministicClientRejectsBlankPrompts()
+    public async Task DeterministicClientReturnsValidationProblemForBlankPrompts()
     {
         var client = new DeterministicAgentRuntimeClient();
 
-        var action = async () => await client.ExecuteAsync(CreateRequest(BlankPrompt, AgentExecutionMode.Plan), CancellationToken.None);
+        var result = await client.ExecuteAsync(CreateRequest(BlankPrompt, AgentExecutionMode.Plan), CancellationToken.None);
+        var problem = result.Problem!;
 
-        await action.Should().ThrowAsync<ArgumentException>();
+        result.IsFailed.Should().BeTrue();
+        result.HasProblem.Should().BeTrue();
+        problem.HasErrorCode(RuntimeCommunicationProblemCode.PromptRequired).Should().BeTrue();
+        problem.InvalidField("Prompt").Should().BeTrue();
     }
 
     [Test]
@@ -107,12 +117,33 @@ public class RuntimeFoundationCatalogTests
         var client = new DeterministicAgentRuntimeClient();
 
         var result = await client.ExecuteAsync(CreateRequest("Review the runtime foundation output.", AgentExecutionMode.Review), CancellationToken.None);
+        var outcome = result.Value!;
 
-        result.NextPhase.Should().Be(SessionPhase.Review);
-        result.ApprovalState.Should().Be(ApprovalState.Approved);
-        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+        result.IsSuccess.Should().BeTrue();
+        outcome.NextPhase.Should().Be(SessionPhase.Review);
+        outcome.ApprovalState.Should().Be(ApprovalState.Approved);
+        outcome.ProducedArtifacts.Should().ContainSingle(artifact =>
             artifact.Name == "runtime-foundation.review.md" &&
             artifact.Kind == ArtifactKind.Report);
+    }
+
+    [Test]
+    public async Task DeterministicClientReturnsProviderUnavailableProblemWhenProviderIsNotReady()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+
+        var result = await client.ExecuteAsync(
+            CreateRequest(
+                "Run the provider-independent runtime flow.",
+                AgentExecutionMode.Execute,
+                ProviderConnectionStatus.Unavailable),
+            CancellationToken.None);
+        var problem = result.Problem!;
+
+        result.IsFailed.Should().BeTrue();
+        result.HasProblem.Should().BeTrue();
+        problem.HasErrorCode(RuntimeCommunicationProblemCode.ProviderUnavailable).Should().BeTrue();
+        problem.StatusCode.Should().Be((int)System.Net.HttpStatusCode.ServiceUnavailable);
     }
 
     [TestCase(CodexCommandName)]
@@ -166,9 +197,12 @@ public class RuntimeFoundationCatalogTests
         return new RuntimeFoundationCatalog(new DeterministicAgentRuntimeClient());
     }
 
-    private static AgentTurnRequest CreateRequest(string prompt, AgentExecutionMode mode)
+    private static AgentTurnRequest CreateRequest(
+        string prompt,
+        AgentExecutionMode mode,
+        ProviderConnectionStatus providerStatus = ProviderConnectionStatus.Available)
     {
-        return new AgentTurnRequest(SessionId.New(), AgentProfileId.New(), prompt, mode);
+        return new AgentTurnRequest(SessionId.New(), AgentProfileId.New(), prompt, mode, providerStatus);
     }
 
     private sealed class EnvironmentVariableScope : IDisposable

@@ -6,4 +6,8 @@
         <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="ManagedCode.Communication" />
+    </ItemGroup>
+
 </Project>

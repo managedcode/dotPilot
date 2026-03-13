@@ -21,7 +21,8 @@ public sealed record AgentTurnRequest(
     SessionId SessionId,
     AgentProfileId AgentProfileId,
     string Prompt,
-    AgentExecutionMode Mode);
+    AgentExecutionMode Mode,
+    ProviderConnectionStatus ProviderStatus = ProviderConnectionStatus.Available);
 
 public sealed record AgentTurnResult(
     string Summary,
