@@ -71,7 +71,7 @@ Define the first stable `dotPilot` control-plane domain contracts for agents, se
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
   Done when: the commands are green or any remaining blocker is explicitly documented here.
 
-- [ ] Step 7: Create the PR for issue `#22`, then continue from a fresh branch for the next slice.
+- [x] Step 7: Create the PR for issue `#22`, then continue from a fresh branch for the next slice.
   Verification: the branch and PR flow matches the enforced repo workflow after completing a slice.
   Done when: the issue `#22` PR exists and follow-up work no longer accumulates on its review branch.
 
@@ -88,6 +88,7 @@ Define the first stable `dotPilot` control-plane domain contracts for agents, se
 - `dotnet test DotPilot.slnx` passed with `0` failed, `37` passed, and `0` skipped.
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"` passed with `0` failed, `23` passed, and `0` skipped.
 - Coverage from `DotPilot.Tests/TestResults/cb30b645-002f-45bf-af57-b224bd5073c1/coverage.cobertura.xml` is `99.43%` line coverage and `85.00%` branch coverage across the covered production surface.
+- PR created: `https://github.com/managedcode/dotPilot/pull/74`.
 
 ## Failing Tests Tracker
 
