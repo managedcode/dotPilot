@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using DotPilot.Core.Features.RuntimeFoundation;
+using DotPilot.Core.Features.ControlPlaneDomain;
 
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
 
@@ -12,7 +12,7 @@ internal sealed class ProviderToolchainProbe
     private static readonly System.Text.CompositeFormat AvailableStatusSummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(AvailableStatusSummaryFormat);
 
-    public static ProviderToolchainStatus Probe(string displayName, string commandName, bool requiresExternalToolchain)
+    public static ProviderDescriptor Probe(string displayName, string commandName, bool requiresExternalToolchain)
     {
         var status = ResolveExecutablePath(commandName) is null
             ? ProviderConnectionStatus.Unavailable
@@ -24,7 +24,15 @@ internal sealed class ProviderToolchainProbe
                 : MissingStatusSummaryCompositeFormat,
             displayName);
 
-        return new(displayName, commandName, status, statusSummary, requiresExternalToolchain);
+        return new ProviderDescriptor
+        {
+            Id = ProviderId.New(),
+            DisplayName = displayName,
+            CommandName = commandName,
+            Status = status,
+            StatusSummary = statusSummary,
+            RequiresExternalToolchain = requiresExternalToolchain,
+        };
     }
 
     private static string? ResolveExecutablePath(string commandName)

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeFoundation;
 
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
@@ -29,22 +30,22 @@ public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
                 PlanSummary,
                 SessionPhase.Plan,
                 ApprovalState.NotRequired,
-                [PlanArtifact]),
+                [CreateArtifact(request.SessionId, PlanArtifact, ArtifactKind.Plan)]),
             AgentExecutionMode.Execute when RequiresApproval(request.Prompt) => new AgentTurnResult(
                 PendingApprovalSummary,
                 SessionPhase.Paused,
                 ApprovalState.Pending,
-                [ExecuteArtifact]),
+                [CreateArtifact(request.SessionId, ExecuteArtifact, ArtifactKind.Snapshot)]),
             AgentExecutionMode.Execute => new AgentTurnResult(
                 ExecuteSummary,
                 SessionPhase.Execute,
                 ApprovalState.NotRequired,
-                [ExecuteArtifact]),
+                [CreateArtifact(request.SessionId, ExecuteArtifact, ArtifactKind.Snapshot)]),
             AgentExecutionMode.Review => new AgentTurnResult(
                 ReviewSummary,
                 SessionPhase.Review,
                 ApprovalState.Approved,
-                [ReviewArtifact]),
+                [CreateArtifact(request.SessionId, ReviewArtifact, ArtifactKind.Report)]),
             _ => throw new UnreachableException(),
         });
     }
@@ -52,5 +53,18 @@ public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
     private static bool RequiresApproval(string prompt)
     {
         return prompt.Contains(ApprovalKeyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ArtifactDescriptor CreateArtifact(SessionId sessionId, string artifactName, ArtifactKind artifactKind)
+    {
+        return new ArtifactDescriptor
+        {
+            Id = ArtifactId.New(),
+            SessionId = sessionId,
+            Name = artifactName,
+            Kind = artifactKind,
+            RelativePath = artifactName,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
     }
 }

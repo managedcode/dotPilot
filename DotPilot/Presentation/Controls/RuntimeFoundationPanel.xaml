@@ -1,6 +1,7 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.RuntimeFoundationPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:domain="using:DotPilot.Core.Features.ControlPlaneDomain"
              xmlns:runtime="using:DotPilot.Core.Features.RuntimeFoundation">
   <UserControl.Resources>
     <DataTemplate x:Key="RuntimeSliceTemplate"
@@ -47,7 +48,7 @@
     </DataTemplate>
 
     <DataTemplate x:Key="ProviderStatusTemplate"
-                  x:DataType="runtime:ProviderToolchainStatus">
+                  x:DataType="domain:ProviderDescriptor">
       <Border Background="{StaticResource AppSoftSurfaceBrush}"
               CornerRadius="18"
               Padding="12">

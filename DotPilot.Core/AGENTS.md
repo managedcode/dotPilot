@@ -12,6 +12,7 @@ Stack: `.NET 10`, class library, feature-aligned contracts and provider-independ
 
 - `DotPilot.Core.csproj`
 - `Features/ApplicationShell/AppConfig.cs`
+- `Features/ControlPlaneDomain/*`
 - `Features/RuntimeFoundation/*`
 
 ## Boundaries

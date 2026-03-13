@@ -9,6 +9,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **System:** `DotPilot` is a `.NET 10` `Uno Platform` desktop-first application that is evolving from a static prototype into a local-first control plane for agent operations.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
 - **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
+- **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
 - **First implementation slice:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) is represented locally through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface instead of mixing runtime work into the Uno app.
 - **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow and the runtime-foundation UI surface. Provider-independent flows must pass in CI through the deterministic test client, while provider-specific checks can run only when the matching toolchain is available.
 
@@ -64,6 +65,7 @@ flowchart TD
   Comm["#23 Communication contracts"]
   Host["#24 Embedded Orleans host"]
   MAF["#25 Agent Framework runtime"]
+  DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
   CoreSlice["DotPilot.Core/Features/RuntimeFoundation"]
   RuntimeSlice["DotPilot.Runtime/Features/RuntimeFoundation"]
   UiSlice["DotPilot runtime panel + banner"]
@@ -72,7 +74,8 @@ flowchart TD
   Epic --> Comm
   Epic --> Host
   Epic --> MAF
-  Domain --> CoreSlice
+  Domain --> DomainSlice
+  DomainSlice --> CoreSlice
   Comm --> CoreSlice
   Host --> RuntimeSlice
   MAF --> RuntimeSlice
@@ -112,6 +115,7 @@ flowchart LR
 - `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
+- `Issue #22 feature doc` — [Control Plane Domain Model](./Features/control-plane-domain-model.md)
 
 ### Modules
 
@@ -130,6 +134,8 @@ flowchart LR
 - `Reusable runtime panel` — [../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml](../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml)
 - `Shell configuration contract` — [../DotPilot.Core/Features/ApplicationShell/AppConfig.cs](../DotPilot.Core/Features/ApplicationShell/AppConfig.cs)
 - `Runtime foundation contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs)
+- `Control-plane domain contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs)
+- `Provider and tool contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs)
 - `Runtime issue catalog` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs)
 - `Runtime catalog implementation` — [../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs](../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs)
 - `Deterministic test client` — [../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs](../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs)

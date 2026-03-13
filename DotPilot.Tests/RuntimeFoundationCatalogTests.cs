@@ -46,7 +46,9 @@ public class RuntimeFoundationCatalogTests
 
         result.NextPhase.Should().Be(SessionPhase.Paused);
         result.ApprovalState.Should().Be(ApprovalState.Pending);
-        result.ProducedArtifacts.Should().ContainSingle("runtime-foundation.snapshot.json");
+        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+            artifact.Name == "runtime-foundation.snapshot.json" &&
+            artifact.Kind == ArtifactKind.Snapshot);
     }
 
     [Test]
@@ -58,7 +60,9 @@ public class RuntimeFoundationCatalogTests
 
         result.NextPhase.Should().Be(SessionPhase.Plan);
         result.ApprovalState.Should().Be(ApprovalState.NotRequired);
-        result.ProducedArtifacts.Should().ContainSingle("runtime-foundation.plan.md");
+        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+            artifact.Name == "runtime-foundation.plan.md" &&
+            artifact.Kind == ArtifactKind.Plan);
     }
 
     [Test]
@@ -70,7 +74,9 @@ public class RuntimeFoundationCatalogTests
 
         result.NextPhase.Should().Be(SessionPhase.Execute);
         result.ApprovalState.Should().Be(ApprovalState.NotRequired);
-        result.ProducedArtifacts.Should().ContainSingle("runtime-foundation.snapshot.json");
+        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+            artifact.Name == "runtime-foundation.snapshot.json" &&
+            artifact.Kind == ArtifactKind.Snapshot);
     }
 
     [Test]
@@ -104,7 +110,9 @@ public class RuntimeFoundationCatalogTests
 
         result.NextPhase.Should().Be(SessionPhase.Review);
         result.ApprovalState.Should().Be(ApprovalState.Approved);
-        result.ProducedArtifacts.Should().ContainSingle("runtime-foundation.review.md");
+        result.ProducedArtifacts.Should().ContainSingle(artifact =>
+            artifact.Name == "runtime-foundation.review.md" &&
+            artifact.Kind == ArtifactKind.Report);
     }
 
     [TestCase(CodexCommandName)]
