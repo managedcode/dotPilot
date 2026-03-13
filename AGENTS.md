@@ -304,6 +304,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Hardcoded values are forbidden.
 - String literals are forbidden in implementation code. Declare them once as named constants, enums, configuration entries, or dedicated value objects, then reuse those symbols.
 - Avoid magic literals. Extract shared values into constants, enums, configuration, or dedicated types.
+- Backlog metadata does not belong in product code: issue numbers, PR numbers, review language, and planning terminology must never appear in production runtime models, diagnostics, or user-facing text unless the feature explicitly exposes source-control metadata.
 - Design boundaries so real behaviour can be tested through public interfaces.
 - For `.NET`, the repo-root `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity.
 - Use nested `.editorconfig` files when they serve a clear subtree-specific purpose. Do not let IDE defaults, pipeline flags, and repo config disagree.
@@ -362,6 +363,7 @@ Ask first:
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
+- Running build, test, or verification commands for file-only structural reorganizations when the user explicitly asked for folder cleanup without behavior changes.
 - Adding fallback paths or alternate harnesses that only make failures disappear in tests while the primary product path remains broken.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
