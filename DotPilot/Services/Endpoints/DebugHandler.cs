@@ -1,8 +1,21 @@
+using Microsoft.Extensions.Logging;
+
 namespace DotPilot.Services.Endpoints;
 
-internal sealed class DebugHttpHandler(ILogger<DebugHttpHandler> logger, HttpMessageHandler? innerHandler = null) : DelegatingHandler(innerHandler ?? new HttpClientHandler())
+internal sealed class DebugHttpHandler : DelegatingHandler
 {
-    private readonly ILogger _logger = logger;
+#if DEBUG
+    private readonly ILogger<DebugHttpHandler> _logger;
+#endif
+
+    public DebugHttpHandler(ILogger<DebugHttpHandler> logger, HttpMessageHandler? innerHandler = null)
+        : base(innerHandler ?? new HttpClientHandler())
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+#if DEBUG
+        _logger = logger;
+#endif
+    }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,

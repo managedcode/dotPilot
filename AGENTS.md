@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Project: dotPilot
-Stack: .NET 10 `Uno Platform` desktop app with central package management, `NUnit` unit tests, and `Uno.UITest` smoke coverage
+Stack: .NET 10 `Uno Platform` desktop app with central package management, `NUnit` unit tests, and `Uno.UITest` browser UI coverage
 
 Follows [MCAF](https://mcaf.managed-code.com/)
 
@@ -14,12 +14,14 @@ This file defines how AI agents work in this solution.
 - Root `AGENTS.md` holds the global workflow, shared commands, cross-cutting rules, and global skill catalog.
 - In multi-project solutions, each project or module root MUST have its own local `AGENTS.md`.
 - Local `AGENTS.md` files add project-specific entry points, boundaries, commands, risks, and applicable skills.
+- `dotPilot` is a desktop control plane for agents in general. Coding agents are first-class, but repository governance, architecture, and planning must also support research, analysis, orchestration, operator, and mixed-provider agent flows.
 
 ## Solution Topology
 
 - Solution root: `.` (`DotPilot.slnx`)
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
+  - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
 - Shared solution artifacts:
@@ -118,23 +120,39 @@ Skill-management rules for this `.NET` solution:
 
 ### Commands
 
-- `build`: `dotnet build DotPilot.slnx`
+- `build`: `dotnet build DotPilot.slnx -warnaserror`
 - `test`: `dotnet test DotPilot.slnx`
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
-- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"`
+- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
+- `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
 
 For this app:
 
 - unit tests currently use `NUnit` through the default `VSTest` runner
-- UI smoke tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
-- `format` uses `dotnet format --verify-no-changes`
-- coverage uses the `coverlet.collector` integration on `DotPilot.Tests`
+- UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
+- a canceled, timed-out, or hanging `DotPilot.UITests` run is a harness failure to fix, not an acceptable substitute for a real pass or fail result in CI
+- `format` uses `dotnet format --verify-no-changes` as a local pre-push check; GitHub Actions validation should not spend CI time rechecking formatting drift that must already be fixed before push
+- coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
+- desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
+- local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
+- quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
+- `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
+- GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
+- GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
+- the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
+- desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
+- desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
+- the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
+- for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks
+- prefer MIT-licensed GitHub and NuGet dependencies when they materially accelerate delivery and align with the current architecture
+- prefer official `.NET` AI evaluation libraries under `Microsoft.Extensions.AI.Evaluation*` for response-quality, tool-usage, and safety evaluation instead of custom or third-party evaluation stacks by default
+- prefer `Microsoft Agent Framework` telemetry and observability patterns with OpenTelemetry-first instrumentation and optional Azure Monitor or Foundry export later
 
 ### Project AGENTS Policy
 
@@ -250,7 +268,10 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Repository or module coverage must not decrease without an explicit written exception. Coverage after the change must stay at least at the previous baseline or improve.
 - Coverage is for finding gaps, not gaming a number. Coverage numbers do not replace scenario coverage or user-flow verification.
 - The task is not done until the full relevant test suite is green, not only the newly added tests.
-- UI smoke tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
+- UI tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
+- GitHub Actions PR validation is mandatory for every PR and must enforce the real repo verification path so test failures are caught in CI, not only locally.
+- GitHub Actions PR validation must run full automated test verification, especially the real UI suite; build-only or smoke-only checks are not an acceptable substitute for pull-request gating.
+- GitHub Actions validation must also produce downloadable app artifacts for macOS, Windows, and Linux so every PR and mainline run has test results plus installable build outputs.
 - For `.NET`, keep the active framework and runner model explicit so agents do not mix `TUnit`, `Microsoft.Testing.Platform`, and legacy `VSTest` assumptions.
 - After changing production code, run the repo-defined quality pass: format, build, analyze, focused tests, broader tests, coverage, and any configured extra gates.
 
@@ -274,6 +295,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Never commit secrets, keys, or connection strings.
 - Never skip tests to make a branch green.
 - Never weaken a test or analyzer without explicit justification.
+- Do not remove the `DotPilot/DotPilot.csproj` XML-doc and `CS1591` configuration unless the repo adopts full public API documentation coverage or a different documented fix for Roslyn `IDE0005`.
 - Never introduce mocks, fakes, stubs, or service doubles to hide real behaviour in tests or local flows.
 - Never introduce a non-SOLID design unless the exception is explicitly documented under `exception_policy`.
 - Never force-push to `main`.
@@ -299,6 +321,7 @@ Ask first:
 ### Likes
 
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
+- Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
 - Keep the solution file name cased as `DotPilot.slnx`.
@@ -306,6 +329,13 @@ Ask first:
 - Use central package management for shared test and tooling packages.
 - Keep one `.NET` test framework active in the solution at a time unless a documented migration is in progress.
 - Validate UI changes through runnable `DotPilot.UITests` on every relevant verification pass, instead of relying only on manual browser inspection or conditional local setup.
+- Keep the UI-test execution path minimal: one normal test command should produce a real result without extra harness indirection or side-effect-heavy setup.
+- Keep validation and release GitHub Actions separate, with descriptive names and filenames instead of a generic `ci.yml`.
+- Keep the validation workflow focused on build and automated test feedback, and keep release responsibilities in a dedicated workflow that bumps versioning, publishes desktop artifacts, and creates the GitHub Release with feature notes.
+- Keep `dotPilot` positioned as a general agent control plane, not a coding-only shell.
+- Reuse the current Uno desktop shell direction instead of replacing it with a wholly different layout when evolving the product.
+- Keep provider integrations SDK-first where good typed SDKs already exist.
+- Keep evaluation and observability aligned with official Microsoft `.NET` AI guidance when building agent-quality and trust features.
 
 ### Dislikes
 
@@ -313,3 +343,5 @@ Ask first:
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
+- Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
+- Planning `MLXSharp` into the first product wave before it is ready for real use.

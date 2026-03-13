@@ -1,0 +1,250 @@
+name: Desktop Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate_release_ref:
+    name: Validate Release Ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Supported Release Branches
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            exit 0
+          fi
+
+          echo "Desktop releases may only run from main." >&2
+          exit 1
+
+  prepare_release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    needs:
+      - validate_release_ref
+    outputs:
+      application_version: ${{ steps.resolve_version.outputs.application_version }}
+      previous_tag: ${{ steps.previous_tag.outputs.value }}
+      release_tag: ${{ steps.resolve_version.outputs.release_tag }}
+      release_version: ${{ steps.resolve_version.outputs.display_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Fetch Tags
+        shell: bash
+        run: git fetch --tags --force
+
+      - name: Capture Previous Tag
+        id: previous_tag
+        shell: bash
+        run: |
+          previous_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          echo "value=${previous_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Release Version
+        id: resolve_version
+        shell: bash
+        run: |
+          version_prefix="$(dotnet msbuild ./DotPilot/DotPilot.csproj -getProperty:ApplicationDisplayVersion | tail -n 1 | tr -d '\r')"
+          if [[ ! "${version_prefix}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "ApplicationDisplayVersion must be a two-segment numeric prefix. Found: '${version_prefix}'." >&2
+            exit 1
+          fi
+
+          display_version="${version_prefix}.${{ github.run_number }}"
+          {
+            echo "display_version=${display_version}"
+            echo "application_version=${{ github.run_number }}"
+            echo "release_tag=v${display_version}"
+          } >> "$GITHUB_OUTPUT"
+
+  publish_desktop:
+    name: Publish Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    needs:
+      - prepare_release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-latest
+            artifact_name: dotpilot-release-macos
+            archive_name: dotpilot-desktop-macos.zip
+            output_path: artifacts/publish/macos
+          - name: Windows
+            runner: windows-latest
+            artifact_name: dotpilot-release-windows
+            archive_name: dotpilot-desktop-windows.zip
+            output_path: artifacts/publish/windows
+          - name: Linux
+            runner: ubuntu-latest
+            artifact_name: dotpilot-release-linux
+            archive_name: dotpilot-desktop-linux.zip
+            output_path: artifacts/publish/linux
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Publish Desktop App
+        shell: pwsh
+        run: >
+          dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop
+          -o ./${{ matrix.output_path }}
+          -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }}
+          -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+
+      - name: Archive Desktop Publish Output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./artifacts/releases | Out-Null
+          $archivePath = "./artifacts/releases/${{ matrix.archive_name }}"
+          if (Test-Path $archivePath) {
+            Remove-Item $archivePath -Force
+          }
+
+          Compress-Archive -Path "./${{ matrix.output_path }}/*" -DestinationPath $archivePath
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ./artifacts/releases/${{ matrix.archive_name }}
+          if-no-files-found: error
+          retention-days: 14
+
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - prepare_release
+      - publish_desktop
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Fetch Tags
+        shell: bash
+        run: git fetch --tags --force
+
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts/release-assets
+
+      - name: Generate Feature Summary
+        shell: bash
+        env:
+          PREVIOUS_TAG: ${{ needs.prepare_release.outputs.previous_tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p ./artifacts
+
+          commit_range="HEAD"
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            commit_range="${PREVIOUS_TAG}..HEAD"
+          fi
+
+          git log --no-merges --pretty=format:%s "${commit_range}" |
+            awk 'NF && tolower($0) !~ /^chore\(release\):/ && !seen[$0]++' > ./artifacts/release-commits.txt
+          if [[ ! -s ./artifacts/release-commits.txt ]]; then
+            printf '%s\n' "Maintenance and release preparation changes." > ./artifacts/release-commits.txt
+          fi
+
+          : > ./artifacts/release-feature-docs.txt
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            git diff --name-only "${PREVIOUS_TAG}..HEAD" -- 'docs/Features/*.md' |
+              awk '/^docs\/Features\// && !seen[$0]++' > ./artifacts/release-feature-docs.txt
+          elif [[ -d ./docs/Features ]]; then
+            find ./docs/Features -maxdepth 1 -type f -name '*.md' | sed 's#^\./##' | sort > ./artifacts/release-feature-docs.txt
+          fi
+
+          {
+            echo "## Feature Summary"
+            while IFS= read -r subject; do
+              if [[ -n "${subject}" ]]; then
+                echo "- ${subject}"
+              fi
+            done < ./artifacts/release-commits.txt
+          } > ./artifacts/release-summary.md
+
+          if [[ -s ./artifacts/release-feature-docs.txt ]]; then
+            {
+              echo
+              echo "## Feature Specs"
+              while IFS= read -r feature_doc; do
+                if [[ -z "${feature_doc}" ]]; then
+                  continue
+                fi
+
+                title="$(sed -n 's/^# //p' "${feature_doc}" | head -n 1)"
+                if [[ -z "${title}" ]]; then
+                  title="$(basename "${feature_doc}" .md)"
+                fi
+
+                printf -- '- [%s](https://github.com/%s/blob/%s/%s)\n' \
+                  "${title}" \
+                  "${REPOSITORY}" \
+                  "${RELEASE_TAG}" \
+                  "${feature_doc}"
+              done < ./artifacts/release-feature-docs.txt
+            } >> ./artifacts/release-summary.md
+          fi
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ needs.prepare_release.outputs.previous_tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          RELEASE_TARGET_SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.release_version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mapfile -t release_assets < <(find ./artifacts/release-assets -type f -name '*.zip' | sort)
+          if [[ ${#release_assets[@]} -eq 0 ]]; then
+            echo "No release assets were downloaded." >&2
+            exit 1
+          fi
+
+          release_notes="$(cat ./artifacts/release-summary.md)"
+          release_command=(
+            gh release create "${RELEASE_TAG}"
+            "${release_assets[@]}"
+            --repo "${REPOSITORY}"
+            --target "${RELEASE_TARGET_SHA}"
+            --title "DotPilot ${RELEASE_VERSION}"
+            --generate-notes
+            --notes "${release_notes}"
+          )
+
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            release_command+=(--notes-start-tag "${PREVIOUS_TAG}")
+          fi
+
+          "${release_command[@]}"

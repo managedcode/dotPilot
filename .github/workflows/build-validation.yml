@@ -1,0 +1,100 @@
+name: Build Validation
+
+on:
+  push:
+    branches:
+      - main
+      - release/**
+
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Quality Gate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build DotPilot.slnx -warnaserror
+
+  unit_tests:
+    name: Unit Test Suite
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Run Unit Tests
+        shell: pwsh
+        run: dotnet test ./DotPilot.Tests/DotPilot.Tests.csproj --logger GitHubActions --blame-crash
+
+  coverage:
+    name: Coverage Suite
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Run Coverage
+        shell: pwsh
+        run: dotnet test ./DotPilot.Tests/DotPilot.Tests.csproj --settings ./DotPilot.Tests/coverlet.runsettings --logger GitHubActions --blame-crash --collect:"XPlat Code Coverage"
+
+  ui_tests:
+    name: UI Test Suite
+    runs-on: macos-latest
+    timeout-minutes: 60
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Run UI Tests
+        shell: bash
+        run: |
+          export UNO_UITEST_DRIVER_PATH="${CHROMEWEBDRIVER}"
+          export UNO_UITEST_CHROME_BINARY_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          export UNO_UITEST_BROWSER_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          dotnet test ./DotPilot.UITests/DotPilot.UITests.csproj --logger GitHubActions --blame-crash

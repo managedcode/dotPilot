@@ -1,15 +1,19 @@
 name: Install Dependencies
-description: ""
+description: "Install the pinned .NET SDK, required host prerequisites, and Uno workloads for CI validation."
 
 inputs:
   target-platform:
     description: 'The platform to install dependencies for. #See available values at https://platform.uno/docs/articles/external/uno.check/doc/using-uno-check.html'
     required: false
     default: 'all'
-  dotnet-version:
-    description: 'Installs and sets the .NET SDK Version'
+  install-windows-sdk:
+    description: 'Whether to install the Windows SDK ISO bootstrap step. Leave false for normal dotnet-based CI validation.'
     required: false
-    default: '10.0.x'
+    default: 'false'
+  run-uno-check:
+    description: 'Whether to run uno-check and install Uno workloads. Leave false for normal dotnet-based CI validation.'
+    required: false
+    default: 'false'
   sdkVersion:
     description: 'The version of the Windows Sdk'
     required: false
@@ -19,20 +23,21 @@ runs:
   using: "composite"
   steps:
     # Install .NET
-    - name: Setup .NET ${{ inputs.dotnet-version }}
-      uses: actions/setup-dotnet@v3
+    - name: Setup .NET SDK from global.json
+      uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '${{ inputs.dotnet-version }}'
+        global-json-file: 'global.json'
 
     # Install Windows SDK
     - name: Install Windows SDK ${{ inputs.sdkVersion }}
       shell: pwsh
-      if: ${{ runner.os == 'Windows' }}
+      if: ${{ runner.os == 'Windows' && inputs.install-windows-sdk == 'true' }}
       run: .\.github\Install-WindowsSdkISO.ps1 ${{ inputs.sdkVersion }}
 
     # Run Uno.Check
     - name: Install ${{ inputs.target-platform }} Workloads
       shell: pwsh
+      if: ${{ inputs.run-uno-check == 'true' }}
       run: |
         dotnet tool install -g uno.check
         ("${{ inputs.target-platform }} ".Split(' ') | ForEach-Object {

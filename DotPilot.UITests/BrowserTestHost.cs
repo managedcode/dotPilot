@@ -21,6 +21,7 @@ internal static class BrowserTestHost
     private const string BuildFailureMessage = "Failed to build the WebAssembly test host.";
     private static readonly TimeSpan BuildTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan HostStartupTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan HostShutdownTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HostProbeInterval = TimeSpan.FromMilliseconds(250);
     private static readonly HttpClient HttpClient = new()
     {
@@ -43,11 +44,13 @@ internal static class BrowserTestHost
         {
             if (IsReachable(hostUri))
             {
+                HarnessLog.Write("Browser host is already reachable.");
                 return;
             }
 
             if (_hostProcess is { HasExited: false })
             {
+                HarnessLog.Write("Browser host process already exists. Waiting for readiness.");
                 WaitForHost(hostUri);
                 return;
             }
@@ -55,7 +58,9 @@ internal static class BrowserTestHost
             var repoRoot = FindRepositoryRoot();
             var projectPath = Path.Combine(repoRoot, ProjectRelativePath);
 
+            HarnessLog.Write("Building browser host.");
             EnsureBuilt(repoRoot, projectPath);
+            HarnessLog.Write("Starting browser host process.");
             StartHostProcess(repoRoot, projectPath);
             WaitForHost(hostUri);
         }
@@ -77,6 +82,8 @@ internal static class BrowserTestHost
         {
             throw new InvalidOperationException($"{BuildFailureMessage} {result.Output}");
         }
+
+        HarnessLog.Write("Browser host build completed.");
     }
 
     private static void StartHostProcess(string repoRoot, string projectPath)
@@ -100,6 +107,7 @@ internal static class BrowserTestHost
         _hostProcess.BeginOutputReadLine();
         _hostProcess.BeginErrorReadLine();
         _startedHost = true;
+        HarnessLog.Write($"Browser host process started with PID {_hostProcess.Id}.");
     }
 
     private static void CaptureOutput(string? line)
@@ -117,6 +125,7 @@ internal static class BrowserTestHost
         {
             if (IsReachable(hostUri))
             {
+                HarnessLog.Write("Browser host responded to readiness probe.");
                 return;
             }
 
@@ -207,16 +216,27 @@ internal static class BrowserTestHost
         {
             if (!_startedHost || _hostProcess is null)
             {
+                HarnessLog.Write("Browser host stop requested, but no owned host process is active.");
                 return;
             }
 
+            var hostProcess = _hostProcess;
+            _hostProcess = null;
+            _startedHost = false;
+            _lastOutput = string.Empty;
+
             try
             {
-                if (!_hostProcess.HasExited)
+                HarnessLog.Write($"Stopping browser host process {hostProcess.Id}.");
+                CancelOutputReaders(hostProcess);
+
+                if (!hostProcess.HasExited)
                 {
-                    _hostProcess.Kill(entireProcessTree: true);
-                    _hostProcess.WaitForExit();
+                    hostProcess.Kill(entireProcessTree: true);
+                    hostProcess.WaitForExit((int)HostShutdownTimeout.TotalMilliseconds);
                 }
+
+                HarnessLog.Write("Browser host process stopped.");
             }
             catch
             {
@@ -224,10 +244,29 @@ internal static class BrowserTestHost
             }
             finally
             {
-                _hostProcess.Dispose();
-                _hostProcess = null;
-                _startedHost = false;
+                hostProcess.Dispose();
             }
+        }
+    }
+
+    private static void CancelOutputReaders(Process process)
+    {
+        try
+        {
+            process.CancelOutputRead();
+        }
+        catch
+        {
+            // Best-effort cleanup only.
+        }
+
+        try
+        {
+            process.CancelErrorRead();
+        }
+        catch
+        {
+            // Best-effort cleanup only.
         }
     }
 }

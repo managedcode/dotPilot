@@ -22,7 +22,7 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 ## Local Commands
 
 - `test`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
-- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --collect:"XPlat Code Coverage"`
+- `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
 - `build`: `dotnet build DotPilot.Tests/DotPilot.Tests.csproj`
 
 ## Applicable Skills

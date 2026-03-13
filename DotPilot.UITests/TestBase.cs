@@ -7,10 +7,15 @@ namespace DotPilot.UITests;
     Justification = "UI smoke tests need one-time browser host and driver bootstrap before test execution.")]
 public class TestBase
 {
+    private const string AttachedAppCleanupOperationName = "attached app";
+    private const string BrowserAppCleanupOperationName = "browser app";
+    private const string BrowserHostCleanupOperationName = "browser host";
     private const string ShowBrowserEnvironmentVariableName = "DOTPILOT_UITEST_SHOW_BROWSER";
+    private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
     private static readonly object BrowserAppSyncRoot = new();
+    private static readonly TimeSpan AppCleanupTimeout = TimeSpan.FromSeconds(15);
 
     private static IApp? _browserApp;
     private static readonly BrowserAutomationSettings? _browserAutomation =
@@ -24,7 +29,12 @@ public class TestBase
     {
         if (Constants.CurrentPlatform == Platform.Browser)
         {
+            HarnessLog.Write($"Browser test target URI is '{Constants.WebAssemblyDefaultUri}'.");
+            HarnessLog.Write($"Browser binary path is '{_browserAutomation!.BrowserBinaryPath}'.");
+            HarnessLog.Write($"Browser driver directory is '{_browserAutomation.DriverPath}'.");
+            HarnessLog.Write("Ensuring browser test host is started.");
             BrowserTestHost.EnsureStarted(Constants.WebAssemblyDefaultUri);
+            HarnessLog.Write("Browser test host is reachable.");
         }
 
         AppInitializer.TestEnvironment.AndroidAppName = Constants.AndroidAppName;
@@ -56,37 +66,77 @@ public class TestBase
     [SetUp]
     public void SetUpTest()
     {
+        HarnessLog.Write($"Starting setup for '{TestContext.CurrentContext.Test.Name}'.");
         App = Constants.CurrentPlatform == Platform.Browser
             ? EnsureBrowserApp(_browserAutomation!)
             : AppInitializer.AttachToApp();
+        HarnessLog.Write($"Setup completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
 
     [TearDown]
     public void TearDownTest()
     {
+        HarnessLog.Write($"Starting teardown for '{TestContext.CurrentContext.Test.Name}'.");
         if (_app is not null)
         {
             TakeScreenshot("teardown");
         }
+
+        HarnessLog.Write($"Teardown completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
 
     [OneTimeTearDown]
     public void TearDownFixture()
     {
+        HarnessLog.Write("Starting fixture cleanup.");
+        List<Exception> cleanupFailures = [];
+
         if (_app is not null && !ReferenceEquals(_app, _browserApp))
         {
-            _app.Dispose();
+            TryCleanup(
+                () => _app.Dispose(),
+                AttachedAppCleanupOperationName,
+                cleanupFailures);
         }
 
         _app = null;
 
-        _browserApp?.Dispose();
-        _browserApp = null;
-
-        if (Constants.CurrentPlatform == Platform.Browser)
+        try
         {
-            BrowserTestHost.Stop();
+            if (_browserApp is not null)
+            {
+                TryCleanup(
+                    () => _browserApp.Dispose(),
+                    BrowserAppCleanupOperationName,
+                    cleanupFailures);
+            }
         }
+        finally
+        {
+            _browserApp = null;
+
+            if (Constants.CurrentPlatform == Platform.Browser)
+            {
+                TryCleanup(
+                    BrowserTestHost.Stop,
+                    BrowserHostCleanupOperationName,
+                    cleanupFailures);
+            }
+        }
+
+        if (cleanupFailures.Count == 1)
+        {
+            HarnessLog.Write("Fixture cleanup failed with a single cleanup exception.");
+            throw cleanupFailures[0];
+        }
+
+        if (cleanupFailures.Count > 1)
+        {
+            HarnessLog.Write("Fixture cleanup failed with multiple cleanup exceptions.");
+            throw new AggregateException(cleanupFailures);
+        }
+
+        HarnessLog.Write("Fixture cleanup completed.");
     }
 
     public FileInfo TakeScreenshot(string stepName)
@@ -140,21 +190,21 @@ public class TestBase
         {
             if (_browserApp is not null)
             {
+                HarnessLog.Write("Reusing browser app instance.");
                 return _browserApp;
             }
 
+            HarnessLog.Write("Starting browser app instance.");
             var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
                 .Uri(new Uri(Constants.WebAssemblyDefaultUri))
                 .UsingBrowser(Constants.WebAssemblyBrowser.ToString())
                 .BrowserBinaryPath(browserAutomation.BrowserBinaryPath)
                 .ScreenShotsPath(AppContext.BaseDirectory)
                 .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
+                .SeleniumArgument($"{BrowserWindowSizeArgumentPrefix}{BrowserWindowWidth},{BrowserWindowHeight}")
                 .Headless(_browserHeadless);
 
-            if (!string.IsNullOrWhiteSpace(browserAutomation.DriverPath))
-            {
-                configurator = configurator.DriverPath(browserAutomation.DriverPath);
-            }
+            configurator = configurator.DriverPath(browserAutomation.DriverPath);
 
             if (!_browserHeadless)
             {
@@ -162,7 +212,23 @@ public class TestBase
             }
 
             _browserApp = configurator.StartApp();
+            HarnessLog.Write("Browser app instance started.");
             return _browserApp;
+        }
+    }
+
+    private static void TryCleanup(Action cleanupAction, string operationName, List<Exception> cleanupFailures)
+    {
+        try
+        {
+            HarnessLog.Write($"Running cleanup for '{operationName}'.");
+            BoundedCleanup.Run(cleanupAction, AppCleanupTimeout, operationName);
+            HarnessLog.Write($"Cleanup completed for '{operationName}'.");
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Cleanup failed for '{operationName}': {exception.Message}");
+            cleanupFailures.Add(exception);
         }
     }
 
