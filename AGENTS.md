@@ -132,7 +132,7 @@ For this app:
 - unit tests currently use `NUnit` through the default `VSTest` runner
 - UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - a canceled, timed-out, or hanging `DotPilot.UITests` run is a harness failure to fix, not an acceptable substitute for a real pass or fail result in CI
-- `format` uses `dotnet format --verify-no-changes`
+- `format` uses `dotnet format --verify-no-changes` as a local pre-push check; GitHub Actions validation should not spend CI time rechecking formatting drift that must already be fixed before push
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
 - desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root

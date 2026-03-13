@@ -34,10 +34,6 @@ jobs:
         timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
-      - name: Format
-        shell: pwsh
-        run: dotnet format DotPilot.slnx --verify-no-changes
-
       - name: Build
         shell: pwsh
         run: dotnet build DotPilot.slnx -warnaserror
