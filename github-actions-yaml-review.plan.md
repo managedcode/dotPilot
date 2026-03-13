@@ -83,6 +83,13 @@ Review the current GitHub Actions validation and release workflows, record concr
   - `actionlint .github/workflows/release-publish.yml`
   Done when: touched workflow files still parse cleanly.
 
+- [x] Step 8: Remove deprecated Node 20 JavaScript action usage from GitHub workflows.
+  Verification:
+  - upgrade `actions/checkout` usages to the current stable major
+  - upgrade `actions/setup-dotnet` usage in the shared composite action to the current stable major
+  - `actionlint` still passes for both workflows
+  Done when: the workflows no longer pin the deprecated Node 20 action majors reported by GitHub Actions.
+
 ## Full-Test Baseline Step
 
 - [x] Capture the current workflow state before proposing changes.

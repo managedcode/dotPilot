@@ -39,7 +39,7 @@ jobs:
       release_tag: ${{ steps.resolve_version.outputs.release_tag }}
       release_version: ${{ steps.resolve_version.outputs.display_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -99,7 +99,7 @@ jobs:
             archive_name: dotpilot-desktop-linux.zip
             output_path: artifacts/publish/linux
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
@@ -142,7 +142,7 @@ jobs:
       - prepare_release
       - publish_desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
