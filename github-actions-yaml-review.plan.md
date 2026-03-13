@@ -90,7 +90,11 @@ Review the current GitHub Actions validation and release workflows, record concr
 
 ## Failing Tests And Checks Tracker
 
-- [x] None currently tracked for this review-only pass.
+- [x] `Build Validation #23045490754 -> Quality Gate -> Build`
+  Failure symptom: Windows CI build fails with `Uno.Dsp.Tasks.targets(20,3): error : Unable to find uno.themes.winui.markup in the Nuget cache.`
+  Suspected cause: the `Dsp` Uno feature activates build-time DSP generation in CI even though the generated `Styles/ColorPaletteOverride.xaml` file is already checked into the repo; on GitHub Actions Windows the DSP task looks for a package identity that is not present in the restored NuGet cache.
+  Intended fix path: keep `Dsp` enabled for local design-time regeneration only and disable it in CI by conditioning the feature on the `CI` environment property.
+  Status: fixed locally; `CI=true dotnet build DotPilot.slnx -warnaserror` and `CI=true dotnet test DotPilot.slnx` both pass.
 
 ## Final Validation Skills
 
