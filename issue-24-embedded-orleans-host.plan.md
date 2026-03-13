@@ -50,7 +50,9 @@ Out of scope:
   - `dotnet test DotPilot.slnx`
   - `dotnet format DotPilot.slnx --verify-no-changes`
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- [ ] Commit the implementation and open a PR that uses GitHub closing references for `#24`.
+- [x] Commit the implementation and open a PR that uses GitHub closing references for `#24`.
+  - Commit: `c63c63c` (`Implement embedded Orleans localhost host`)
+  - PR: [#80](https://github.com/managedcode/dotPilot/pull/80)
 
 ## Full-Test Baseline
 
