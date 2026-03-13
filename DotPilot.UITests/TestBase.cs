@@ -7,11 +7,15 @@ namespace DotPilot.UITests;
     Justification = "UI smoke tests need one-time browser host and driver bootstrap before test execution.")]
 public class TestBase
 {
+    private const string AttachedAppCleanupOperationName = "attached app";
+    private const string BrowserAppCleanupOperationName = "browser app";
+    private const string BrowserHostCleanupOperationName = "browser host";
     private const string ShowBrowserEnvironmentVariableName = "DOTPILOT_UITEST_SHOW_BROWSER";
     private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
     private static readonly object BrowserAppSyncRoot = new();
+    private static readonly TimeSpan AppCleanupTimeout = TimeSpan.FromSeconds(15);
 
     private static IApp? _browserApp;
     private static readonly BrowserAutomationSettings? _browserAutomation =
@@ -74,16 +78,27 @@ public class TestBase
     [OneTimeTearDown]
     public void TearDownFixture()
     {
+        List<Exception> cleanupFailures = [];
+
         if (_app is not null && !ReferenceEquals(_app, _browserApp))
         {
-            _app.Dispose();
+            TryCleanup(
+                () => _app.Dispose(),
+                AttachedAppCleanupOperationName,
+                cleanupFailures);
         }
 
         _app = null;
 
         try
         {
-            _browserApp?.Dispose();
+            if (_browserApp is not null)
+            {
+                TryCleanup(
+                    () => _browserApp.Dispose(),
+                    BrowserAppCleanupOperationName,
+                    cleanupFailures);
+            }
         }
         finally
         {
@@ -91,8 +106,21 @@ public class TestBase
 
             if (Constants.CurrentPlatform == Platform.Browser)
             {
-                BrowserTestHost.Stop();
+                TryCleanup(
+                    BrowserTestHost.Stop,
+                    BrowserHostCleanupOperationName,
+                    cleanupFailures);
             }
+        }
+
+        if (cleanupFailures.Count == 1)
+        {
+            throw cleanupFailures[0];
+        }
+
+        if (cleanupFailures.Count > 1)
+        {
+            throw new AggregateException(cleanupFailures);
         }
     }
 
@@ -168,6 +196,18 @@ public class TestBase
 
             _browserApp = configurator.StartApp();
             return _browserApp;
+        }
+    }
+
+    private static void TryCleanup(Action cleanupAction, string operationName, List<Exception> cleanupFailures)
+    {
+        try
+        {
+            BoundedCleanup.Run(cleanupAction, AppCleanupTimeout, operationName);
+        }
+        catch (Exception exception)
+        {
+            cleanupFailures.Add(exception);
         }
     }
 

@@ -1,4 +1,4 @@
-name: Validation Pipeline
+name: Build Validation
 
 on:
   push:
@@ -17,15 +17,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: build-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
-env:
-  STEP_TIMEOUT_MINUTES: 60
 
 jobs:
   build:
-    name: Build
+    name: Quality Gate
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -50,7 +47,7 @@ jobs:
         run: dotnet build DotPilot.slnx -warnaserror
 
   unit_tests:
-    name: Unit Tests
+    name: Unit Test Suite
     runs-on: windows-latest
     timeout-minutes: 60
     needs:
@@ -69,7 +66,7 @@ jobs:
         run: dotnet test ./DotPilot.Tests/DotPilot.Tests.csproj --logger GitHubActions --blame-crash
 
   coverage:
-    name: Coverage
+    name: Coverage Suite
     runs-on: windows-latest
     timeout-minutes: 60
     needs:
@@ -88,7 +85,7 @@ jobs:
         run: dotnet test ./DotPilot.Tests/DotPilot.Tests.csproj --settings ./DotPilot.Tests/coverlet.runsettings --logger GitHubActions --blame-crash --collect:"XPlat Code Coverage"
 
   ui_tests:
-    name: UI Tests
+    name: UI Test Suite
     runs-on: windows-latest
     timeout-minutes: 60
     needs:
@@ -105,50 +102,3 @@ jobs:
       - name: Run UI Tests
         shell: pwsh
         run: dotnet test ./DotPilot.UITests/DotPilot.UITests.csproj --logger GitHubActions --blame-crash
-
-  desktop_artifacts:
-    name: Desktop Artifact (${{ matrix.name }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    needs:
-      - build
-      - unit_tests
-      - coverage
-      - ui_tests
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS
-            runner: macos-latest
-            artifact_name: dotpilot-desktop-macos
-            output_path: artifacts/publish/macos
-          - name: Windows
-            runner: windows-latest
-            artifact_name: dotpilot-desktop-windows
-            output_path: artifacts/publish/windows
-          - name: Linux
-            runner: ubuntu-latest
-            artifact_name: dotpilot-desktop-linux
-            output_path: artifacts/publish/linux
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET SDK from global.json
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Publish Desktop App
-        shell: pwsh
-        run: dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -o ./${{ matrix.output_path }}
-
-      - name: Upload Desktop Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ./${{ matrix.output_path }}
-          if-no-files-found: error
-          retention-days: 14

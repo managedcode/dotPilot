@@ -1,0 +1,222 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version bump type for DotPilot desktop releases
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: Publish the GitHub Release as a prerelease
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate_release_ref:
+    name: Validate Release Ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Supported Release Branches
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" || "${GITHUB_REF_NAME}" == release/* ]]; then
+            exit 0
+          fi
+
+          echo "Desktop releases may only run from main or release/* branches." >&2
+          exit 1
+
+  prepare_release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    needs:
+      - validate_release_ref
+    outputs:
+      application_version: ${{ steps.bump_version.outputs.application_version }}
+      previous_tag: ${{ steps.previous_tag.outputs.value }}
+      release_tag: ${{ steps.bump_version.outputs.release_tag }}
+      release_version: ${{ steps.bump_version.outputs.display_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch Tags
+        shell: bash
+        run: git fetch --tags --force
+
+      - name: Capture Previous Tag
+        id: previous_tag
+        shell: bash
+        run: |
+          previous_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          echo "value=${previous_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump App Version
+        id: bump_version
+        shell: bash
+        run: |
+          python3 ./scripts/release/update_app_version.py \
+            --project-file ./DotPilot/DotPilot.csproj \
+            --bump-type '${{ inputs.version_bump }}' \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Commit Version Bump
+        shell: bash
+        run: |
+          git add DotPilot/DotPilot.csproj
+          git commit -m "chore(release): v${{ steps.bump_version.outputs.display_version }}"
+
+      - name: Create Release Tag
+        shell: bash
+        run: git tag "${{ steps.bump_version.outputs.release_tag }}"
+
+      - name: Push Release Commit And Tag
+        shell: bash
+        run: |
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "${{ steps.bump_version.outputs.release_tag }}"
+
+  publish_desktop:
+    name: Publish Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    needs:
+      - prepare_release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-latest
+            artifact_name: dotpilot-release-macos
+            archive_name: dotpilot-desktop-macos.zip
+            output_path: artifacts/publish/macos
+          - name: Windows
+            runner: windows-latest
+            artifact_name: dotpilot-release-windows
+            archive_name: dotpilot-desktop-windows.zip
+            output_path: artifacts/publish/windows
+          - name: Linux
+            runner: ubuntu-latest
+            artifact_name: dotpilot-release-linux
+            archive_name: dotpilot-desktop-linux.zip
+            output_path: artifacts/publish/linux
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare_release.outputs.release_tag }}
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Publish Desktop App
+        shell: pwsh
+        run: dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop -o ./${{ matrix.output_path }}
+
+      - name: Archive Desktop Publish Output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./artifacts/releases | Out-Null
+          $archivePath = "./artifacts/releases/${{ matrix.archive_name }}"
+          if (Test-Path $archivePath) {
+            Remove-Item $archivePath -Force
+          }
+
+          Compress-Archive -Path "./${{ matrix.output_path }}/*" -DestinationPath $archivePath
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ./artifacts/releases/${{ matrix.archive_name }}
+          if-no-files-found: error
+          retention-days: 14
+
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - prepare_release
+      - publish_desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare_release.outputs.release_tag }}
+
+      - name: Fetch Tags
+        shell: bash
+        run: git fetch --tags --force
+
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts/release-assets
+
+      - name: Generate Feature Summary
+        shell: bash
+        run: |
+          python3 ./scripts/release/get_release_summary.py \
+            --repository '${{ github.repository }}' \
+            --release-tag '${{ needs.prepare_release.outputs.release_tag }}' \
+            --previous-tag '${{ needs.prepare_release.outputs.previous_tag }}' \
+            --output-path ./artifacts/release-summary.md
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ needs.prepare_release.outputs.previous_tag }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.release_version }}
+          REPOSITORY: ${{ github.repository }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          mapfile -t release_assets < <(find ./artifacts/release-assets -type f -name '*.zip' | sort)
+          if [[ ${#release_assets[@]} -eq 0 ]]; then
+            echo "No release assets were downloaded." >&2
+            exit 1
+          fi
+
+          release_notes="$(cat ./artifacts/release-summary.md)"
+          release_command=(
+            gh release create "${RELEASE_TAG}"
+            "${release_assets[@]}"
+            --repo "${REPOSITORY}"
+            --verify-tag
+            --title "DotPilot ${RELEASE_VERSION}"
+            --generate-notes
+            --notes "${release_notes}"
+          )
+
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            release_command+=(--notes-start-tag "${PREVIOUS_TAG}")
+          fi
+
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            release_command+=(--prerelease)
+          fi
+
+          "${release_command[@]}"
