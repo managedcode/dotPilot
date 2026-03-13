@@ -1,0 +1,431 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.ToolchainCenterPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="using:DotPilot.Presentation"
+             xmlns:toolchains="using:DotPilot.Core.Features.ToolchainCenter"
+             AutomationProperties.AutomationId="ToolchainCenterPanel">
+  <UserControl.Resources>
+    <DataTemplate x:Key="ToolchainWorkstreamTemplate"
+                  x:DataType="presentation:ToolchainWorkstreamItem">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="16"
+              Margin="0,0,0,10"
+              Padding="12,10"
+              AutomationProperties.AutomationId="{x:Bind AutomationId}">
+        <StackPanel Spacing="4">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind Workstream.IssueLabel}" />
+          <TextBlock FontSize="13"
+                     FontWeight="SemiBold"
+                     Text="{x:Bind Workstream.Name}" />
+          <TextBlock FontSize="11"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind Workstream.Summary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ToolchainProviderTemplate"
+                  x:DataType="presentation:ToolchainProviderItem">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="16"
+              Margin="0,0,0,10"
+              Padding="12,10">
+        <StackPanel Spacing="4">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind IssueLabel}" />
+          <TextBlock FontSize="13"
+                     FontWeight="SemiBold"
+                     AutomationProperties.AutomationId="{x:Bind AutomationId}"
+                     Text="{x:Bind DisplayName}" />
+          <TextBlock FontSize="11"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind ReadinessSummary}"
+                     TextWrapping="WrapWholeWords" />
+          <Border Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  HorizontalAlignment="Left">
+            <TextBlock FontSize="10"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind ReadinessLabel}" />
+          </Border>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ToolchainDiagnosticTemplate"
+                  x:DataType="toolchains:ToolchainDiagnosticDescriptor">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="16"
+              Margin="0,0,0,10"
+              Padding="12,10">
+        <Grid AutomationProperties.AutomationId="ToolchainDiagnosticItem"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       Text="{x:Bind Name}" />
+            <TextBlock FontSize="11"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{x:Bind Summary}"
+                       TextWrapping="WrapWholeWords" />
+          </StackPanel>
+          <Border Grid.Column="1"
+                  Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  VerticalAlignment="Top">
+            <TextBlock FontSize="10"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind Status}" />
+          </Border>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ToolchainConfigurationTemplate"
+                  x:DataType="toolchains:ToolchainConfigurationEntry">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="16"
+              Margin="0,0,0,10"
+              Padding="12,10">
+        <Grid AutomationProperties.AutomationId="ToolchainConfigurationItem"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       Text="{x:Bind Name}" />
+            <TextBlock FontSize="12"
+                       Text="{x:Bind ValueDisplay}" />
+            <TextBlock FontSize="11"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{x:Bind Summary}"
+                       TextWrapping="WrapWholeWords" />
+          </StackPanel>
+          <Border Grid.Column="1"
+                  Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  VerticalAlignment="Top">
+            <TextBlock FontSize="10"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind Status}" />
+          </Border>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ToolchainActionTemplate"
+                  x:DataType="toolchains:ToolchainActionDescriptor">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="16"
+              Margin="0,0,0,10"
+              Padding="12,10">
+        <Grid AutomationProperties.AutomationId="ToolchainActionItem"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       Text="{x:Bind Title}" />
+            <TextBlock FontSize="11"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{x:Bind Summary}"
+                       TextWrapping="WrapWholeWords" />
+          </StackPanel>
+          <Border Grid.Column="1"
+                  Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  VerticalAlignment="Top">
+            <TextBlock FontSize="10"
+                       Foreground="{StaticResource AppPrimaryTextBrush}">
+              <Run Text="{x:Bind Kind}" />
+              <Run Text=" · " />
+              <Run Text="{x:Bind IsEnabled}" />
+            </TextBlock>
+          </Border>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Grid RowSpacing="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Border Style="{StaticResource GlassPanelStyle}">
+      <StackPanel Spacing="12">
+        <StackPanel Spacing="4">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding ToolchainCenter.EpicLabel}" />
+          <TextBlock FontSize="24"
+                     FontWeight="SemiBold"
+                     Text="Toolchain Center" />
+          <TextBlock FontSize="12"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding ToolchainCenter.Summary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+
+        <Border Background="{StaticResource AppBadgeSurfaceBrush}"
+                CornerRadius="100"
+                Padding="12,6"
+                HorizontalAlignment="Left">
+          <TextBlock AutomationProperties.AutomationId="ToolchainBackgroundPolling"
+                     FontSize="11"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{Binding ToolchainCenter.BackgroundPolling.Summary}" />
+        </Border>
+
+        <ItemsControl AutomationProperties.AutomationId="ToolchainWorkstreamsList"
+                      ItemTemplate="{StaticResource ToolchainWorkstreamTemplate}"
+                      ItemsSource="{Binding ToolchainWorkstreams}" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="1"
+          ColumnSpacing="20">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="320" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource GlassPanelStyle}">
+        <StackPanel Spacing="14">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="PROVIDERS" />
+          <ListView AutomationProperties.AutomationId="ToolchainProviderList"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    ItemsSource="{Binding ToolchainProviders}"
+                    SelectedItem="{Binding SelectedToolchainProvider, Mode=TwoWay}"
+                    SelectionMode="Single"
+                    ItemTemplate="{StaticResource ToolchainProviderTemplate}" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="1"
+              Style="{StaticResource GlassPanelStyle}">
+        <StackPanel Spacing="16">
+          <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+              <TextBlock CharacterSpacing="80"
+                         FontSize="11"
+                         FontWeight="Medium"
+                         Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding SelectedToolchainProviderSnapshot.IssueLabel}" />
+              <TextBlock AutomationProperties.AutomationId="SelectedToolchainProviderTitle"
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Text="{Binding SelectedToolchainProviderSnapshot.Provider.DisplayName}" />
+              <TextBlock FontSize="12"
+                         Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding SelectedToolchainProviderSnapshot.ReadinessSummary}"
+                         TextWrapping="WrapWholeWords" />
+            </StackPanel>
+            <Border Grid.Column="1"
+                    Background="{StaticResource AppAccentBrush}"
+                    CornerRadius="100"
+                    Padding="12,6"
+                    VerticalAlignment="Top">
+              <TextBlock FontSize="11"
+                         Foreground="{StaticResource AppPrimaryTextBrush}"
+                         Text="{Binding SelectedToolchainProviderSnapshot.ReadinessState}" />
+            </Border>
+          </Grid>
+
+          <ItemsControl AutomationProperties.AutomationId="ToolchainProviderFacts"
+                        ItemsSource="{Binding SelectedToolchainProviderSnapshot.Diagnostics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="toolchains:ToolchainDiagnosticDescriptor">
+                <Border Background="{StaticResource AppBadgeSurfaceBrush}"
+                        CornerRadius="100"
+                        Padding="10,4">
+                  <TextBlock FontSize="10"
+                             Foreground="{StaticResource AppPrimaryTextBrush}">
+                    <Run Text="{x:Bind Name}" />
+                    <Run Text=" · " />
+                    <Run Text="{x:Bind Status}" />
+                  </TextBlock>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="10">
+              <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                      CornerRadius="16"
+                      Padding="12,10">
+                <StackPanel Spacing="4">
+                  <TextBlock CharacterSpacing="80"
+                             FontSize="11"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="VERSION" />
+                  <TextBlock FontSize="13"
+                             FontWeight="SemiBold"
+                             Text="{Binding SelectedToolchainProviderSnapshot.InstalledVersion}" />
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding SelectedToolchainProviderSnapshot.VersionSummary}"
+                             TextWrapping="WrapWholeWords" />
+                </StackPanel>
+              </Border>
+              <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                      CornerRadius="16"
+                      Padding="12,10">
+                <StackPanel Spacing="4">
+                  <TextBlock CharacterSpacing="80"
+                             FontSize="11"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="AUTH" />
+                  <TextBlock FontSize="13"
+                             FontWeight="SemiBold"
+                             Text="{Binding SelectedToolchainProviderSnapshot.AuthStatus}" />
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding SelectedToolchainProviderSnapshot.AuthSummary}"
+                             TextWrapping="WrapWholeWords" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <StackPanel Grid.Column="1"
+                        Spacing="10">
+              <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                      CornerRadius="16"
+                      Padding="12,10">
+                <StackPanel Spacing="4">
+                  <TextBlock CharacterSpacing="80"
+                             FontSize="11"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="HEALTH" />
+                  <TextBlock FontSize="13"
+                             FontWeight="SemiBold"
+                             Text="{Binding SelectedToolchainProviderSnapshot.HealthStatus}" />
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding SelectedToolchainProviderSnapshot.HealthSummary}"
+                             TextWrapping="WrapWholeWords" />
+                </StackPanel>
+              </Border>
+              <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                      CornerRadius="16"
+                      Padding="12,10">
+                <StackPanel Spacing="4">
+                  <TextBlock CharacterSpacing="80"
+                             FontSize="11"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="POLLING" />
+                  <TextBlock FontSize="13"
+                             FontWeight="SemiBold"
+                             Text="{Binding SelectedToolchainProviderSnapshot.Polling.Status}" />
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding SelectedToolchainProviderSnapshot.Polling.Summary}"
+                             TextWrapping="WrapWholeWords" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Grid>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <StackPanel Spacing="8">
+            <TextBlock CharacterSpacing="80"
+                       FontSize="11"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="DIAGNOSTICS" />
+            <ItemsControl AutomationProperties.AutomationId="ToolchainDiagnosticsList"
+                          ItemTemplate="{StaticResource ToolchainDiagnosticTemplate}"
+                          ItemsSource="{Binding SelectedToolchainProviderSnapshot.Diagnostics}" />
+          </StackPanel>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <StackPanel Spacing="8">
+            <TextBlock CharacterSpacing="80"
+                       FontSize="11"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="CONFIGURATION" />
+            <ItemsControl AutomationProperties.AutomationId="ToolchainConfigurationList"
+                          ItemTemplate="{StaticResource ToolchainConfigurationTemplate}"
+                          ItemsSource="{Binding SelectedToolchainProviderSnapshot.Configuration}" />
+          </StackPanel>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <StackPanel Spacing="8">
+            <TextBlock CharacterSpacing="80"
+                       FontSize="11"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="ACTIONS" />
+            <ItemsControl AutomationProperties.AutomationId="ToolchainActionsList"
+                          ItemTemplate="{StaticResource ToolchainActionTemplate}"
+                          ItemsSource="{Binding SelectedToolchainProviderSnapshot.Actions}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

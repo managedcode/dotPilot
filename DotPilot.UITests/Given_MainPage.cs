@@ -1,171 +1,361 @@
 namespace DotPilot.UITests;
 
+[NonParallelizable]
 public class GivenMainPage : TestBase
 {
     private static readonly TimeSpan InitialScreenProbeTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ScreenTransitionTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan QueryRetryFrequency = TimeSpan.FromMilliseconds(250);
-    private const double DesktopSectionMinimumWidth = 900d;
-    private const string MainChatScreenAutomationId = "MainChatScreen";
-    private const string ChatSidebarAutomationId = "ChatSidebar";
-    private const string ChatMessagesListAutomationId = "ChatMessagesList";
-    private const string ChatMembersListAutomationId = "ChatMembersList";
-    private const string AgentsNavButtonAutomationId = "AgentsNavButton";
+    private static readonly TimeSpan ShortProbeTimeout = TimeSpan.FromSeconds(3);
+    private const string WorkbenchScreenAutomationId = "WorkbenchScreen";
+    private const string SettingsScreenAutomationId = "SettingsScreen";
     private const string AgentBuilderScreenAutomationId = "AgentBuilderScreen";
-    private const string AgentBasicInfoSectionAutomationId = "AgentBasicInfoSection";
-    private const string AgentPromptSectionAutomationId = "AgentPromptSection";
-    private const string AgentSkillsSectionAutomationId = "AgentSkillsSection";
-    private const string PromptTemplateButtonAutomationId = "PromptTemplateButton";
-    private const string BackToChatButtonAutomationId = "BackToChatButton";
-    private const string SidebarChatButtonAutomationId = "SidebarChatButton";
+    private const string WorkbenchSessionTitleAutomationId = "WorkbenchSessionTitle";
+    private const string WorkbenchPreviewEditorAutomationId = "WorkbenchPreviewEditor";
+    private const string RepositoryNodesListAutomationId = "RepositoryNodesList";
+    private const string WorkbenchSearchInputAutomationId = "WorkbenchSearchInput";
+    private const string SelectedDocumentTitleAutomationId = "SelectedDocumentTitle";
+    private const string DocumentViewModeToggleAutomationId = "DocumentViewModeToggle";
+    private const string WorkbenchDiffLinesListAutomationId = "WorkbenchDiffLinesList";
+    private const string WorkbenchDiffLineItemAutomationId = "WorkbenchDiffLineItem";
+    private const string InspectorModeToggleAutomationId = "InspectorModeToggle";
+    private const string ArtifactDockListAutomationId = "ArtifactDockList";
+    private const string ArtifactDockItemAutomationId = "ArtifactDockItem";
+    private const string RuntimeLogListAutomationId = "RuntimeLogList";
+    private const string RuntimeLogItemAutomationId = "RuntimeLogItem";
+    private const string WorkbenchNavButtonAutomationId = "WorkbenchNavButton";
+    private const string AgentSidebarWorkbenchButtonAutomationId = "AgentSidebarWorkbenchButton";
+    private const string SettingsSidebarWorkbenchButtonAutomationId = "SettingsSidebarWorkbenchButton";
+    private const string WorkbenchSidebarAgentsButtonAutomationId = "WorkbenchSidebarAgentsButton";
+    private const string SettingsSidebarAgentsButtonAutomationId = "SettingsSidebarAgentsButton";
+    private const string BackToWorkbenchButtonAutomationId = "BackToWorkbenchButton";
+    private const string WorkbenchSidebarSettingsButtonAutomationId = "WorkbenchSidebarSettingsButton";
+    private const string SettingsCategoryListAutomationId = "SettingsCategoryList";
+    private const string SettingsEntriesListAutomationId = "SettingsEntriesList";
+    private const string SelectedSettingsCategoryTitleAutomationId = "SelectedSettingsCategoryTitle";
+    private const string StorageSettingsCategoryAutomationId = "SettingsCategory-storage";
+    private const string ToolchainSettingsCategoryAutomationId = "SettingsCategory-toolchains";
+    private const string ToolchainCenterPanelAutomationId = "ToolchainCenterPanel";
+    private const string ToolchainProviderListAutomationId = "ToolchainProviderList";
+    private const string SelectedToolchainProviderTitleAutomationId = "SelectedToolchainProviderTitle";
+    private const string ToolchainDiagnosticsListAutomationId = "ToolchainDiagnosticsList";
+    private const string ToolchainConfigurationListAutomationId = "ToolchainConfigurationList";
+    private const string ToolchainActionsListAutomationId = "ToolchainActionsList";
+    private const string ToolchainBackgroundPollingAutomationId = "ToolchainBackgroundPolling";
+    private const string ClaudeToolchainProviderAutomationId = "ToolchainProvider-claude";
+    private const string SettingsPageSearchText = "SettingsPage";
+    private const string SettingsPageDocumentTitle = "SettingsPage.xaml";
+    private const string SettingsPageRepositoryNodeAutomationId = "RepositoryNodeTap-dotpilot-presentation-settingspage-xaml";
     private const string RuntimeFoundationPanelAutomationId = "RuntimeFoundationPanel";
-    private const string RuntimeFoundationSlicesListAutomationId = "RuntimeFoundationSlicesList";
-    private const string RuntimeFoundationProvidersListAutomationId = "RuntimeFoundationProvidersList";
-    private const string RuntimeFoundationDeterministicClientAutomationId = "RuntimeFoundationDeterministicClient";
-    private const string RuntimeFoundationSliceItemAutomationId = "RuntimeFoundationSliceItem";
-    private const string RuntimeFoundationProviderItemAutomationId = "RuntimeFoundationProviderItem";
-    private const string AgentBuilderRuntimeBannerAutomationId = "AgentBuilderRuntimeBanner";
-    private const string AgentBuilderRuntimeIssueLabelAutomationId = "AgentBuilderRuntimeIssueLabel";
-    private const string AgentBuilderRuntimeSummaryAutomationId = "AgentBuilderRuntimeSummary";
-    private const string AgentBuilderRuntimeClientAutomationId = "AgentBuilderRuntimeClient";
-    private const string AgentBuilderWidthFailureMessage =
-        "The browser smoke host dropped below the desktop layout width threshold.";
 
     [Test]
-    public async Task WhenOpeningTheAppThenChatShellSectionsAreVisible()
+    public async Task WhenOpeningTheAppThenWorkbenchSectionsAreVisible()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.WaitForElement(ByMarked(ChatSidebarAutomationId));
-        App.WaitForElement(ByMarked(ChatMessagesListAutomationId));
-        App.WaitForElement(ByMarked(ChatMembersListAutomationId));
-        App.WaitForElement(ByMarked(RuntimeFoundationPanelAutomationId));
-        App.WaitForElement(ByMarked(RuntimeFoundationSlicesListAutomationId));
-        App.WaitForElement(ByMarked(RuntimeFoundationProvidersListAutomationId));
-        TakeScreenshot("chat_shell_visible");
+        EnsureOnWorkbenchScreen();
+        EnsureArtifactDockVisible();
+        WaitForElement(WorkbenchNavButtonAutomationId);
+        WaitForElement(WorkbenchSessionTitleAutomationId);
+        WaitForElement(WorkbenchPreviewEditorAutomationId);
+        WaitForElement(RepositoryNodesListAutomationId);
+        WaitForElement(ArtifactDockListAutomationId);
+        WaitForElement(ArtifactDockItemAutomationId);
+        WaitForElement(RuntimeFoundationPanelAutomationId);
+        TakeScreenshot("workbench_shell_visible");
     }
 
     [Test]
-    public async Task WhenNavigatingToAgentBuilderThenKeySectionsAreVisible()
+    public async Task WhenFilteringTheRepositoryThenTheMatchingFileOpens()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.Tap(ByMarked(AgentsNavButtonAutomationId));
-        App.WaitForElement(ByMarked(AgentBuilderScreenAutomationId));
-        App.WaitForElement(ByMarked(AgentBasicInfoSectionAutomationId));
-        App.Find(AgentPromptSectionAutomationId, ScreenTransitionTimeout);
-        App.Find(AgentSkillsSectionAutomationId, ScreenTransitionTimeout);
-        App.Find(PromptTemplateButtonAutomationId, ScreenTransitionTimeout);
-        App.WaitForElement(ByMarked(AgentBuilderRuntimeBannerAutomationId));
-        App.WaitForElement(ByMarked(AgentBuilderRuntimeIssueLabelAutomationId));
-        App.WaitForElement(ByMarked(AgentBuilderRuntimeSummaryAutomationId));
-        App.WaitForElement(ByMarked(AgentBuilderRuntimeClientAutomationId));
-        TakeScreenshot("agent_builder_sections_visible");
+        EnsureOnWorkbenchScreen();
+        OpenSettingsPageDocumentFromRepositorySearch();
+
+        TakeScreenshot("repository_search_open_file");
     }
 
     [Test]
-    public async Task WhenReturningToChatFromAgentBuilderThenChatShellSectionsAreVisible()
+    public async Task WhenSwitchingToDiffReviewThenDiffSurfaceIsVisible()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.Tap(ByMarked(AgentsNavButtonAutomationId));
-        App.WaitForElement(ByMarked(SidebarChatButtonAutomationId));
-        App.Tap(ByMarked(SidebarChatButtonAutomationId));
-        App.WaitForElement(ByMarked(MainChatScreenAutomationId));
-        App.WaitForElement(ByMarked(ChatMessagesListAutomationId));
-        App.WaitForElement(ByMarked(RuntimeFoundationPanelAutomationId));
-        TakeScreenshot("chat_shell_restored");
+        EnsureOnWorkbenchScreen();
+        EnsureDiffReviewVisible();
+        WaitForElement(WorkbenchDiffLinesListAutomationId);
+        WaitForElement(WorkbenchDiffLineItemAutomationId);
+
+        TakeScreenshot("diff_review_visible");
     }
 
     [Test]
-    public async Task WhenOpeningTheAppThenRuntimeFoundationPanelShowsSlicesAndProviders()
+    public async Task WhenSwitchingInspectorModeThenRuntimeLogConsoleIsVisible()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.WaitForElement(ByMarked(RuntimeFoundationDeterministicClientAutomationId));
+        EnsureOnWorkbenchScreen();
+        EnsureRuntimeLogVisible();
+        WaitForElement(RuntimeLogListAutomationId);
+        WaitForElement(RuntimeLogItemAutomationId);
 
-        var sliceItems = GetResults(RuntimeFoundationSliceItemAutomationId);
-        var providerItems = GetResults(RuntimeFoundationProviderItemAutomationId);
-
-        Assert.That(sliceItems, Has.Length.EqualTo(4));
-        Assert.That(providerItems.Length, Is.GreaterThanOrEqualTo(4));
-
-        TakeScreenshot("runtime_foundation_panel");
+        TakeScreenshot("runtime_log_console_visible");
     }
 
     [Test]
-    public async Task WhenNavigatingAcrossWorkbenchThenRuntimeFoundationRemainsVisible()
+    public async Task WhenNavigatingToSettingsThenCategoriesAndEntriesAreVisible()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.WaitForElement(ByMarked(RuntimeFoundationPanelAutomationId));
-        App.Tap(ByMarked(AgentsNavButtonAutomationId));
-        App.WaitForElement(ByMarked(AgentBuilderRuntimeBannerAutomationId));
-        App.Tap(ByMarked(SidebarChatButtonAutomationId));
-        App.WaitForElement(ByMarked(RuntimeFoundationPanelAutomationId));
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(SettingsCategoryListAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        WaitForElement(ToolchainProviderListAutomationId);
+        TapAutomationElement(StorageSettingsCategoryAutomationId);
+        WaitForElement(SettingsEntriesListAutomationId);
 
-        TakeScreenshot("runtime_foundation_roundtrip");
+        var categoryTitle = GetSingleTextContent(SelectedSettingsCategoryTitleAutomationId);
+        Assert.That(categoryTitle, Is.EqualTo("Storage"));
+
+        TakeScreenshot("settings_shell_visible");
     }
 
     [Test]
-    public async Task WhenOpeningAgentBuilderThenDesktopSectionWidthIsPreserved()
+    public async Task WhenNavigatingFromSettingsToAgentsThenAgentBuilderIsVisible()
     {
         await Task.CompletedTask;
 
-        EnsureOnMainChatScreen();
-        App.Tap(ByMarked(AgentsNavButtonAutomationId));
-        App.WaitForElement(ByMarked(AgentBasicInfoSectionAutomationId));
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForElement(BackToWorkbenchButtonAutomationId);
 
-        var basicInfoSection = GetSingleResult(AgentBasicInfoSectionAutomationId);
-        Assert.That(
-            basicInfoSection.Rect.Width,
-            Is.GreaterThanOrEqualTo(DesktopSectionMinimumWidth),
-            AgentBuilderWidthFailureMessage);
-
-        TakeScreenshot("agent_builder_desktop_width");
+        TakeScreenshot("settings_to_agents_navigation");
     }
 
-    private void EnsureOnMainChatScreen()
+    [Test]
+    public async Task WhenReturningFromSettingsToWorkbenchThenWorkbenchScreenIsVisible()
     {
-        var mainChatScreen = ByMarked(MainChatScreenAutomationId);
-        if (TryWaitForElement(mainChatScreen, InitialScreenProbeTimeout))
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        TapAutomationElement(SettingsSidebarWorkbenchButtonAutomationId);
+        EnsureOnWorkbenchScreen();
+        WaitForElement(RuntimeFoundationPanelAutomationId);
+
+        TakeScreenshot("settings_to_workbench_navigation");
+    }
+
+    [Test]
+    public async Task WhenNavigatingToSettingsThenToolchainCenterProviderDetailsAreVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ToolchainSettingsCategoryAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        WaitForElement(ToolchainProviderListAutomationId);
+        WaitForElement(SelectedToolchainProviderTitleAutomationId);
+        WaitForElement(ToolchainDiagnosticsListAutomationId);
+        WaitForElement(ToolchainConfigurationListAutomationId);
+        WaitForElement(ToolchainActionsListAutomationId);
+        WaitForElement(ToolchainBackgroundPollingAutomationId);
+
+        TakeScreenshot("toolchain_center_visible");
+    }
+
+    [Test]
+    public async Task WhenSwitchingToolchainProvidersThenProviderSpecificDetailsAreVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ClaudeToolchainProviderAutomationId);
+        TapAutomationElement(ClaudeToolchainProviderAutomationId);
+        WaitForElement(SelectedToolchainProviderTitleAutomationId);
+
+        var providerTitle = GetSingleTextContent(SelectedToolchainProviderTitleAutomationId);
+        Assert.That(providerTitle, Is.EqualTo("Claude Code"));
+
+        WaitForElement(ToolchainDiagnosticsListAutomationId);
+        WaitForElement(ToolchainConfigurationListAutomationId);
+        WaitForElement(ToolchainActionsListAutomationId);
+
+        TakeScreenshot("toolchain_center_claude_details");
+    }
+
+    [Test]
+    public async Task WhenNavigatingToSettingsAfterOpeningADocumentThenSettingsScreenIsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        OpenSettingsPageDocumentFromRepositorySearch();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+
+        TakeScreenshot("document_to_settings_navigation");
+    }
+
+    [Test]
+    public async Task WhenNavigatingToAgentsAfterOpeningADocumentThenAgentBuilderIsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        OpenSettingsPageDocumentFromRepositorySearch();
+        TapAutomationElement(WorkbenchSidebarAgentsButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+
+        TakeScreenshot("document_to_agents_navigation");
+    }
+
+    [Test]
+    public async Task WhenNavigatingToSettingsAfterChangingWorkbenchModesThenSettingsScreenIsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        OpenSettingsPageDocumentFromRepositorySearch();
+        EnsureDiffReviewVisible();
+        EnsureRuntimeLogVisible();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+
+        TakeScreenshot("workbench_modes_to_settings_navigation");
+    }
+
+    [Test]
+    public async Task WhenRunningAWorkbenchRoundTripThenTheMainShellCanBeRestored()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        OpenSettingsPageDocumentFromRepositorySearch();
+        EnsureDiffReviewVisible();
+        EnsureRuntimeLogVisible();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        TapAutomationElement(StorageSettingsCategoryAutomationId);
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        TapAutomationElement(AgentSidebarWorkbenchButtonAutomationId);
+        EnsureOnWorkbenchScreen();
+        WaitForElement(RuntimeFoundationPanelAutomationId);
+
+        TakeScreenshot("workbench_roundtrip_restored");
+    }
+
+    private void EnsureOnWorkbenchScreen()
+    {
+        if (TryWaitForWorkbenchSurface(InitialScreenProbeTimeout))
         {
             return;
         }
 
-        var backToChatButton = ByMarked(BackToChatButtonAutomationId);
-        var sidebarChatButton = ByMarked(SidebarChatButtonAutomationId);
-        if (TryWaitForElement(backToChatButton, InitialScreenProbeTimeout))
+        if (TryWaitForElement(AgentSidebarWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
         {
-            App.Tap(backToChatButton);
+            TapAutomationElement(AgentSidebarWorkbenchButtonAutomationId);
         }
-        else if (TryWaitForElement(sidebarChatButton, InitialScreenProbeTimeout))
+        else if (TryWaitForElement(BackToWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
         {
-            App.Tap(sidebarChatButton);
+            TapAutomationElement(BackToWorkbenchButtonAutomationId);
+        }
+        else if (TryWaitForElement(SettingsSidebarWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
+        {
+            TapAutomationElement(SettingsSidebarWorkbenchButtonAutomationId);
         }
 
-        App.WaitForElement(
-            mainChatScreen,
-            timeoutMessage: "Timed out returning to the main chat screen.",
-            timeout: ScreenTransitionTimeout,
-            retryFrequency: QueryRetryFrequency);
+        WaitForElement(WorkbenchScreenAutomationId, "Timed out returning to the workbench screen.", ScreenTransitionTimeout);
+        WaitForElement(WorkbenchSearchInputAutomationId);
+        WaitForElement(SelectedDocumentTitleAutomationId);
     }
 
-    private bool TryWaitForElement(Query query, TimeSpan timeout)
+    private bool TryWaitForWorkbenchSurface(TimeSpan timeout)
+    {
+        if (!TryWaitForElement(WorkbenchScreenAutomationId, timeout))
+        {
+            return false;
+        }
+
+        if (!TryWaitForElement(WorkbenchNavButtonAutomationId, timeout))
+        {
+            return false;
+        }
+
+        if (!TryWaitForElement(WorkbenchSearchInputAutomationId, timeout))
+        {
+            return false;
+        }
+
+        return TryWaitForElement(SelectedDocumentTitleAutomationId, timeout);
+    }
+
+    private void EnsureArtifactDockVisible()
+    {
+        if (TryWaitForElement(ArtifactDockListAutomationId, ShortProbeTimeout))
+        {
+            return;
+        }
+
+        if (TryWaitForElement(RuntimeLogListAutomationId, ShortProbeTimeout))
+        {
+            App.Tap(InspectorModeToggleAutomationId);
+        }
+
+        WaitForElement(ArtifactDockListAutomationId);
+    }
+
+    private void EnsureRuntimeLogVisible()
+    {
+        if (TryWaitForElement(RuntimeLogListAutomationId, ShortProbeTimeout))
+        {
+            return;
+        }
+
+        App.Tap(InspectorModeToggleAutomationId);
+        WaitForElement(RuntimeLogListAutomationId);
+    }
+
+    private void OpenSettingsPageDocumentFromRepositorySearch()
+    {
+        App.ClearText(WorkbenchSearchInputAutomationId);
+        App.EnterText(WorkbenchSearchInputAutomationId, SettingsPageSearchText);
+        WaitForElement(SettingsPageRepositoryNodeAutomationId);
+        TapAutomationElement(SettingsPageRepositoryNodeAutomationId);
+        WaitForElement(SelectedDocumentTitleAutomationId);
+
+        var title = GetSingleTextContent(SelectedDocumentTitleAutomationId);
+        Assert.That(title, Is.EqualTo(SettingsPageDocumentTitle));
+    }
+
+    private void EnsureDiffReviewVisible()
+    {
+        if (TryWaitForElement(WorkbenchDiffLinesListAutomationId, ShortProbeTimeout))
+        {
+            return;
+        }
+
+        App.Tap(DocumentViewModeToggleAutomationId);
+        WaitForElement(WorkbenchDiffLinesListAutomationId);
+    }
+
+    private bool TryWaitForElement(string automationId, TimeSpan timeout)
     {
         try
         {
-            App.WaitForElement(
-                query,
-                timeoutMessage: "Element probe timed out.",
-                timeout: timeout,
-                retryFrequency: QueryRetryFrequency);
-
+            WaitForElement(automationId, "Element probe timed out.", timeout);
             return true;
         }
         catch (TimeoutException)
@@ -174,20 +364,84 @@ public class GivenMainPage : TestBase
         }
     }
 
-    private IAppResult GetSingleResult(string automationId)
+    private string GetSingleTextContent(string automationId)
     {
-        var results = App.Query(ByMarked(automationId));
+        var results = App.Query(automationId);
         Assert.That(results, Has.Length.EqualTo(1), $"Expected a single result for automation id '{automationId}'.");
-        return results[0];
+        return NormalizeTextContent(results[0].Text);
     }
 
-    private IAppResult[] GetResults(string automationId)
+    private static string NormalizeTextContent(string value)
     {
-        return App.Query(ByMarked(automationId));
+        var segments = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', segments);
     }
 
-    private static Query ByMarked(string automationId)
+    private IAppResult[] WaitForElement(string automationId, string? timeoutMessage = null, TimeSpan? timeout = null)
     {
-        return q => q.All().Marked(automationId);
+        try
+        {
+            return App.WaitForElement(
+                automationId,
+                timeoutMessage ?? $"Timed out waiting for automation id '{automationId}'.",
+                timeout ?? ScreenTransitionTimeout,
+                QueryRetryFrequency,
+                null);
+        }
+        catch (TimeoutException)
+        {
+            WriteTimeoutDiagnostics(automationId);
+            throw;
+        }
+    }
+
+    private void WriteTimeoutDiagnostics(string automationId)
+    {
+        WriteBrowserSystemLogs($"timeout:{automationId}");
+        WriteBrowserDomSnapshot($"timeout:{automationId}", automationId);
+        WriteSelectorDiagnostics(automationId);
+
+        try
+        {
+            TakeScreenshot($"timeout_{automationId}");
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Timeout screenshot capture failed for '{automationId}': {exception.Message}");
+        }
+    }
+
+    private void WriteSelectorDiagnostics(string timedOutAutomationId)
+    {
+        var automationIds = new[]
+        {
+            timedOutAutomationId,
+            WorkbenchScreenAutomationId,
+            SettingsScreenAutomationId,
+            AgentBuilderScreenAutomationId,
+            WorkbenchNavButtonAutomationId,
+            AgentSidebarWorkbenchButtonAutomationId,
+            SettingsSidebarWorkbenchButtonAutomationId,
+            WorkbenchSidebarAgentsButtonAutomationId,
+            SettingsSidebarAgentsButtonAutomationId,
+            WorkbenchSidebarSettingsButtonAutomationId,
+            WorkbenchSearchInputAutomationId,
+            SelectedDocumentTitleAutomationId,
+            RuntimeFoundationPanelAutomationId,
+            BackToWorkbenchButtonAutomationId,
+        };
+
+        foreach (var automationId in automationIds.Distinct(StringComparer.Ordinal))
+        {
+            try
+            {
+                var matches = App.Query(automationId);
+                HarnessLog.Write($"Selector diagnostic '{automationId}' returned {matches.Length} matches.");
+            }
+            catch (Exception exception)
+            {
+                HarnessLog.Write($"Selector diagnostic '{automationId}' failed: {exception.Message}");
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeFoundation;
+using DotPilot.Runtime.Features.ToolchainCenter;
 
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
 
@@ -9,6 +10,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         "Issue #12 is staged into isolated contracts, communication, host, and orchestration slices so the Uno workbench can stay presentation-only.";
     private const string DeterministicProbePrompt =
         "Summarize the runtime foundation readiness for a local-first session that may require approval.";
+    private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
     private const string DomainModelName = "Domain contracts";
     private const string DomainModelSummary =
         "Typed identifiers and durable agent, session, fleet, provider, and runtime contracts live outside the Uno app.";
@@ -21,13 +23,6 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
     private const string OrchestrationName = "Orchestration runtime";
     private const string OrchestrationSummary =
         "Agent Framework integration is prepared as a separate slice that can plug into the embedded host without reshaping the UI layer.";
-
-    private readonly IAgentRuntimeClient _deterministicClient;
-    public RuntimeFoundationCatalog(IAgentRuntimeClient deterministicClient)
-    {
-        ArgumentNullException.ThrowIfNull(deterministicClient);
-        _deterministicClient = deterministicClient;
-    }
 
     public RuntimeFoundationSnapshot GetSnapshot()
     {
@@ -71,7 +66,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         ];
     }
 
-    private IReadOnlyList<ProviderDescriptor> CreateProviders()
+    private static IReadOnlyList<ProviderDescriptor> CreateProviders()
     {
         return
         [
@@ -81,21 +76,11 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
                 DisplayName = ProviderToolchainNames.DeterministicClientDisplayName,
                 CommandName = ProviderToolchainNames.DeterministicClientCommandName,
                 Status = ProviderConnectionStatus.Available,
-                StatusSummary = _deterministicClient.GetType().Name,
+                StatusSummary = DeterministicClientStatusSummary,
                 RequiresExternalToolchain = false,
             },
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.CodexDisplayName,
-                ProviderToolchainNames.CodexCommandName,
-                true),
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.ClaudeCodeDisplayName,
-                ProviderToolchainNames.ClaudeCodeCommandName,
-                true),
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.GitHubCopilotDisplayName,
-                ProviderToolchainNames.GitHubCopilotCommandName,
-                true),
+            .. ToolchainProviderSnapshotFactory.Create(TimeProvider.System.GetUtcNow())
+                .Select(snapshot => snapshot.Provider),
         ];
     }
 }

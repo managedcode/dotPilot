@@ -1,0 +1,84 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.WorkbenchActivityPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:workbench="using:DotPilot.Core.Features.Workbench"
+             AutomationProperties.AutomationId="WorkbenchActivityPanel">
+  <Border Style="{StaticResource GlassPanelStyle}">
+    <StackPanel Spacing="16">
+      <Grid ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Spacing="4">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding EpicLabel}" />
+          <TextBlock AutomationProperties.AutomationId="WorkbenchSessionTitle"
+                     FontSize="20"
+                     FontWeight="SemiBold"
+                     Text="{Binding PageTitle}" />
+          <TextBlock FontSize="12"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding SessionSummary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+        <Border Grid.Column="1"
+                Background="{StaticResource AppAccentBrush}"
+                CornerRadius="100"
+                Padding="12,6"
+                VerticalAlignment="Top">
+          <TextBlock FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{Binding SessionStage}" />
+        </Border>
+      </Grid>
+
+      <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+      <ItemsControl AutomationProperties.AutomationId="WorkbenchSessionEntriesList"
+                    ItemsSource="{Binding SessionEntries}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="workbench:WorkbenchSessionEntry">
+            <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                    BorderBrush="{StaticResource AppOutlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Margin="0,0,0,10"
+                    Padding="14,12">
+              <Grid AutomationProperties.AutomationId="WorkbenchSessionEntryItem"
+                    ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="4">
+                  <TextBlock FontSize="13"
+                             FontWeight="SemiBold"
+                             Text="{x:Bind Title}" />
+                  <TextBlock FontSize="12"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{x:Bind Summary}"
+                             TextWrapping="WrapWholeWords" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            Spacing="4">
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{x:Bind Timestamp}" />
+                  <TextBlock FontSize="11"
+                             Foreground="{StaticResource AppSecondaryTextBrush}"
+                             Text="{x:Bind Kind}" />
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </Border>
+</UserControl>

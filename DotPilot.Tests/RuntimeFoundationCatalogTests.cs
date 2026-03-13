@@ -7,6 +7,7 @@ public class RuntimeFoundationCatalogTests
     private const string CodexCommandName = "codex";
     private const string ClaudeCommandName = "claude";
     private const string GitHubCommandName = "gh";
+    private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
 
     [Test]
     public void CatalogGroupsEpicTwelveIntoFourSequencedSlices()
@@ -33,6 +34,7 @@ public class RuntimeFoundationCatalogTests
 
         snapshot.Providers.Should().ContainSingle(provider =>
             provider.DisplayName == snapshot.DeterministicClientName &&
+            provider.StatusSummary == DeterministicClientStatusSummary &&
             provider.RequiresExternalToolchain == false &&
             provider.Status == ProviderConnectionStatus.Available);
     }
@@ -194,7 +196,7 @@ public class RuntimeFoundationCatalogTests
 
     private static RuntimeFoundationCatalog CreateCatalog()
     {
-        return new RuntimeFoundationCatalog(new DeterministicAgentRuntimeClient());
+        return new RuntimeFoundationCatalog();
     }
 
     private static AgentTurnRequest CreateRequest(

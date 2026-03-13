@@ -74,30 +74,12 @@ jobs:
             echo "release_tag=v${display_version}"
           } >> "$GITHUB_OUTPUT"
 
-  publish_desktop:
-    name: Publish Desktop (${{ matrix.name }})
-    runs-on: ${{ matrix.runner }}
+  publish_macos:
+    name: Publish macOS Release Asset
+    runs-on: macos-latest
+    timeout-minutes: 60
     needs:
       - prepare_release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS
-            runner: macos-latest
-            artifact_name: dotpilot-release-macos
-            archive_name: dotpilot-desktop-macos.zip
-            output_path: artifacts/publish/macos
-          - name: Windows
-            runner: windows-latest
-            artifact_name: dotpilot-release-windows
-            archive_name: dotpilot-desktop-windows.zip
-            output_path: artifacts/publish/windows
-          - name: Linux
-            runner: ubuntu-latest
-            artifact_name: dotpilot-release-linux
-            archive_name: dotpilot-desktop-linux.zip
-            output_path: artifacts/publish/linux
     steps:
       - uses: actions/checkout@v6
         with:
@@ -108,30 +90,189 @@ jobs:
         timeout-minutes: 60
         uses: "./.github/steps/install_dependencies"
 
-      - name: Publish Desktop App
+      - name: Resolve macOS RID
+        id: macos_rid
+        shell: bash
+        run: |
+          architecture="$(uname -m)"
+          case "${architecture}" in
+            arm64)
+              rid="osx-arm64"
+              asset_suffix="macos-arm64"
+              ;;
+            x86_64)
+              rid="osx-x64"
+              asset_suffix="macos-x64"
+              ;;
+            *)
+              echo "Unsupported macOS runner architecture: ${architecture}" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "rid=${rid}" >> "$GITHUB_OUTPUT"
+          echo "asset_suffix=${asset_suffix}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish macOS Disk Image
+        shell: bash
+        working-directory: ./DotPilot
+        run: |
+          dotnet publish DotPilot.csproj \
+            -c Release \
+            -f net10.0-desktop \
+            -r "${{ steps.macos_rid.outputs.rid }}" \
+            -warnaserror \
+            -m:1 \
+            -p:BuildInParallel=false \
+            -p:SelfContained=true \
+            -p:PackageFormat=dmg \
+            -p:CodesignKey=- \
+            -p:DiskImageSigningKey=- \
+            -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
+            -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+
+      - name: Stage macOS Release Asset
+        shell: bash
+        run: |
+          mkdir -p ./artifacts/releases
+          source_path="./DotPilot/bin/Release/net10.0-desktop/${{ steps.macos_rid.outputs.rid }}/publish/DotPilot.dmg"
+          target_path="./artifacts/releases/dotpilot-${{ needs.prepare_release.outputs.release_version }}-${{ steps.macos_rid.outputs.asset_suffix }}.dmg"
+
+          if [[ ! -f "${source_path}" ]]; then
+            echo "Expected macOS release asset was not produced: ${source_path}" >&2
+            exit 1
+          fi
+
+          cp "${source_path}" "${target_path}"
+
+      - name: Upload macOS Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotpilot-release-macos
+          path: ./artifacts/releases/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  publish_windows:
+    name: Publish Windows Release Asset
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs:
+      - prepare_release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Publish Windows Single-File Executable
         shell: pwsh
+        working-directory: .\DotPilot
         run: >
-          dotnet publish ./DotPilot/DotPilot.csproj -c Release -f net10.0-desktop
-          -o ./${{ matrix.output_path }}
+          dotnet publish DotPilot.csproj
+          -c Release
+          -f net10.0-desktop
+          -r win-x64
+          -warnaserror
+          -m:1
+          -p:BuildInParallel=false
+          -p:SelfContained=true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:IncludeAllContentForSelfExtract=true
           -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }}
           -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
 
-      - name: Archive Desktop Publish Output
+      - name: Stage Windows Release Asset
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path ./artifacts/releases | Out-Null
-          $archivePath = "./artifacts/releases/${{ matrix.archive_name }}"
-          if (Test-Path $archivePath) {
-            Remove-Item $archivePath -Force
+          New-Item -ItemType Directory -Force -Path .\artifacts\releases | Out-Null
+          $sourcePath = ".\DotPilot\bin\Release\net10.0-desktop\win-x64\publish\DotPilot.exe"
+          $targetPath = ".\artifacts\releases\dotpilot-${{ needs.prepare_release.outputs.release_version }}-windows-x64.exe"
+
+          if (-not (Test-Path $sourcePath)) {
+            throw "Expected Windows release asset was not produced: $sourcePath"
           }
 
-          Compress-Archive -Path "./${{ matrix.output_path }}/*" -DestinationPath $archivePath
+          Copy-Item $sourcePath $targetPath -Force
 
-      - name: Upload Release Artifact
+      - name: Upload Windows Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ./artifacts/releases/${{ matrix.archive_name }}
+          name: dotpilot-release-windows
+          path: ./artifacts/releases/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  publish_linux:
+    name: Publish Linux Snap Release Asset
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs:
+      - prepare_release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Install Dependencies
+        timeout-minutes: 60
+        uses: "./.github/steps/install_dependencies"
+
+      - name: Install Linux Snap Packaging Prerequisites
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y snapd
+          sudo systemctl start snapd.socket
+          sudo snap wait system seed.loaded
+          sudo snap install core24
+          sudo snap install multipass
+          sudo snap install lxd
+          sudo snap install snapcraft --classic
+          sudo lxd init --minimal
+
+      - name: Publish Linux Snap Package
+        shell: bash
+        working-directory: ./DotPilot
+        run: |
+          dotnet publish DotPilot.csproj \
+            -c Release \
+            -f net10.0-desktop \
+            -r linux-x64 \
+            -warnaserror \
+            -m:1 \
+            -p:BuildInParallel=false \
+            -p:SelfContained=true \
+            -p:PackageFormat=snap \
+            -p:UnoSnapcraftAdditionalParameters=--destructive-mode \
+            -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
+            -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+
+      - name: Stage Linux Release Asset
+        shell: bash
+        run: |
+          mkdir -p ./artifacts/releases
+          source_path="$(find ./DotPilot/bin/Release/net10.0-desktop/linux-x64/publish -maxdepth 1 -type f -name '*.snap' | sort | head -n 1)"
+          target_path="./artifacts/releases/dotpilot-${{ needs.prepare_release.outputs.release_version }}-linux-x64.snap"
+
+          if [[ -z "${source_path}" || ! -f "${source_path}" ]]; then
+            echo "Expected Linux snap release asset was not produced." >&2
+            exit 1
+          fi
+
+          cp "${source_path}" "${target_path}"
+
+      - name: Upload Linux Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotpilot-release-linux
+          path: ./artifacts/releases/*.snap
           if-no-files-found: error
           retention-days: 14
 
@@ -140,7 +281,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare_release
-      - publish_desktop
+      - publish_macos
+      - publish_windows
+      - publish_linux
     steps:
       - uses: actions/checkout@v6
         with:
@@ -226,7 +369,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.prepare_release.outputs.release_version }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          mapfile -t release_assets < <(find ./artifacts/release-assets -type f -name '*.zip' | sort)
+          mapfile -t release_assets < <(find ./artifacts/release-assets -type f | sort)
           if [[ ${#release_assets[@]} -eq 0 ]]; then
             echo "No release assets were downloaded." >&2
             exit 1

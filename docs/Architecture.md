@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, and the new vertical-slice runtime foundation that starts epic `#12`.
+Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, the workbench foundation for epic `#13`, the Toolchain Center for epic `#14`, and the vertical-slice runtime foundation that starts epic `#12`.
 
 This file is the required start-here architecture map for non-trivial tasks.
 
@@ -8,11 +8,13 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 - **System:** `DotPilot` is a `.NET 10` `Uno Platform` desktop-first application that is evolving from a static prototype into a local-first control plane for agent operations.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
+- **Workbench boundary:** epic [#13](https://github.com/managedcode/dotPilot/issues/13) is landing as a `Workbench` slice that will provide repository navigation, file inspection, artifact and log inspection, and a unified settings shell without moving that behavior into page code-behind.
+- **Toolchain Center boundary:** epic [#14](https://github.com/managedcode/dotPilot/issues/14) now lives as a `ToolchainCenter` slice. [../DotPilot.Core/Features/ToolchainCenter](../DotPilot.Core/Features/ToolchainCenter) defines the readiness, diagnostics, configuration, action, and polling contracts; [../DotPilot.Runtime/Features/ToolchainCenter](../DotPilot.Runtime/Features/ToolchainCenter) probes local provider CLIs for `Codex`, `Claude Code`, and `GitHub Copilot`; the Uno app surfaces the slice through the settings shell.
 - **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
 - **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
 - **Communication slice boundary:** issue [#23](https://github.com/managedcode/dotPilot/issues/23) lives in `DotPilot.Core/Features/RuntimeCommunication`, which defines the shared `ManagedCode.Communication` result/problem language for runtime public boundaries.
 - **First implementation slice:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) is represented locally through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface instead of mixing runtime work into the Uno app.
-- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow and the runtime-foundation UI surface. Provider-independent flows must pass in CI through the deterministic test client, while provider-specific checks can run only when the matching toolchain is available.
+- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow, Toolchain Center, and runtime-foundation UI surface. Provider-independent flows must pass in CI through deterministic or environment-agnostic checks, while provider-specific checks can run only when the matching toolchain is available.
 
 ## Scoping
 
@@ -32,6 +34,7 @@ flowchart LR
   Adr1["ADR-0001 control-plane direction"]
   Adr3["ADR-0003 vertical slices + UI-only app"]
   Feature["agent-control-plane-experience.md"]
+  Toolchains["toolchain-center.md"]
   Plan["vertical-slice-runtime-foundation.plan.md"]
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core contracts"]
@@ -44,6 +47,7 @@ flowchart LR
   Root --> Adr1
   Root --> Adr3
   Root --> Feature
+  Root --> Toolchains
   Root --> Plan
   Root --> Ui
   Root --> Core
@@ -55,6 +59,68 @@ flowchart LR
   Unit --> Ui
   Unit --> Core
   Unit --> Runtime
+```
+
+### Workbench foundation slice for epic #13
+
+```mermaid
+flowchart TD
+  Epic["#13 Desktop workbench"]
+  Shell["#28 Primary workbench shell"]
+  Tree["#29 Repository tree"]
+  File["#30 File surface + diff review"]
+  Dock["#31 Artifact dock + runtime console"]
+  Settings["#32 Settings shell"]
+  CoreSlice["DotPilot.Core/Features/Workbench"]
+  RuntimeSlice["DotPilot.Runtime/Features/Workbench"]
+  UiSlice["MainPage + SettingsPage + workbench controls"]
+
+  Epic --> Shell
+  Epic --> Tree
+  Epic --> File
+  Epic --> Dock
+  Epic --> Settings
+  Shell --> CoreSlice
+  Tree --> CoreSlice
+  File --> CoreSlice
+  Dock --> CoreSlice
+  Settings --> CoreSlice
+  CoreSlice --> RuntimeSlice
+  RuntimeSlice --> UiSlice
+```
+
+### Toolchain Center slice for epic #14
+
+```mermaid
+flowchart TD
+  Epic["#14 Provider toolchain center"]
+  UiIssue["#33 Toolchain Center UI"]
+  Codex["#34 Codex readiness"]
+  Claude["#35 Claude Code readiness"]
+  Copilot["#36 GitHub Copilot readiness"]
+  Diagnostics["#37 Connection diagnostics"]
+  Config["#38 Provider configuration"]
+  Polling["#39 Background polling"]
+  CoreSlice["DotPilot.Core/Features/ToolchainCenter"]
+  RuntimeSlice["DotPilot.Runtime/Features/ToolchainCenter"]
+  UiSlice["SettingsViewModel + ToolchainCenterPanel"]
+
+  Epic --> UiIssue
+  Epic --> Codex
+  Epic --> Claude
+  Epic --> Copilot
+  Epic --> Diagnostics
+  Epic --> Config
+  Epic --> Polling
+  UiIssue --> CoreSlice
+  Codex --> CoreSlice
+  Claude --> CoreSlice
+  Copilot --> CoreSlice
+  Diagnostics --> CoreSlice
+  Config --> CoreSlice
+  Polling --> CoreSlice
+  CoreSlice --> RuntimeSlice
+  RuntimeSlice --> UiSlice
 ```
 
 ### Runtime foundation slice for epic #12
@@ -91,20 +157,25 @@ flowchart TD
 ```mermaid
 flowchart LR
   App["DotPilot/App.xaml.cs"]
-  Views["MainPage + SecondPage + RuntimeFoundationPanel"]
-  ViewModels["MainViewModel + SecondViewModel"]
+  Views["MainPage + SecondPage + SettingsShell + RuntimeFoundationPanel + ToolchainCenterPanel"]
+  ViewModels["MainViewModel + SecondViewModel + SettingsViewModel"]
   Catalog["RuntimeFoundationCatalog"]
+  Toolchains["ToolchainCenterCatalog"]
   TestClient["DeterministicAgentRuntimeClient"]
   Probe["ProviderToolchainProbe"]
+  ToolchainProbe["ToolchainCommandProbe + provider profiles"]
   Contracts["Typed IDs + contracts"]
   Future["Future Orleans + Agent Framework integrations"]
 
   App --> ViewModels
   Views --> ViewModels
   ViewModels --> Catalog
+  ViewModels --> Toolchains
   Catalog --> TestClient
   Catalog --> Probe
   Catalog --> Contracts
+  Toolchains --> ToolchainProbe
+  Toolchains --> Contracts
   Future --> Contracts
   Future --> Catalog
 ```
@@ -118,6 +189,8 @@ flowchart LR
 - `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
+- `Issue #13 feature doc` — [Workbench Foundation](./Features/workbench-foundation.md)
+- `Issue #14 feature doc` — [Toolchain Center](./Features/toolchain-center.md)
 - `Issue #22 feature doc` — [Control Plane Domain Model](./Features/control-plane-domain-model.md)
 - `Issue #23 feature doc` — [Runtime Communication Contracts](./Features/runtime-communication-contracts.md)
 
@@ -134,14 +207,20 @@ flowchart LR
 
 - `Application startup and composition` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
 - `Chat workbench view model` — [../DotPilot/Presentation/MainViewModel.cs](../DotPilot/Presentation/MainViewModel.cs)
+- `Settings view model` — [../DotPilot/Presentation/SettingsViewModel.cs](../DotPilot/Presentation/SettingsViewModel.cs)
 - `Agent builder view model` — [../DotPilot/Presentation/SecondViewModel.cs](../DotPilot/Presentation/SecondViewModel.cs)
+- `Toolchain Center panel` — [../DotPilot/Presentation/Controls/ToolchainCenterPanel.xaml](../DotPilot/Presentation/Controls/ToolchainCenterPanel.xaml)
 - `Reusable runtime panel` — [../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml](../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml)
+- `Toolchain Center contracts` — [../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterContracts.cs](../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterContracts.cs)
+- `Toolchain Center issue catalog` — [../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterIssues.cs](../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterIssues.cs)
 - `Shell configuration contract` — [../DotPilot.Core/Features/ApplicationShell/AppConfig.cs](../DotPilot.Core/Features/ApplicationShell/AppConfig.cs)
 - `Runtime foundation contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs)
 - `Runtime communication problems` — [../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs](../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs)
 - `Control-plane domain contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs)
 - `Provider and tool contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs)
 - `Runtime issue catalog` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs)
+- `Toolchain Center catalog implementation` — [../DotPilot.Runtime/Features/ToolchainCenter/ToolchainCenterCatalog.cs](../DotPilot.Runtime/Features/ToolchainCenter/ToolchainCenterCatalog.cs)
+- `Toolchain snapshot factory` — [../DotPilot.Runtime/Features/ToolchainCenter/ToolchainProviderSnapshotFactory.cs](../DotPilot.Runtime/Features/ToolchainCenter/ToolchainProviderSnapshotFactory.cs)
 - `Runtime catalog implementation` — [../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs](../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs)
 - `Deterministic test client` — [../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs](../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs)
 - `Provider toolchain probing` — [../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs](../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs)
@@ -159,6 +238,7 @@ flowchart LR
 - The Uno app must remain a presentation-only host instead of becoming a dump for runtime logic.
 - Feature work should land as vertical slices with isolated contracts and implementations, not as shared horizontal folders.
 - Epic `#12` starts with contracts, sequencing, deterministic runtime coverage, and UI exposure before live Orleans or provider integration.
+- Epic `#14` makes external-provider toolchain readiness explicit before session creation, so install, auth, diagnostics, and configuration state stays visible instead of being inferred later.
 - CI must stay meaningful without external provider CLIs by using the in-repo deterministic runtime client.
 - Real provider checks may run only when the corresponding toolchain is present and discoverable.
 
