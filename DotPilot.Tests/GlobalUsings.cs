@@ -6,5 +6,6 @@ global using DotPilot.Core.Features.ToolchainCenter;
 global using DotPilot.Core.Features.Workbench;
 global using DotPilot.Runtime.Features.RuntimeFoundation;
 global using DotPilot.Runtime.Features.ToolchainCenter;
+global using DotPilot.Runtime.Host.Features.RuntimeFoundation;
 global using FluentAssertions;
 global using NUnit.Framework;

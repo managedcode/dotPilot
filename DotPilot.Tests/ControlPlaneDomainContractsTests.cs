@@ -17,6 +17,7 @@ public class ControlPlaneDomainContractsTests
             AgentProfileId.New().ToString(),
             SessionId.New().ToString(),
             FleetId.New().ToString(),
+            PolicyId.New().ToString(),
             ProviderId.New().ToString(),
             ModelRuntimeId.New().ToString(),
             ToolCapabilityId.New().ToString(),
@@ -53,6 +54,7 @@ public class ControlPlaneDomainContractsTests
         envelope.CodingAgent.ProviderId.Should().Be(envelope.Provider.Id);
         envelope.ReviewerAgent.ModelRuntimeId.Should().Be(envelope.LocalRuntime.Id);
         envelope.Fleet.ExecutionMode.Should().Be(FleetExecutionMode.Orchestrated);
+        envelope.Policy.DefaultApprovalState.Should().Be(ApprovalState.Pending);
         envelope.Approval.Scope.Should().Be(ApprovalScope.CommandExecution);
         envelope.Artifact.Kind.Should().Be(ArtifactKind.Snapshot);
         envelope.Telemetry.Kind.Should().Be(TelemetrySignalKind.Trace);
@@ -195,6 +197,15 @@ public class ControlPlaneDomainContractsTests
             CodingAgent = codingAgent,
             ReviewerAgent = reviewerAgent,
             Fleet = fleet,
+            Policy = new PolicyDescriptor
+            {
+                Id = PolicyId.New(),
+                Name = "Desktop Local Policy",
+                DefaultApprovalState = ApprovalState.Pending,
+                AllowsNetworkAccess = false,
+                AllowsFileSystemWrites = true,
+                ProtectedScopes = [ApprovalScope.FileWrite, ApprovalScope.CommandExecution],
+            },
             Session = session,
             Approval = approval,
             Artifact = artifact,
@@ -218,6 +229,8 @@ public class ControlPlaneDomainContractsTests
         public AgentProfileDescriptor ReviewerAgent { get; init; } = new();
 
         public FleetDescriptor Fleet { get; init; } = new();
+
+        public PolicyDescriptor Policy { get; init; } = new();
 
         public SessionDescriptor Session { get; init; } = new();
 

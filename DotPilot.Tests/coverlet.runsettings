@@ -12,7 +12,7 @@
           <SkipAutoProps>true</SkipAutoProps>
           <SingleHit>true</SingleHit>
           <DeterministicReport>true</DeterministicReport>
-          <ExcludeAssembliesWithoutSources>MissingAny</ExcludeAssembliesWithoutSources>
+          <ExcludeAssembliesWithoutSources>MissingAll</ExcludeAssembliesWithoutSources>
         </Configuration>
       </DataCollector>
     </DataCollectors>

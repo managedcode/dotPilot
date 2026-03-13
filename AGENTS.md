@@ -23,6 +23,7 @@ This file defines how AI agents work in this solution.
   - `DotPilot`
   - `DotPilot.Core`
   - `DotPilot.Runtime`
+  - `DotPilot.Runtime.Host`
   - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
@@ -152,7 +153,11 @@ For this app:
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
 - when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out
 - epic implementation PRs must include automated tests for every direct child issue they claim to cover, plus the broader runtime and UI regressions required by the touched flows
-- the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; durable resume and replay can persist session data outside Orleans storage until a later issue explicitly upgrades the cluster topology
+- structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
+- the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; do not introduce remote clustering or external durable stores until a later backlog item explicitly requires them, and keep durable resume/replay outside Orleans storage until the cluster topology is intentionally upgraded
+- GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
+- Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
+- Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
