@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, and the new vertical-slice runtime foundation that starts epic `#12`.
+Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, the workbench foundation for epic `#13`, and the vertical-slice runtime foundation that starts epic `#12`.
 
 This file is the required start-here architecture map for non-trivial tasks.
 
@@ -8,6 +8,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 - **System:** `DotPilot` is a `.NET 10` `Uno Platform` desktop-first application that is evolving from a static prototype into a local-first control plane for agent operations.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
+- **Workbench boundary:** epic [#13](https://github.com/managedcode/dotPilot/issues/13) is landing as a `Workbench` slice that will provide repository navigation, file inspection, artifact and log inspection, and a unified settings shell without moving that behavior into page code-behind.
 - **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
 - **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
 - **Communication slice boundary:** issue [#23](https://github.com/managedcode/dotPilot/issues/23) lives in `DotPilot.Core/Features/RuntimeCommunication`, which defines the shared `ManagedCode.Communication` result/problem language for runtime public boundaries.
@@ -55,6 +56,34 @@ flowchart LR
   Unit --> Ui
   Unit --> Core
   Unit --> Runtime
+```
+
+### Workbench foundation slice for epic #13
+
+```mermaid
+flowchart TD
+  Epic["#13 Desktop workbench"]
+  Shell["#28 Primary workbench shell"]
+  Tree["#29 Repository tree"]
+  File["#30 File surface + diff review"]
+  Dock["#31 Artifact dock + runtime console"]
+  Settings["#32 Settings shell"]
+  CoreSlice["DotPilot.Core/Features/Workbench"]
+  RuntimeSlice["DotPilot.Runtime/Features/Workbench"]
+  UiSlice["MainPage + SettingsPage + workbench controls"]
+
+  Epic --> Shell
+  Epic --> Tree
+  Epic --> File
+  Epic --> Dock
+  Epic --> Settings
+  Shell --> CoreSlice
+  Tree --> CoreSlice
+  File --> CoreSlice
+  Dock --> CoreSlice
+  Settings --> CoreSlice
+  CoreSlice --> RuntimeSlice
+  RuntimeSlice --> UiSlice
 ```
 
 ### Runtime foundation slice for epic #12
@@ -118,6 +147,7 @@ flowchart LR
 - `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
+- `Issue #13 feature doc` — [Workbench Foundation](./Features/workbench-foundation.md)
 - `Issue #22 feature doc` — [Control Plane Domain Model](./Features/control-plane-domain-model.md)
 - `Issue #23 feature doc` — [Runtime Communication Contracts](./Features/runtime-communication-contracts.md)
 

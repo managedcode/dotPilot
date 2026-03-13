@@ -6,8 +6,8 @@
       Background="{StaticResource AppShellBackgroundBrush}"
       FontFamily="{StaticResource AppBodyFontFamily}">
   <Grid utu:SafeArea.Insets="VisibleBounds"
-        AutomationProperties.AutomationId="MainChatScreen">
-    <Canvas>
+        AutomationProperties.AutomationId="WorkbenchScreen">
+    <Canvas IsHitTestVisible="False">
       <Ellipse Width="540"
                Height="473"
                Canvas.Left="-207"
@@ -23,29 +23,30 @@
     </Canvas>
 
     <Grid Margin="12"
-          AutomationProperties.AutomationId="MainChatLayout"
+          AutomationProperties.AutomationId="WorkbenchLayout"
           ColumnSpacing="20"
           RowSpacing="18">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="260" />
+        <ColumnDefinition Width="280" />
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="304" />
+        <ColumnDefinition Width="344" />
       </Grid.ColumnDefinitions>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="*" />
-        <RowDefinition Height="Auto" />
-      </Grid.RowDefinitions>
 
-      <controls:ChatSidebar Grid.RowSpan="2" />
+      <controls:WorkbenchSidebar />
 
-      <controls:ChatConversationView Grid.Column="1" />
+      <Grid Grid.Column="1"
+            RowSpacing="18">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-      <controls:ChatComposer Grid.Column="1"
-                             Grid.Row="1"
-                             Margin="0,0,0,6" />
+        <controls:WorkbenchActivityPanel />
 
-      <controls:ChatInfoPanel Grid.Column="2"
-                              Grid.RowSpan="2" />
+        <controls:WorkbenchDocumentSurface Grid.Row="1" />
+      </Grid>
+
+      <controls:WorkbenchInspectorPanel Grid.Column="2" />
     </Grid>
   </Grid>
 </Page>

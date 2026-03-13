@@ -94,10 +94,23 @@ internal static partial class BrowserAutomationBootstrap
             return configuredDriverPath;
         }
 
-        var cachedDriverPath = ResolveAnyCachedChromeDriverDirectory(GetDriverCacheRootPath());
-        return !string.IsNullOrWhiteSpace(cachedDriverPath)
-            ? cachedDriverPath
-            : EnsureChromeDriverDownloaded(browserBinaryPath);
+        var browserVersion = ResolveBrowserVersion(browserBinaryPath);
+        var browserBuild = BuildChromeVersionKey(browserVersion);
+        var driverPlatform = ResolveChromeDriverPlatform();
+        var cacheRootPath = GetDriverCacheRootPath();
+
+        HarnessLog.Write($"Browser version '{browserVersion}' resolved for '{browserBinaryPath}'.");
+
+        var cachedDriverPath = ResolveCachedChromeDriverDirectory(cacheRootPath, browserBuild, driverPlatform);
+        if (!string.IsNullOrWhiteSpace(cachedDriverPath))
+        {
+            var cachedDriverExecutablePath = Path.Combine(cachedDriverPath, GetChromeDriverExecutableFileName());
+            EnsureDriverExecutablePermissions(cachedDriverExecutablePath);
+            HarnessLog.Write($"Reusing cached ChromeDriver at '{cachedDriverExecutablePath}'.");
+            return cachedDriverPath;
+        }
+
+        return EnsureChromeDriverDownloaded(browserBuild, driverPlatform, cacheRootPath);
     }
 
     private static string? NormalizeBrowserDriverPath(IReadOnlyDictionary<string, string?> environment)
@@ -129,24 +142,11 @@ internal static partial class BrowserAutomationBootstrap
         return null;
     }
 
-    private static string EnsureChromeDriverDownloaded(string browserBinaryPath)
+    private static string EnsureChromeDriverDownloaded(
+        string browserBuild,
+        string driverPlatform,
+        string cacheRootPath)
     {
-        var browserVersion = ResolveBrowserVersion(browserBinaryPath);
-        var browserBuild = BuildChromeVersionKey(browserVersion);
-        var driverPlatform = ResolveChromeDriverPlatform();
-        var cacheRootPath = GetDriverCacheRootPath();
-
-        HarnessLog.Write($"Browser version '{browserVersion}' resolved for '{browserBinaryPath}'.");
-
-        var cachedDriverDirectory = ResolveCachedChromeDriverDirectory(cacheRootPath, browserBuild, driverPlatform);
-        if (!string.IsNullOrWhiteSpace(cachedDriverDirectory))
-        {
-            var cachedDriverExecutablePath = Path.Combine(cachedDriverDirectory, GetChromeDriverExecutableFileName());
-            EnsureDriverExecutablePermissions(cachedDriverExecutablePath);
-            HarnessLog.Write($"Reusing cached ChromeDriver at '{cachedDriverExecutablePath}'.");
-            return cachedDriverDirectory;
-        }
-
         var driverVersion = ResolveChromeDriverVersion(browserBuild);
         var driverVersionRootPath = Path.Combine(cacheRootPath, driverVersion);
         var driverDirectory = Path.Combine(driverVersionRootPath, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
@@ -175,6 +175,13 @@ internal static partial class BrowserAutomationBootstrap
         return driverDirectory;
     }
 
+    internal static string? ResolveCachedChromeDriverDirectory(string cacheRootPath, string browserVersion)
+    {
+        var browserBuild = BuildChromeVersionKey(browserVersion);
+        var driverPlatform = ResolveChromeDriverPlatform();
+        return ResolveCachedChromeDriverDirectory(cacheRootPath, browserBuild, driverPlatform);
+    }
+
     internal static string? ResolveCachedChromeDriverDirectory(string cacheRootPath, string browserBuild, string driverPlatform)
     {
         var driverVersionMappingPath = GetDriverVersionMappingPath(cacheRootPath, browserBuild, driverPlatform);
@@ -192,27 +199,6 @@ internal static partial class BrowserAutomationBootstrap
         var driverDirectory = Path.Combine(cacheRootPath, driverVersion, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
         var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
         return File.Exists(driverExecutablePath) ? driverDirectory : null;
-    }
-
-    internal static string? ResolveAnyCachedChromeDriverDirectory(string cacheRootPath)
-    {
-        if (!Directory.Exists(cacheRootPath))
-        {
-            return null;
-        }
-
-        foreach (var executablePath in Directory
-                     .EnumerateFiles(cacheRootPath, GetChromeDriverExecutableFileName(), SearchOption.AllDirectories)
-                     .OrderByDescending(path => path, StringComparer.Ordinal))
-        {
-            var driverDirectory = Path.GetDirectoryName(executablePath);
-            if (!string.IsNullOrWhiteSpace(driverDirectory))
-            {
-                return driverDirectory;
-            }
-        }
-
-        return null;
     }
 
     internal static void PersistDriverVersionMapping(

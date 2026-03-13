@@ -122,10 +122,10 @@ Skill-management rules for this `.NET` solution:
 
 ### Commands
 
-- `build`: `dotnet build DotPilot.slnx -warnaserror`
+- `build`: `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
 - `test`: `dotnet test DotPilot.slnx`
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
-- `analyze`: `dotnet build DotPilot.slnx -warnaserror`
+- `analyze`: `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
 - `coverage`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
 - `publish-desktop`: `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`
 
@@ -134,6 +134,7 @@ For this app:
 - unit tests currently use `NUnit` through the default `VSTest` runner
 - UI tests live in `DotPilot.UITests` and are a mandatory part of normal verification; the harness must provision or resolve browser-driver prerequisites automatically instead of skipping when local setup is missing
 - a canceled, timed-out, or hanging `DotPilot.UITests` run is a harness failure to fix, not an acceptable substitute for a real pass or fail result in CI
+- when debugging or validating the browser UI path, do not launch the app manually outside `DotPilot.UITests`; reproduce and diagnose only through the real UI-test harness so failures match the enforced verification path
 - `format` uses `dotnet format --verify-no-changes` as a local pre-push check; GitHub Actions validation should not spend CI time rechecking formatting drift that must already be fixed before push
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
 - desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
@@ -141,6 +142,7 @@ For this app:
 - prefer the newest stable `.NET 10` and `C#` language features that are supported by the pinned SDK and do not weaken readability, determinism, or analyzability
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
+- do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
@@ -150,8 +152,10 @@ For this app:
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
+- meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
+- desktop release assets must be native installable or directly executable outputs for each OS, not archives of raw publish folders; package the real `.exe`, `.snap`, `.dmg`, `.pkg`, `Setup.exe`, or equivalent runnable installer/app artifact instead of zipping intermediate publish directories
 - desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
 - the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
 - for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks
@@ -278,6 +282,8 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - The task is not done until the full relevant test suite is green, not only the newly added tests.
 - UI tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
 - UI coverage must validate complete end-to-end operator flows and also assert the presence and behavior of each interactive element introduced by a feature.
+- For `Uno` UI-test changes, use the official `Uno` MCP documentation as the source of truth and align browser assertions with the documented WebAssembly automation mapping before changing the harness shape.
+- When debugging local product behavior on this machine, prefer the real desktop `Uno` app head plus local `Uno` app tooling or MCP over ad hoc `browserwasm` runs; keep `browserwasm` for the dedicated `DotPilot.UITests` verification path.
 - GitHub Actions PR validation is mandatory for every PR and must enforce the real repo verification path so test failures are caught in CI, not only locally.
 - GitHub Actions PR validation must run full automated test verification, especially the real UI suite; build-only or smoke-only checks are not an acceptable substitute for pull-request gating.
 - GitHub Actions validation must also produce downloadable app artifacts for macOS, Windows, and Linux so every PR and mainline run has test results plus installable build outputs.
@@ -332,6 +338,7 @@ Ask first:
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.
+- Keep `DotPilot` feeling like a fast desktop control plane: startup, navigation, and visible UI reactions should be prompt, and agents should remove unnecessary waits instead of normalizing slow web-style loading behavior.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
 - Keep the solution file name cased as `DotPilot.slnx`.
@@ -352,6 +359,7 @@ Ask first:
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
+- Adding fallback paths or alternate harnesses that only make failures disappear in tests while the primary product path remains broken.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
 - Planning `MLXSharp` into the first product wave before it is ready for real use.

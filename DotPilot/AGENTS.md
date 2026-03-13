@@ -33,6 +33,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Replace scaffold sample data with real runtime-backed state as product features arrive; do not throw away the shell structure unless a later documented decision explicitly requires it.
 - Reuse shared resources and small XAML components instead of duplicating large visual sections across pages.
 - Treat desktop window sizing and positioning as an app-startup responsibility in `App.xaml.cs`.
+- For local UI debugging on this machine, run the real desktop head and prefer local `Uno` app tooling or MCP inspection over `browserwasm` reproduction unless the task is specifically about `DotPilot.UITests`.
 - Prefer `Microsoft Agent Framework` for orchestration, sessions, workflows, HITL, MCP-aware runtime features, and OpenTelemetry-based observability hooks.
 - Prefer official `.NET` AI evaluation libraries under `Microsoft.Extensions.AI.Evaluation*` for quality and safety evaluation features.
 - Do not plan or wire `MLXSharp` into the first product wave for this project.

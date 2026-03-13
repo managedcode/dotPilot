@@ -32,7 +32,9 @@ We will split GitHub Actions into two explicit workflows:
 2. `release-publish.yml`
    - runs automatically on pushes to `main`
    - resolves the release version from the two-segment `ApplicationDisplayVersion` prefix in `DotPilot/DotPilot.csproj` plus the GitHub Actions build number
-   - publishes desktop outputs for macOS, Windows, and Linux, and creates the GitHub Release
+   - publishes desktop release assets for macOS, Windows, and Linux as real packaged outputs instead of raw publish-folder archives
+   - uses `.dmg` for macOS, a self-contained single-file `.exe` for Windows, and `.snap` for Linux
+   - creates the GitHub Release
    - prepends repo-owned feature summaries and feature-doc links to GitHub-generated release notes
 
 ## Decision Diagram
@@ -46,7 +48,7 @@ flowchart LR
   Quality["Format + build + analyze"]
   Tests["Unit + coverage + UI tests"]
   Version["Version resolved from DotPilot.csproj prefix + CI build number"]
-  Publish["Desktop publish matrix"]
+  Publish["Desktop packaged assets (.dmg, .exe, .snap)"]
   GitHubRelease["GitHub Release with feature notes"]
 
   Change --> Validation

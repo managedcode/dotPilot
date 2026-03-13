@@ -14,10 +14,8 @@ public class TestBase
     private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
-    private static readonly object BrowserAppSyncRoot = new();
     private static readonly TimeSpan AppCleanupTimeout = TimeSpan.FromSeconds(15);
 
-    private static IApp? _browserApp;
     private static readonly BrowserAutomationSettings? _browserAutomation =
         Constants.CurrentPlatform == Platform.Browser
             ? BrowserAutomationBootstrap.Resolve()
@@ -68,7 +66,7 @@ public class TestBase
     {
         HarnessLog.Write($"Starting setup for '{TestContext.CurrentContext.Test.Name}'.");
         App = Constants.CurrentPlatform == Platform.Browser
-            ? EnsureBrowserApp(_browserAutomation!)
+            ? StartBrowserApp(_browserAutomation!)
             : AppInitializer.AttachToApp();
         HarnessLog.Write($"Setup completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
@@ -77,9 +75,33 @@ public class TestBase
     public void TearDownTest()
     {
         HarnessLog.Write($"Starting teardown for '{TestContext.CurrentContext.Test.Name}'.");
+        List<Exception> cleanupFailures = [];
+
         if (_app is not null)
         {
             TakeScreenshot("teardown");
+        }
+
+        if (Constants.CurrentPlatform == Platform.Browser && _app is not null)
+        {
+            TryCleanup(
+                () => _app.Dispose(),
+                BrowserAppCleanupOperationName,
+                cleanupFailures);
+        }
+
+        _app = null;
+
+        if (cleanupFailures.Count == 1)
+        {
+            HarnessLog.Write("Teardown failed with a single cleanup exception.");
+            throw cleanupFailures[0];
+        }
+
+        if (cleanupFailures.Count > 1)
+        {
+            HarnessLog.Write("Teardown failed with multiple cleanup exceptions.");
+            throw new AggregateException(cleanupFailures);
         }
 
         HarnessLog.Write($"Teardown completed for '{TestContext.CurrentContext.Test.Name}'.");
@@ -91,37 +113,24 @@ public class TestBase
         HarnessLog.Write("Starting fixture cleanup.");
         List<Exception> cleanupFailures = [];
 
-        if (_app is not null && !ReferenceEquals(_app, _browserApp))
+        if (_app is not null)
         {
             TryCleanup(
                 () => _app.Dispose(),
-                AttachedAppCleanupOperationName,
+                Constants.CurrentPlatform == Platform.Browser
+                    ? BrowserAppCleanupOperationName
+                    : AttachedAppCleanupOperationName,
                 cleanupFailures);
         }
 
         _app = null;
 
-        try
+        if (Constants.CurrentPlatform == Platform.Browser)
         {
-            if (_browserApp is not null)
-            {
-                TryCleanup(
-                    () => _browserApp.Dispose(),
-                    BrowserAppCleanupOperationName,
-                    cleanupFailures);
-            }
-        }
-        finally
-        {
-            _browserApp = null;
-
-            if (Constants.CurrentPlatform == Platform.Browser)
-            {
-                TryCleanup(
-                    BrowserTestHost.Stop,
-                    BrowserHostCleanupOperationName,
-                    cleanupFailures);
-            }
+            TryCleanup(
+                BrowserTestHost.Stop,
+                BrowserHostCleanupOperationName,
+                cleanupFailures);
         }
 
         if (cleanupFailures.Count == 1)
@@ -172,6 +181,131 @@ public class TestBase
         return fileInfo;
     }
 
+    protected void WriteBrowserSystemLogs(string context, int maxEntries = 50)
+    {
+        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var logEntries = _app.GetSystemLogs()
+                .TakeLast(maxEntries)
+                .ToArray();
+
+            HarnessLog.Write($"Browser system log dump for '{context}' contains {logEntries.Length} entries.");
+
+            foreach (var entry in logEntries)
+            {
+                HarnessLog.Write($"BrowserLog {entry.Timestamp:O} {entry.Level}: {entry.Message}");
+            }
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser system log dump failed for '{context}': {exception.Message}");
+        }
+    }
+
+    protected void WriteBrowserDomSnapshot(string context)
+    {
+        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                HarnessLog.Write($"Browser DOM snapshot skipped for '{context}': Selenium driver field was not found.");
+                return;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                HarnessLog.Write($"Browser DOM snapshot skipped for '{context}': ExecuteScript was not found.");
+                return;
+            }
+
+            static string Normalize(object? value)
+            {
+                var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                text = text.ReplaceLineEndings(" ");
+                return text.Length <= 800 ? text : text[..800];
+            }
+
+            object? ExecuteScript(string script)
+            {
+                return executeScriptMethod.Invoke(driver, [script, Array.Empty<object>()]);
+            }
+
+            var readyState = Normalize(ExecuteScript("return document.readyState;"));
+            var location = Normalize(ExecuteScript("return window.location.href;"));
+            var automationCount = Normalize(ExecuteScript("return document.querySelectorAll('[xamlautomationid]').length;"));
+            var automationIds = Normalize(ExecuteScript(
+                "return Array.from(document.querySelectorAll('[xamlautomationid]')).slice(0, 25).map(e => e.getAttribute('xamlautomationid')).join(' | ');"));
+            var ariaLabels = Normalize(ExecuteScript(
+                "return Array.from(document.querySelectorAll('[aria-label]')).slice(0, 25).map(e => e.getAttribute('aria-label')).join(' | ');"));
+            var bodyText = Normalize(ExecuteScript("return document.body.innerText;"));
+            var bodyHtml = Normalize(ExecuteScript("return document.body.innerHTML;"));
+            var settingsNavHitTest = Normalize(ExecuteScript(
+                """
+                return (() => {
+                    const target = document.querySelector('[xamlautomationid="SidebarSettingsButton"]');
+                    if (!target) {
+                        return 'missing SidebarSettingsButton';
+                    }
+
+                    const rect = target.getBoundingClientRect();
+                    const x = rect.left + (rect.width / 2);
+                    const y = rect.top + (rect.height / 2);
+                    const top = document.elementFromPoint(x, y);
+
+                    return JSON.stringify({
+                        targetTag: target.tagName,
+                        targetClass: target.className,
+                        targetId: target.getAttribute('xamlautomationid') ?? '',
+                        x,
+                        y,
+                        containsTop: top ? target.contains(top) : false,
+                        topTag: top?.tagName ?? '',
+                        topClass: top?.className ?? '',
+                        topId: top?.getAttribute('xamlautomationid') ?? '',
+                        topXamlType: top?.getAttribute('xamltype') ?? '',
+                        topAria: top?.getAttribute('aria-label') ?? ''
+                    });
+                })();
+                """));
+
+            HarnessLog.Write($"Browser DOM snapshot for '{context}': readyState='{readyState}', location='{location}', xamlautomationid-count='{automationCount}'.");
+            HarnessLog.Write($"Browser DOM snapshot automation ids for '{context}': {automationIds}");
+            HarnessLog.Write($"Browser DOM snapshot aria-labels for '{context}': {ariaLabels}");
+            HarnessLog.Write($"Browser DOM snapshot SidebarSettingsButton hit test for '{context}': {settingsNavHitTest}");
+            HarnessLog.Write($"Browser DOM snapshot innerText for '{context}': {bodyText}");
+            HarnessLog.Write($"Browser DOM snapshot innerHTML for '{context}': {bodyHtml}");
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser DOM snapshot failed for '{context}': {exception.Message}");
+        }
+    }
+
+    protected void TapAutomationElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        App.Tap(automationId);
+    }
+
     private static bool ResolveBrowserHeadless()
     {
 #if DEBUG
@@ -184,37 +318,28 @@ public class TestBase
 #endif
     }
 
-    private static IApp EnsureBrowserApp(BrowserAutomationSettings browserAutomation)
+    private static IApp StartBrowserApp(BrowserAutomationSettings browserAutomation)
     {
-        lock (BrowserAppSyncRoot)
+        HarnessLog.Write("Starting browser app instance.");
+        var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
+            .Uri(new Uri(Constants.WebAssemblyDefaultUri))
+            .UsingBrowser(Constants.WebAssemblyBrowser.ToString())
+            .BrowserBinaryPath(browserAutomation.BrowserBinaryPath)
+            .ScreenShotsPath(AppContext.BaseDirectory)
+            .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
+            .SeleniumArgument($"{BrowserWindowSizeArgumentPrefix}{BrowserWindowWidth},{BrowserWindowHeight}")
+            .Headless(_browserHeadless);
+
+        configurator = configurator.DriverPath(browserAutomation.DriverPath);
+
+        if (!_browserHeadless)
         {
-            if (_browserApp is not null)
-            {
-                HarnessLog.Write("Reusing browser app instance.");
-                return _browserApp;
-            }
-
-            HarnessLog.Write("Starting browser app instance.");
-            var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
-                .Uri(new Uri(Constants.WebAssemblyDefaultUri))
-                .UsingBrowser(Constants.WebAssemblyBrowser.ToString())
-                .BrowserBinaryPath(browserAutomation.BrowserBinaryPath)
-                .ScreenShotsPath(AppContext.BaseDirectory)
-                .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
-                .SeleniumArgument($"{BrowserWindowSizeArgumentPrefix}{BrowserWindowWidth},{BrowserWindowHeight}")
-                .Headless(_browserHeadless);
-
-            configurator = configurator.DriverPath(browserAutomation.DriverPath);
-
-            if (!_browserHeadless)
-            {
-                configurator = configurator.SeleniumArgument("--remote-debugging-port=9222");
-            }
-
-            _browserApp = configurator.StartApp();
-            HarnessLog.Write("Browser app instance started.");
-            return _browserApp;
+            configurator = configurator.SeleniumArgument("--remote-debugging-port=9222");
         }
+
+        var browserApp = configurator.StartApp();
+        HarnessLog.Write("Browser app instance started.");
+        return browserApp;
     }
 
     private static void TryCleanup(Action cleanupAction, string operationName, List<Exception> cleanupFailures)

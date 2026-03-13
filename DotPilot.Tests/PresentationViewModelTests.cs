@@ -1,25 +1,49 @@
 using DotPilot.Presentation;
+using DotPilot.Runtime.Features.Workbench;
 
 namespace DotPilot.Tests;
 
 public class PresentationViewModelTests
 {
     [Test]
-    public void MainViewModelExposesChatScreenState()
+    public void MainViewModelExposesWorkbenchShellState()
     {
-        var viewModel = new MainViewModel(CreateRuntimeFoundationCatalog());
+        using var workspace = TemporaryWorkbenchDirectory.Create();
+        var runtimeFoundationCatalog = CreateRuntimeFoundationCatalog();
+        var viewModel = new MainViewModel(
+            new WorkbenchCatalog(runtimeFoundationCatalog, workspace.Root),
+            runtimeFoundationCatalog);
 
-        viewModel.Title.Should().Be("Design Automation Agent");
-        viewModel.StatusSummary.Should().Be("3 members · GPT-4o");
-        viewModel.RecentChats.Should().HaveCount(3);
-        viewModel.RecentChats.Should().ContainSingle(chat => chat.IsSelected);
-        viewModel.Messages.Should().HaveCount(3);
-        viewModel.Messages.Should().ContainSingle(message => message.IsCurrentUser);
-        viewModel.Members.Should().HaveCount(3);
-        viewModel.Agents.Should().ContainSingle(agent => agent.Name == "Design Agent");
+        viewModel.EpicLabel.Should().Be(WorkbenchIssues.FormatIssueLabel(WorkbenchIssues.DesktopWorkbenchEpic));
+        viewModel.WorkspaceRoot.Should().Be(workspace.Root);
+        viewModel.FilteredRepositoryNodes.Should().NotBeEmpty();
+        viewModel.SelectedDocumentTitle.Should().NotBeEmpty();
+        viewModel.IsPreviewMode.Should().BeTrue();
+        viewModel.RepositorySearchText = "SettingsPage";
+        viewModel.FilteredRepositoryNodes.Should().ContainSingle(node => node.RelativePath == "src/SettingsPage.xaml");
+        viewModel.SelectedDocumentTitle.Should().Be("SettingsPage.xaml");
+        viewModel.IsDiffReviewMode = true;
+        viewModel.IsPreviewMode.Should().BeFalse();
+        viewModel.IsLogConsoleVisible = true;
+        viewModel.IsArtifactsVisible.Should().BeFalse();
         viewModel.RuntimeFoundation.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
-        viewModel.RuntimeFoundation.Slices.Should().HaveCount(4);
         viewModel.RuntimeFoundation.Providers.Should().Contain(provider => !provider.RequiresExternalToolchain);
+    }
+
+    [Test]
+    public void SettingsViewModelExposesUnifiedSettingsShellState()
+    {
+        using var workspace = TemporaryWorkbenchDirectory.Create();
+        var runtimeFoundationCatalog = CreateRuntimeFoundationCatalog();
+        var viewModel = new SettingsViewModel(
+            new WorkbenchCatalog(runtimeFoundationCatalog, workspace.Root),
+            runtimeFoundationCatalog);
+
+        viewModel.SettingsIssueLabel.Should().Be(WorkbenchIssues.FormatIssueLabel(WorkbenchIssues.SettingsShell));
+        viewModel.Categories.Should().HaveCountGreaterOrEqualTo(3);
+        viewModel.SelectedCategoryTitle.Should().NotBeEmpty();
+        viewModel.VisibleEntries.Should().NotBeEmpty();
+        viewModel.ProviderSummary.Should().Contain("provider checks");
     }
 
     [Test]
@@ -45,6 +69,6 @@ public class PresentationViewModelTests
 
     private static RuntimeFoundationCatalog CreateRuntimeFoundationCatalog()
     {
-        return new RuntimeFoundationCatalog(new DeterministicAgentRuntimeClient());
+        return new RuntimeFoundationCatalog();
     }
 }

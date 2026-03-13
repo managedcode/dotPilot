@@ -44,15 +44,15 @@
                   Margin="12,20,12,0"
                   Spacing="4">
         <Button Style="{StaticResource SidebarButtonStyle}"
-                AutomationProperties.AutomationId="SidebarChatButton"
-                uen:Navigation.Request="-">
+                AutomationProperties.AutomationId="SidebarWorkbenchButton"
+                uen:Navigation.Request="Main">
           <StackPanel Orientation="Horizontal"
                       Spacing="8">
             <TextBlock VerticalAlignment="Center"
                        FontSize="13"
                        Text="◌" />
             <TextBlock VerticalAlignment="Center"
-                       Text="Chat" />
+                       Text="Workbench" />
           </StackPanel>
         </Button>
         <Button Style="{StaticResource SidebarButtonSelectedStyle}"
@@ -64,6 +64,18 @@
                        Text="✦" />
             <TextBlock VerticalAlignment="Center"
                        Text="Agents" />
+          </StackPanel>
+        </Button>
+        <Button Style="{StaticResource SidebarButtonStyle}"
+                AutomationProperties.AutomationId="SidebarSettingsButton"
+                uen:Navigation.Request="Settings">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="8">
+            <TextBlock VerticalAlignment="Center"
+                       FontSize="13"
+                       Text="⌘" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="Settings" />
           </StackPanel>
         </Button>
       </StackPanel>

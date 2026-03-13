@@ -2,7 +2,11 @@
 
 `dotPilot` is a desktop-first, local-first control plane for AI agents built with `.NET 10` and `Uno Platform`.
 
-The product is being shaped as a single operator workbench where you can:
+## Product Summary
+
+`dotPilot` is designed as a single operator workbench for running, supervising, and reviewing agent workflows from one desktop UI. Coding workflows are first-class, but the product is not limited to coding agents. The same control plane is intended to support research, analysis, orchestration, reviewer, and operator-style flows.
+
+From the workbench, the operator should be able to:
 
 - manage agent profiles and fleets
 - connect external agent runtimes such as `Codex`, `Claude Code`, and `GitHub Copilot`
@@ -10,28 +14,48 @@ The product is being shaped as a single operator workbench where you can:
 - browse repositories, inspect files, review diffs, and work with Git
 - orchestrate sessions, approvals, telemetry, replay, and evaluation from one UI
 
-Coding workflows are first-class, but `dotPilot` is not a coding-only shell. The target product also supports research, analysis, orchestration, reviewer, and operator-style agent flows.
+## Main Features
+
+### Available In The Current Repository
+
+- a desktop-first three-pane workbench shell
+- repository tree search and open-file navigation
+- read-only file inspection and diff-review surface
+- artifact dock and runtime log console
+- unified settings shell for providers, policies, and storage
+- dedicated agent-builder screen
+- deterministic runtime foundation panel for provider readiness and control-plane state
+- `NUnit` unit tests plus `Uno.UITest` browser UI coverage
+
+### Main Product Capabilities On The Roadmap
+
+- multi-agent session composition and orchestration
+- embedded local-first runtime hosting with `Orleans`
+- SDK-first provider integrations for `Codex`, `Claude Code`, and `GitHub Copilot`
+- local model runtime support through `LLamaSharp` and `ONNX Runtime`
+- approvals, replay, audit trails, and artifact inspection
+- OpenTelemetry-first observability and official `.NET` AI evaluation flows
 
 ## Current Status
 
-The repository is currently in the **planned architecture and backlog** stage for the control-plane direction.
+The repository is in the **active foundation and workbench implementation** stage.
 
 What already exists:
 
-- a desktop-first `Uno Platform` shell with the future workbench information architecture
-- a dedicated agent-builder screen
-- `NUnit` unit tests and `Uno.UITest` browser UI coverage
-- planning artifacts for the approved direction
-- a detailed GitHub issue backlog for implementation
+- the first runtime foundation slices in `DotPilot.Core` and `DotPilot.Runtime`
+- the first operator workbench slice for repository browsing, document inspection, artifacts, logs, and settings
+- a presentation-only `Uno Platform` app shell with separate non-UI class-library boundaries
+- unit, coverage, and UI automation validation paths
+- architecture docs, ADRs, feature specs, and GitHub backlog tracking
 
 What is planned next:
 
-- embedded `Orleans` host inside the desktop app
+- embedded `Orleans` hosting inside the desktop app
 - `Microsoft Agent Framework` orchestration and session workflows
-- SDK-first provider adapters
-- MCP and repo-intelligence tooling
-- local runtime support
-- OpenTelemetry-first observability and official `.NET` AI evaluation
+- richer provider adapters and toolchain management
+- MCP and repository-intelligence tooling
+- local runtime execution flows
+- telemetry, replay, and evaluation surfaces backed by real runtime events
 
 ## Product Direction
 
@@ -57,8 +81,11 @@ Start here if you want the current source of truth:
 
 - [Architecture Overview](docs/Architecture.md)
 - [ADR-0001: Agent Control Plane Architecture](docs/ADR/ADR-0001-agent-control-plane-architecture.md)
+- [ADR-0003: Vertical Slices And UI-Only Uno App](docs/ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - [Feature Spec: Agent Control Plane Experience](docs/Features/agent-control-plane-experience.md)
-- [Task Plan: Agent Control Plane Backlog](agent-control-plane-backlog.plan.md)
+- [Feature Spec: Workbench Foundation](docs/Features/workbench-foundation.md)
+- [Task Plan: Vertical Slice Runtime Foundation](vertical-slice-runtime-foundation.plan.md)
+- [Task Plan: Workbench Foundation](issue-13-workbench-foundation.plan.md)
 - [Root Governance](AGENTS.md)
 
 GitHub tracking:
@@ -69,14 +96,19 @@ GitHub tracking:
 
 ```text
 .
-├── DotPilot/                 # Uno desktop app and current shell
-├── DotPilot.Tests/           # NUnit in-process tests
+├── DotPilot/                 # Uno desktop presentation host
+├── DotPilot.Core/            # Vertical-slice contracts and typed identifiers
+├── DotPilot.Runtime/         # Provider-independent runtime implementations
+├── DotPilot.ReleaseTool/     # Release automation utilities
+├── DotPilot.Tests/           # NUnit contract and composition tests
 ├── DotPilot.UITests/         # Uno.UITest browser coverage
 ├── docs/
 │   ├── ADR/                  # architectural decisions
 │   ├── Features/             # executable feature specs
 │   └── Architecture.md       # repo architecture map
 ├── AGENTS.md                 # root governance for humans and agents
+├── vertical-slice-runtime-foundation.plan.md
+├── issue-13-workbench-foundation.plan.md
 └── DotPilot.slnx             # solution entry point
 ```
 
@@ -91,12 +123,13 @@ GitHub tracking:
 ### Core Commands
 
 ```bash
-dotnet build DotPilot.slnx
+dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false
 dotnet test DotPilot.slnx
 dotnet format DotPilot.slnx --verify-no-changes
-dotnet build DotPilot.slnx -warnaserror
 dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop
 ```
+
+`build` and `analyze` use the same serialized `-warnaserror` command because the multi-target Uno app must not build in parallel in a shared workspace or CI cache.
 
 ### Run the App
 
@@ -124,4 +157,4 @@ This repository treats the following as mandatory:
 
 - The current repository still contains prototype data in the shell; the new backlog tracks the transition to runtime-backed features.
 - If you are working on non-trivial changes, start with [AGENTS.md](AGENTS.md) and [docs/Architecture.md](docs/Architecture.md).
-- The current machine-local baseline may still hit a `Uno.Resizetizer` file-lock during `dotnet build`; that risk is documented in [agent-control-plane-backlog.plan.md](agent-control-plane-backlog.plan.md).
+- The current machine-local baseline may still hit a `Uno.Resizetizer` file-lock during `dotnet build`; that risk is documented in [ci-build-lock-fix.plan.md](ci-build-lock-fix.plan.md).

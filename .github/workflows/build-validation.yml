@@ -36,7 +36,7 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: dotnet build DotPilot.slnx -warnaserror
+        run: dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false
 
   unit_tests:
     name: Unit Test Suite

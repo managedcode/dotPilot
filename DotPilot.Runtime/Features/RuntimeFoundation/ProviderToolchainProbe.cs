@@ -37,6 +37,11 @@ internal sealed class ProviderToolchainProbe
 
     private static string? ResolveExecutablePath(string commandName)
     {
+        if (OperatingSystem.IsBrowser())
+        {
+            return null;
+        }
+
         var searchPaths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 

@@ -5,6 +5,9 @@
         <IsTestProject>true</IsTestProject>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <UiAutomationHostConfiguration>Release</UiAutomationHostConfiguration>
+        <UiAutomationHostProject>..\DotPilot\DotPilot.csproj</UiAutomationHostProject>
+        <UiAutomationHostTargetFramework>net10.0-browserwasm</UiAutomationHostTargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
@@ -24,4 +27,15 @@
     <ItemGroup>
         <ProjectReference Include="..\DotPilot\DotPilot.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
+
+    <Target
+        Name="BuildUiAutomationBrowserHost"
+        BeforeTargets="VSTest"
+        Condition="'$(DesignTimeBuild)' != 'true'">
+        <MSBuild
+            Projects="$(UiAutomationHostProject)"
+            Targets="Build"
+            BuildInParallel="false"
+            Properties="Configuration=$(UiAutomationHostConfiguration);TargetFramework=$(UiAutomationHostTargetFramework);IsUiAutomationMappingEnabled=True" />
+    </Target>
 </Project>
