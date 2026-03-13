@@ -31,8 +31,9 @@ We will use these architectural defaults for implementation work going forward:
 2. Non-UI feature work moves into separate class libraries:
    - `DotPilot.Core` for contracts, typed identifiers, and public slice interfaces
    - `DotPilot.Runtime` for provider-independent runtime implementations and future host integration seams
+   - `DotPilot.Runtime.Host` for the embedded Orleans silo and desktop-only runtime-host lifecycle
 3. Feature code must be organized as vertical slices under `Features/<FeatureName>/...`, not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
-4. Epic `#12` starts with a `RuntimeFoundation` slice that sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface before live Orleans or provider integration.
+4. Epic `#12` starts with a `RuntimeFoundation` slice that sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface. Issue `#24` is implemented through a desktop-only `DotPilot.Runtime.Host` project that uses localhost clustering plus in-memory storage/reminders before any remote or durable topology is introduced.
 5. CI-safe agent-flow verification must use a deterministic in-repo runtime client as a first-class implementation of the same public contracts, not a mock or hand-wired test double.
 6. Tests that require real `Codex`, `Claude Code`, or `GitHub Copilot` toolchains may run only when the corresponding toolchain is available; their absence must not weaken the provider-independent baseline.
 
@@ -43,16 +44,20 @@ flowchart LR
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core"]
   Runtime["DotPilot.Runtime"]
+  Host["DotPilot.Runtime.Host"]
   TestClient["Deterministic test client"]
   ProviderChecks["Conditional provider checks"]
   Future["Future Orleans + Agent Framework slices"]
 
   Ui --> Core
   Ui --> Runtime
+  Ui --> Host
+  Host --> Core
   Runtime --> TestClient
   Runtime --> ProviderChecks
   Future --> Core
   Future --> Runtime
+  Future --> Host
 ```
 
 ## Alternatives Considered
@@ -83,6 +88,7 @@ CI does not guarantee those toolchains, so the repo would lose an honest agent-f
 - Future slices can land without merging unrelated feature logic into shared buckets.
 - Contracts for `#12` become reusable across UI, runtime, and tests.
 - CI keeps a real provider-independent verification path through the deterministic runtime client.
+- The embedded Orleans host can evolve without leaking server-only dependencies into browserwasm or the presentation project.
 
 ### Negative
 

@@ -1,6 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+#if !__WASM__
+using DotPilot.Runtime.Host.Features.RuntimeFoundation;
+#endif
 
 namespace DotPilot;
 
@@ -51,6 +54,9 @@ public partial class App : Application
 #if DEBUG
                     // Switch to Development environment when running in DEBUG
                     .UseEnvironment(Environments.Development)
+#endif
+#if !__WASM__
+                    .UseDotPilotEmbeddedRuntime()
 #endif
                     .UseLogging(configure: (context, logBuilder) =>
                     {
