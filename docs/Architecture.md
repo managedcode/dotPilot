@@ -162,7 +162,6 @@ flowchart LR
   Catalog["RuntimeFoundationCatalog"]
   Toolchains["ToolchainCenterCatalog"]
   TestClient["DeterministicAgentRuntimeClient"]
-  Probe["ProviderToolchainProbe"]
   ToolchainProbe["ToolchainCommandProbe + provider profiles"]
   Contracts["Typed IDs + contracts"]
   Future["Future Orleans + Agent Framework integrations"]
@@ -172,7 +171,6 @@ flowchart LR
   ViewModels --> Catalog
   ViewModels --> Toolchains
   Catalog --> TestClient
-  Catalog --> Probe
   Catalog --> Contracts
   Toolchains --> ToolchainProbe
   Toolchains --> Contracts

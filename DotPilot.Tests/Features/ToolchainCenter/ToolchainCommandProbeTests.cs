@@ -4,6 +4,8 @@ namespace DotPilot.Tests.Features.ToolchainCenter;
 
 public class ToolchainCommandProbeTests
 {
+    private const string NonExecutableContents = "not an executable";
+
     [Test]
     public void ReadVersionUsesStandardErrorWhenStandardOutputIsEmpty()
     {
@@ -80,6 +82,37 @@ public class ToolchainCommandProbeTests
         var version = ReadVersion(executablePath, arguments);
 
         version.Should().BeEmpty();
+    }
+
+    [Test]
+    public void CanExecuteReturnsFalseWhenTheResolvedPathCannotBeLaunched()
+    {
+        var nonExecutablePath = Path.GetTempFileName();
+
+        try
+        {
+            File.WriteAllText(nonExecutablePath, NonExecutableContents);
+
+            CanExecute(nonExecutablePath, []).Should().BeFalse();
+            ReadVersion(nonExecutablePath, []).Should().BeEmpty();
+        }
+        finally
+        {
+            File.Delete(nonExecutablePath);
+        }
+    }
+
+    [Test]
+    public void CanExecuteReturnsTrueWhenTheCommandProducesLargeRedirectedOutput()
+    {
+        var (executablePath, arguments) = CreateShellCommand(
+            OperatingSystem.IsWindows()
+                ? "for /L %i in (1,1,3000) do @echo output-line-%i"
+                : "i=1; while [ $i -le 3000 ]; do printf 'output-line-%s\\n' \"$i\"; i=$((i+1)); done");
+
+        var canExecute = CanExecute(executablePath, arguments);
+
+        canExecute.Should().BeTrue();
     }
 
     private static string ReadVersion(string executablePath, IReadOnlyList<string> arguments)

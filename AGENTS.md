@@ -150,6 +150,9 @@ For this app:
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
+- GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
+- Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
+- Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
@@ -302,6 +305,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Hardcoded values are forbidden.
 - String literals are forbidden in implementation code. Declare them once as named constants, enums, configuration entries, or dedicated value objects, then reuse those symbols.
 - Avoid magic literals. Extract shared values into constants, enums, configuration, or dedicated types.
+- Backlog metadata does not belong in product code: issue numbers, PR numbers, review language, and planning terminology must never appear in production runtime models, diagnostics, or user-facing text unless the feature explicitly exposes source-control metadata.
 - Design boundaries so real behaviour can be tested through public interfaces.
 - For `.NET`, the repo-root `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity.
 - Use nested `.editorconfig` files when they serve a clear subtree-specific purpose. Do not let IDE defaults, pipeline flags, and repo config disagree.

@@ -6,11 +6,15 @@ internal static class ToolchainCommandProbe
 {
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(2);
     private const string VersionSeparator = "version";
+    private const string EmptyOutput = "";
 
     public static string? ResolveExecutablePath(string commandName) =>
         RuntimeFoundation.ProviderToolchainProbe.ResolveExecutablePath(commandName);
 
     public static string ReadVersion(string executablePath, IReadOnlyList<string> arguments)
+        => ProbeVersion(executablePath, arguments).Version;
+
+    public static ToolchainVersionProbeResult ProbeVersion(string executablePath, IReadOnlyList<string> arguments)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
         ArgumentNullException.ThrowIfNull(arguments);
@@ -18,7 +22,7 @@ internal static class ToolchainCommandProbe
         var execution = Execute(executablePath, arguments);
         if (!execution.Succeeded)
         {
-            return string.Empty;
+            return ToolchainVersionProbeResult.Missing with { Launched = execution.Launched };
         }
 
         var output = string.IsNullOrWhiteSpace(execution.StandardOutput)
@@ -31,13 +35,15 @@ internal static class ToolchainCommandProbe
 
         if (string.IsNullOrWhiteSpace(firstLine))
         {
-            return string.Empty;
+            return ToolchainVersionProbeResult.Missing with { Launched = execution.Launched };
         }
 
         var separatorIndex = firstLine.IndexOf(VersionSeparator, StringComparison.OrdinalIgnoreCase);
-        return separatorIndex >= 0
+        var version = separatorIndex >= 0
             ? firstLine[(separatorIndex + VersionSeparator.Length)..].Trim(' ', ':')
             : firstLine.Trim();
+
+        return new(execution.Launched, version);
     }
 
     public static bool CanExecute(string executablePath, IReadOnlyList<string> arguments)
@@ -64,22 +70,57 @@ internal static class ToolchainCommandProbe
             startInfo.ArgumentList.Add(argument);
         }
 
-        using var process = Process.Start(startInfo);
+        Process? process;
+        try
+        {
+            process = Process.Start(startInfo);
+        }
+        catch
+        {
+            return ToolchainCommandExecution.LaunchFailed;
+        }
+
         if (process is null)
         {
-            return ToolchainCommandExecution.Failed;
+            return ToolchainCommandExecution.LaunchFailed;
         }
 
-        if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
+        using (process)
         {
-            TryTerminate(process);
-            return ToolchainCommandExecution.Failed;
-        }
+            var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            var standardErrorTask = process.StandardError.ReadToEndAsync();
 
-        return new(
-            process.ExitCode == 0,
-            process.StandardOutput.ReadToEnd(),
-            process.StandardError.ReadToEnd());
+            if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
+            {
+                TryTerminate(process);
+                ObserveRedirectedStreamFaults(standardOutputTask, standardErrorTask);
+                return new(true, false, EmptyOutput, EmptyOutput);
+            }
+
+            return new(
+                true,
+                process.ExitCode == 0,
+                AwaitStreamRead(standardOutputTask),
+                AwaitStreamRead(standardErrorTask));
+        }
+    }
+
+    private static string AwaitStreamRead(Task<string> readTask)
+    {
+        try
+        {
+            return readTask.GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return EmptyOutput;
+        }
+    }
+
+    private static void ObserveRedirectedStreamFaults(Task<string> standardOutputTask, Task<string> standardErrorTask)
+    {
+        _ = standardOutputTask.Exception;
+        _ = standardErrorTask.Exception;
     }
 
     private static void TryTerminate(Process process)
@@ -97,8 +138,13 @@ internal static class ToolchainCommandProbe
         }
     }
 
-    private readonly record struct ToolchainCommandExecution(bool Succeeded, string StandardOutput, string StandardError)
+    public readonly record struct ToolchainVersionProbeResult(bool Launched, string Version)
     {
-        public static ToolchainCommandExecution Failed => new(false, string.Empty, string.Empty);
+        public static ToolchainVersionProbeResult Missing => new(false, EmptyOutput);
+    }
+
+    private readonly record struct ToolchainCommandExecution(bool Launched, bool Succeeded, string StandardOutput, string StandardError)
+    {
+        public static ToolchainCommandExecution LaunchFailed => new(false, false, EmptyOutput, EmptyOutput);
     }
 }
