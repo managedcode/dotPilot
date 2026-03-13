@@ -42,9 +42,9 @@ Out of scope:
   - `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
   - `dotnet test DotPilot.slnx`
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- [ ] Commit the consolidation fixes on `codex/consolidated-13-15-76`.
-- [ ] Push the consolidated branch and open one replacement PR to `main`.
-- [ ] Delete extra local branches and extra local worktrees so only `main` and `codex/consolidated-13-15-76` remain locally.
+- [x] Commit the consolidation fixes on `codex/consolidated-13-15-76`.
+- [x] Push the consolidated branch and open one replacement PR to `main`.
+- [x] Delete extra local branches and extra local worktrees so only `main` and `codex/consolidated-13-15-76` remain locally.
 
 ## Full-Test Baseline
 
@@ -71,6 +71,14 @@ Out of scope:
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
   - Passed: `60` tests
   - Coverage artifact: `DotPilot.Tests/TestResults/9a4b4ba7-ae2c-4a23-9eab-0af4d4e30730/coverage.cobertura.xml`
+
+## Git Results
+
+- Consolidated branch pushed: `origin/codex/consolidated-13-15-76`
+- Replacement PR: `#79` <https://github.com/managedcode/dotPilot/pull/79>
+- Local branches remaining: `main`, `codex/consolidated-13-15-76`
+- Local worktrees remaining: only `/Users/ksemenenko/Developer/dotPilot`
+- Remote branches remaining for this repo clone: `origin/main`, `origin/codex/consolidated-13-15-76`
 
 ## Done Criteria
 
