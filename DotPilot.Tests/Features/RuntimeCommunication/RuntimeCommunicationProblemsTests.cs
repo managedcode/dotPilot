@@ -1,4 +1,4 @@
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.RuntimeCommunication;
 
 public class RuntimeCommunicationProblemsTests
 {

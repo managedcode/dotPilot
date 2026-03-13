@@ -143,6 +143,7 @@ For this app:
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
 - do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
+- do not commit user-specific local paths, usernames, or machine-specific identifiers in tests, docs, snapshots, or fixtures; use neutral synthetic values so the repo stays portable and does not leak personal machine details
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
@@ -150,6 +151,7 @@ For this app:
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
+- structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback

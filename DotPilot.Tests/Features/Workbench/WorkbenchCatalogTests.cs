@@ -1,6 +1,6 @@
 using DotPilot.Runtime.Features.Workbench;
 
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.Workbench;
 
 public class WorkbenchCatalogTests
 {

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 internal static class BrowserTestHost
 {

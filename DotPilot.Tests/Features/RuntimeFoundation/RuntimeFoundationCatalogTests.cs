@@ -1,4 +1,4 @@
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.RuntimeFoundation;
 
 public class RuntimeFoundationCatalogTests
 {
@@ -8,6 +8,7 @@ public class RuntimeFoundationCatalogTests
     private const string ClaudeCommandName = "claude";
     private const string GitHubCommandName = "gh";
     private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
+    private static readonly DateTimeOffset DeterministicArtifactCreatedAt = new(2026, 3, 13, 0, 0, 0, TimeSpan.Zero);
 
     [Test]
     public void CatalogGroupsEpicTwelveIntoFourSequencedSlices()
@@ -72,6 +73,24 @@ public class RuntimeFoundationCatalogTests
     }
 
     [Test]
+    public async Task DeterministicClientProducesStableArtifactsForIdenticalRequests()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var request = CreateRequest("Run the provider-independent runtime flow.", AgentExecutionMode.Execute);
+
+        var firstResult = await client.ExecuteAsync(request, CancellationToken.None);
+        var secondResult = await client.ExecuteAsync(request, CancellationToken.None);
+        var firstArtifact = firstResult.Value!.ProducedArtifacts.Should().ContainSingle().Subject;
+        var secondArtifact = secondResult.Value!.ProducedArtifacts.Should().ContainSingle().Subject;
+
+        firstResult.IsSuccess.Should().BeTrue();
+        secondResult.IsSuccess.Should().BeTrue();
+        firstArtifact.Id.Should().Be(secondArtifact.Id);
+        firstArtifact.CreatedAt.Should().Be(DeterministicArtifactCreatedAt);
+        secondArtifact.CreatedAt.Should().Be(DeterministicArtifactCreatedAt);
+    }
+
+    [Test]
     public async Task DeterministicClientReturnsExecuteResultsWhenApprovalIsNotRequested()
     {
         var client = new DeterministicAgentRuntimeClient();
@@ -133,6 +152,7 @@ public class RuntimeFoundationCatalogTests
     public async Task DeterministicClientReturnsProviderUnavailableProblemWhenProviderIsNotReady()
     {
         var client = new DeterministicAgentRuntimeClient();
+        var snapshot = CreateCatalog().GetSnapshot();
 
         var result = await client.ExecuteAsync(
             CreateRequest(
@@ -146,6 +166,18 @@ public class RuntimeFoundationCatalogTests
         result.HasProblem.Should().BeTrue();
         problem.HasErrorCode(RuntimeCommunicationProblemCode.ProviderUnavailable).Should().BeTrue();
         problem.StatusCode.Should().Be((int)System.Net.HttpStatusCode.ServiceUnavailable);
+        problem.Detail.Should().Contain(snapshot.DeterministicClientName);
+    }
+
+    [Test]
+    public void DeterministicClientRejectsUnexpectedExecutionModes()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var invalidRequest = CreateRequest("Plan the runtime foundation rollout.", (AgentExecutionMode)int.MaxValue);
+
+        var action = () => client.ExecuteAsync(invalidRequest, CancellationToken.None);
+
+        action.Should().Throw<System.Diagnostics.UnreachableException>();
     }
 
     [TestCase(CodexCommandName)]
@@ -163,6 +195,22 @@ public class RuntimeFoundationCatalogTests
 
         provider.RequiresExternalToolchain.Should().BeTrue();
         provider.StatusSummary.Should().Contain("available");
+    }
+
+    [Test]
+    public void CatalogPreservesProviderIdentityAcrossSnapshotRefreshes()
+    {
+        var catalog = CreateCatalog();
+
+        var firstSnapshot = catalog.GetSnapshot();
+        var secondSnapshot = catalog.GetSnapshot();
+
+        firstSnapshot.Providers.Should().HaveSameCount(secondSnapshot.Providers);
+        foreach (var firstProvider in firstSnapshot.Providers)
+        {
+            var secondProvider = secondSnapshot.Providers.Single(provider => provider.CommandName == firstProvider.CommandName);
+            firstProvider.Id.Should().Be(secondProvider.Id);
+        }
     }
 
     [Test]

@@ -1,7 +1,7 @@
 using System.Net;
 using DotPilot.Runtime.Features.HttpDiagnostics;
 
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.HttpDiagnostics;
 
 public class DebugHttpHandlerTests
 {

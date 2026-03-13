@@ -72,7 +72,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         [
             new ProviderDescriptor
             {
-                Id = ProviderId.New(),
+                Id = RuntimeFoundationDeterministicIdentity.CreateProviderId(ProviderToolchainNames.DeterministicClientCommandName),
                 DisplayName = ProviderToolchainNames.DeterministicClientDisplayName,
                 CommandName = ProviderToolchainNames.DeterministicClientCommandName,
                 Status = ProviderConnectionStatus.Available,

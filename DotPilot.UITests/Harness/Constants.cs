@@ -1,4 +1,4 @@
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 public class Constants
 {

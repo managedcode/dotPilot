@@ -11,7 +11,7 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 ## Entry Points
 
 - `DotPilot.Tests.csproj`
-- `AppInfoTests.cs`
+- `Features/*`
 
 ## Boundaries
 
@@ -21,6 +21,7 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 - Prefer production-facing flows and public contracts over implementation-detail assertions.
 - Keep a deterministic in-repo test AI client available for CI so provider-independent agent flows remain testable even when Codex, Claude Code, or GitHub Copilot are unavailable.
 - Tests that require real provider CLIs or auth must detect availability and run only when the corresponding external toolchain is present.
+- Organize test files by feature slice, with shared helpers living next to the slice that owns them instead of a flat project root.
 
 ## Local Commands
 
