@@ -2,9 +2,17 @@ namespace DotPilot.Presentation;
 
 public sealed class MainViewModel
 {
+    public MainViewModel(IRuntimeFoundationCatalog runtimeFoundationCatalog)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeFoundationCatalog);
+        RuntimeFoundation = runtimeFoundationCatalog.GetSnapshot();
+    }
+
     public string Title { get; } = "Design Automation Agent";
 
     public string StatusSummary { get; } = "3 members · GPT-4o";
+
+    public RuntimeFoundationSnapshot RuntimeFoundation { get; }
 
     public IReadOnlyList<SidebarChatItem> RecentChats { get; } =
     [

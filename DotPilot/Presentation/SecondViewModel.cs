@@ -2,9 +2,17 @@ namespace DotPilot.Presentation;
 
 public sealed class SecondViewModel
 {
+    public SecondViewModel(IRuntimeFoundationCatalog runtimeFoundationCatalog)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeFoundationCatalog);
+        RuntimeFoundation = runtimeFoundationCatalog.GetSnapshot();
+    }
+
     public string PageTitle { get; } = "Create New Agent";
 
     public string PageSubtitle { get; } = "Configure your AI agent's capabilities, model, and behavior";
+
+    public RuntimeFoundationSnapshot RuntimeFoundation { get; }
 
     public string SystemPrompt { get; } =
         """

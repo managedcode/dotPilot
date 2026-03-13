@@ -1,0 +1,161 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.RuntimeFoundationPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:runtime="using:DotPilot.Core.Features.RuntimeFoundation">
+  <UserControl.Resources>
+    <DataTemplate x:Key="RuntimeSliceTemplate"
+                  x:DataType="runtime:RuntimeSliceDescriptor">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              CornerRadius="18"
+              Padding="12">
+        <Grid AutomationProperties.AutomationId="RuntimeFoundationSliceItem"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Spacing="4">
+            <TextBlock AutomationProperties.AutomationId="RuntimeFoundationSliceIssue"
+                       CharacterSpacing="80"
+                       FontSize="11"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{x:Bind IssueLabel}" />
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind Name}" />
+            <TextBlock FontSize="12"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{x:Bind Summary}"
+                       TextWrapping="WrapWholeWords" />
+          </StackPanel>
+
+          <Border Grid.Column="1"
+                  Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  VerticalAlignment="Top">
+            <TextBlock FontSize="10"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind State}" />
+          </Border>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ProviderStatusTemplate"
+                  x:DataType="runtime:ProviderToolchainStatus">
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              CornerRadius="18"
+              Padding="12">
+        <Grid AutomationProperties.AutomationId="RuntimeFoundationProviderItem"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind DisplayName}" />
+            <TextBlock FontSize="12"
+                       Foreground="{StaticResource AppMutedTextBrush}">
+              <Run Text="{x:Bind CommandName}" />
+              <Run Text=" • " />
+              <Run Text="{x:Bind StatusSummary}" />
+            </TextBlock>
+          </StackPanel>
+
+          <Border Grid.Column="1"
+                  Background="{StaticResource AppBadgeSurfaceBrush}"
+                  CornerRadius="100"
+                  Padding="10,4"
+                  VerticalAlignment="Top">
+            <TextBlock FontSize="10"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind Status}" />
+          </Border>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Border Style="{StaticResource GlassPanelStyle}"
+          AutomationProperties.AutomationId="RuntimeFoundationPanel"
+          Padding="16">
+    <StackPanel Spacing="14">
+      <StackPanel Spacing="4">
+        <TextBlock AutomationProperties.AutomationId="RuntimeFoundationPanelTitle"
+                   CharacterSpacing="80"
+                   FontSize="12"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="RUNTIME FOUNDATION" />
+        <TextBlock AutomationProperties.AutomationId="RuntimeFoundationEpicLabel"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource AppPrimaryTextBrush}"
+                   Text="{Binding EpicLabel}" />
+        <TextBlock AutomationProperties.AutomationId="RuntimeFoundationPanelSummary"
+                   FontSize="12"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="{Binding Summary}"
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
+
+      <Border Background="{StaticResource AppSoftSurfaceBrush}"
+              CornerRadius="18"
+              Padding="12">
+        <StackPanel Spacing="6">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="11"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="DETERMINISTIC CLIENT" />
+          <TextBlock AutomationProperties.AutomationId="RuntimeFoundationDeterministicClient"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{Binding DeterministicClientName}" />
+          <TextBlock AutomationProperties.AutomationId="RuntimeFoundationProbePrompt"
+                     FontSize="12"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding DeterministicProbePrompt}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+
+      <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+      <StackPanel Spacing="8">
+        <TextBlock CharacterSpacing="80"
+                   FontSize="11"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="ISSUE SLICES" />
+        <ItemsControl AutomationProperties.AutomationId="RuntimeFoundationSlicesList"
+                      ItemTemplate="{StaticResource RuntimeSliceTemplate}"
+                      ItemsSource="{Binding Slices}" />
+      </StackPanel>
+
+      <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+      <StackPanel Spacing="8">
+        <TextBlock CharacterSpacing="80"
+                   FontSize="11"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="PROVIDER READINESS" />
+        <ItemsControl AutomationProperties.AutomationId="RuntimeFoundationProvidersList"
+                      ItemTemplate="{StaticResource ProviderStatusTemplate}"
+                      ItemsSource="{Binding Providers}" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

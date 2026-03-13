@@ -8,6 +8,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - This project contains the production `Uno Platform` application shell and presentation layer.
 - It owns app startup, route registration, desktop window behavior, shared styling resources, and the current static desktop screens.
 - It is evolving into the desktop control plane for local-first agent operations across coding, research, orchestration, and operator workflows.
+- It must remain the presentation host for the product, while feature logic lives in separate vertical-slice class libraries.
 
 ## Entry Points
 
@@ -23,10 +24,12 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 ## Boundaries
 
 - Keep this project focused on app composition, presentation, routing, and platform startup concerns.
+- Keep feature/domain/runtime code out of this project; reference it through slice-owned contracts and application services from separate DLLs.
 - Reuse the current desktop workbench direction: left navigation, central session surface, right-side inspector, and the agent-builder flow should evolve into real runtime-backed features instead of being replaced with a different shell concept.
 - Prefer declarative `Uno.Extensions.Navigation` in XAML via `uen:Navigation.Request` over page code-behind navigation calls.
 - Keep business logic, persistence, networking workflows, and non-UI orchestration out of page code-behind.
 - Build presentation with `MVVM`-friendly view models and separate reusable XAML components instead of large monolithic pages.
+- Organize non-UI work by feature-aligned vertical slices so each slice can evolve and ship without creating a shared dump of cross-cutting services in the app project.
 - Replace scaffold sample data with real runtime-backed state as product features arrive; do not throw away the shell structure unless a later documented decision explicitly requires it.
 - Reuse shared resources and small XAML components instead of duplicating large visual sections across pages.
 - Treat desktop window sizing and positioning as an app-startup responsibility in `App.xaml.cs`.

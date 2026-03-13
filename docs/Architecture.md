@@ -1,118 +1,106 @@
 # Architecture Overview
 
-Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, and the target control-plane boundaries that the backlog now plans to deliver.
+Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, and the new vertical-slice runtime foundation that starts epic `#12`.
 
 This file is the required start-here architecture map for non-trivial tasks.
 
 ## Summary
 
 - **System:** `DotPilot` is a `.NET 10` `Uno Platform` desktop-first application that is evolving from a static prototype into a local-first control plane for agent operations.
-- **Current product shell:** [../DotPilot/](../DotPilot/) already contains the visual workbench concepts that future work must preserve: a left navigation shell, a central session surface, a right-side inspector, and a separate agent-builder surface.
-- **Target runtime direction:** the planned product architecture uses an embedded `Orleans` silo, `Microsoft Agent Framework` orchestration, provider adapters for external agent runtimes, local runtime adapters, `MCPGateway` for tool federation, `RagSharp` for repo intelligence, and OpenTelemetry-first observability.
-- **Planning artifacts:** the control-plane direction is captured in [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md), the CI/release workflow split is captured in [ADR-0002](./ADR/ADR-0002-split-github-actions-build-and-release.md), and the operator experience is captured in [agent-control-plane-experience.md](./Features/agent-control-plane-experience.md).
-- **Automated verification today:** [../DotPilot.Tests/](../DotPilot.Tests/) contains in-process `NUnit` tests, [../DotPilot.UITests/](../DotPilot.UITests/) contains browser-driven `Uno.UITest` UI coverage, GitHub Actions `Build Validation` gates normal changes, and `Desktop Release` runs automatically on pushes to `main` to publish desktop artifacts and create the GitHub Release.
+- **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
+- **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
+- **First implementation slice:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) is represented locally through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface instead of mixing runtime work into the Uno app.
+- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow and the runtime-foundation UI surface. Provider-independent flows must pass in CI through the deterministic test client, while provider-specific checks can run only when the matching toolchain is available.
 
 ## Scoping
 
-- **In scope for current planning:** governance, docs, backlog structure, current shell mapping, target control-plane boundaries, and repo-level planning artifacts.
-- **In scope for future implementation:** embedded runtime host, provider toolchains, session orchestration, MCP/tools, repo intelligence, Git flows, local runtimes, telemetry, evaluation, and replay.
-- **Out of scope in the current repository state:** production backend services, external fleet workers, and cloud-only control-plane dependencies.
+- **In scope for the current repository state:** the Uno workbench shell, the new `DotPilot.Core` and `DotPilot.Runtime` libraries, the runtime-foundation slice, and the automated validation boundaries around them.
+- **In scope for future implementation:** embedded Orleans hosting, `Microsoft Agent Framework`, provider adapters, persistence, telemetry, evaluation, Git tooling, and local runtimes.
+- **Out of scope in the current slice:** full Orleans hosting, live provider execution, remote workers, and cloud-only control-plane services.
 
 ## Diagrams
 
-### Repository and planning map
+### Solution module map
 
 ```mermaid
 flowchart LR
   Root["dotPilot repository root"]
-  RootAgents["AGENTS.md"]
-  Plan["agent-control-plane-backlog.plan.md"]
+  Governance["AGENTS.md"]
   Architecture["docs/Architecture.md"]
-  Adr["docs/ADR/ADR-0001-agent-control-plane-architecture.md"]
-  Feature["docs/Features/agent-control-plane-experience.md"]
-  App["DotPilot Uno app"]
+  Adr1["ADR-0001 control-plane direction"]
+  Adr3["ADR-0003 vertical slices + UI-only app"]
+  Feature["agent-control-plane-experience.md"]
+  Plan["vertical-slice-runtime-foundation.plan.md"]
+  Ui["DotPilot Uno UI host"]
+  Core["DotPilot.Core contracts"]
+  Runtime["DotPilot.Runtime services"]
   Unit["DotPilot.Tests"]
-  Ui["DotPilot.UITests"]
-  BuildWorkflow[".github/workflows/build-validation.yml"]
-  ReleaseWorkflow[".github/workflows/release-publish.yml"]
+  UiTests["DotPilot.UITests"]
 
-  Root --> RootAgents
-  Root --> Plan
+  Root --> Governance
   Root --> Architecture
-  Root --> Adr
+  Root --> Adr1
+  Root --> Adr3
   Root --> Feature
-  Root --> App
-  Root --> Unit
+  Root --> Plan
   Root --> Ui
-  Root --> BuildWorkflow
-  Root --> ReleaseWorkflow
+  Root --> Core
+  Root --> Runtime
+  Root --> Unit
+  Root --> UiTests
+  Ui --> Core
+  Ui --> Runtime
+  Unit --> Ui
+  Unit --> Core
+  Unit --> Runtime
 ```
 
-### Current product shell to target control-plane boundaries
-
-```mermaid
-flowchart LR
-  Shell["Current Uno workbench shell"]
-  Sidebar["Left navigation and workspace tree"]
-  SessionSurface["Central session/chat surface"]
-  Inspector["Right inspector and activity pane"]
-  Builder["Agent builder and profile editor"]
-
-  Runtime["Embedded Orleans host"]
-  Orchestration["Microsoft Agent Framework"]
-  Providers["Provider adapters"]
-  Tools["MCPGateway + built-in tools + RagSharp"]
-  Git["Git workspace services"]
-  Local["LLamaSharp + ONNX Runtime"]
-  Trust["Evaluation + telemetry + audit"]
-
-  Shell --> Sidebar
-  Shell --> SessionSurface
-  Shell --> Inspector
-  Shell --> Builder
-
-  SessionSurface --> Runtime
-  Builder --> Runtime
-  Runtime --> Orchestration
-  Orchestration --> Providers
-  Orchestration --> Tools
-  Runtime --> Git
-  Orchestration --> Local
-  Runtime --> Trust
-```
-
-### Planned runtime and contract map
+### Runtime foundation slice for epic #12
 
 ```mermaid
 flowchart TD
-  UI["Uno desktop UI"]
-  Session["Session grain"]
-  Workspace["Workspace grain"]
-  Fleet["Fleet and policy grains"]
-  Artifact["Artifact and replay storage"]
-  MAF["Microsoft Agent Framework"]
-  Codex["Codex adapter"]
-  Claude["Claude Code adapter"]
-  Copilot["GitHub Copilot adapter"]
-  MCP["MCPGateway catalog"]
-  Rag["RagSharp index"]
-  Local["Local runtime adapters"]
-  Eval["Microsoft.Extensions.AI.Evaluation*"]
-  OTel["OpenTelemetry exporters"]
+  Epic["#12 Embedded agent runtime host"]
+  Domain["#22 Domain contracts"]
+  Comm["#23 Communication contracts"]
+  Host["#24 Embedded Orleans host"]
+  MAF["#25 Agent Framework runtime"]
+  CoreSlice["DotPilot.Core/Features/RuntimeFoundation"]
+  RuntimeSlice["DotPilot.Runtime/Features/RuntimeFoundation"]
+  UiSlice["DotPilot runtime panel + banner"]
 
-  UI --> Session
-  UI --> Workspace
-  UI --> Fleet
-  Session --> Artifact
-  Session --> MAF
-  MAF --> Codex
-  MAF --> Claude
-  MAF --> Copilot
-  MAF --> MCP
-  MAF --> Rag
-  MAF --> Local
-  MAF --> Eval
-  MAF --> OTel
+  Epic --> Domain
+  Epic --> Comm
+  Epic --> Host
+  Epic --> MAF
+  Domain --> CoreSlice
+  Comm --> CoreSlice
+  Host --> RuntimeSlice
+  MAF --> RuntimeSlice
+  CoreSlice --> UiSlice
+  RuntimeSlice --> UiSlice
+```
+
+### Current composition flow
+
+```mermaid
+flowchart LR
+  App["DotPilot/App.xaml.cs"]
+  Views["MainPage + SecondPage + RuntimeFoundationPanel"]
+  ViewModels["MainViewModel + SecondViewModel"]
+  Catalog["RuntimeFoundationCatalog"]
+  TestClient["DeterministicAgentRuntimeClient"]
+  Probe["ProviderToolchainProbe"]
+  Contracts["Typed IDs + contracts"]
+  Future["Future Orleans + Agent Framework integrations"]
+
+  App --> ViewModels
+  Views --> ViewModels
+  ViewModels --> Catalog
+  Catalog --> TestClient
+  Catalog --> Probe
+  Catalog --> Contracts
+  Future --> Contracts
+  Future --> Catalog
 ```
 
 ## Navigation Index
@@ -120,58 +108,57 @@ flowchart TD
 ### Planning and decision docs
 
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
-- `Task plan` — [../agent-control-plane-backlog.plan.md](../agent-control-plane-backlog.plan.md)
-- `Architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
-- `Release automation decision` — [ADR-0002](./ADR/ADR-0002-split-github-actions-build-and-release.md)
+- `Task plan` — [../vertical-slice-runtime-foundation.plan.md](../vertical-slice-runtime-foundation.plan.md)
+- `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
+- `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
 
 ### Modules
 
 - `Production Uno app` — [../DotPilot/](../DotPilot/)
-- `Unit tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
+- `Contracts and typed identifiers` — [../DotPilot.Core/](../DotPilot.Core/)
+- `Provider-independent runtime services` — [../DotPilot.Runtime/](../DotPilot.Runtime/)
+- `Unit and API-style tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
 - `UI tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
-- `CI build validation` — [../.github/workflows/build-validation.yml](../.github/workflows/build-validation.yml)
-- `Desktop release automation` — [../.github/workflows/release-publish.yml](../.github/workflows/release-publish.yml)
 - `Shared build and analyzer policy` — [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
 
-### High-signal code paths in the current shell
+### High-signal code paths
 
-- `Application startup and route registration` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
-- `Desktop startup host` — [../DotPilot/Platforms/Desktop/Program.cs](../DotPilot/Platforms/Desktop/Program.cs)
-- `Shell` — [../DotPilot/Presentation/Shell.xaml](../DotPilot/Presentation/Shell.xaml)
-- `Session surface prototype` — [../DotPilot/Presentation/MainPage.xaml](../DotPilot/Presentation/MainPage.xaml)
-- `Agent profile prototype` — [../DotPilot/Presentation/SecondPage.xaml](../DotPilot/Presentation/SecondPage.xaml)
-- `Workbench sidebar` — [../DotPilot/Presentation/Controls/ChatSidebar.xaml](../DotPilot/Presentation/Controls/ChatSidebar.xaml)
-- `Session conversation view` — [../DotPilot/Presentation/Controls/ChatConversationView.xaml](../DotPilot/Presentation/Controls/ChatConversationView.xaml)
-- `Inspector panel` — [../DotPilot/Presentation/Controls/ChatInfoPanel.xaml](../DotPilot/Presentation/Controls/ChatInfoPanel.xaml)
-- `Agent builder sidebar` — [../DotPilot/Presentation/Controls/AgentSidebar.xaml](../DotPilot/Presentation/Controls/AgentSidebar.xaml)
+- `Application startup and composition` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
+- `Chat workbench view model` — [../DotPilot/Presentation/MainViewModel.cs](../DotPilot/Presentation/MainViewModel.cs)
+- `Agent builder view model` — [../DotPilot/Presentation/SecondViewModel.cs](../DotPilot/Presentation/SecondViewModel.cs)
+- `Reusable runtime panel` — [../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml](../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml)
+- `Shell configuration contract` — [../DotPilot.Core/Features/ApplicationShell/AppConfig.cs](../DotPilot.Core/Features/ApplicationShell/AppConfig.cs)
+- `Runtime foundation contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs)
+- `Runtime issue catalog` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs)
+- `Runtime catalog implementation` — [../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs](../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs)
+- `Deterministic test client` — [../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs](../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs)
+- `Provider toolchain probing` — [../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs](../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs)
 
 ## Dependency Rules
 
-- `DotPilot` owns the desktop shell, startup, navigation, and future control-plane presentation work.
-- `DotPilot.Tests` validates in-process contracts and behavior-focused logic.
-- `DotPilot.UITests` validates the visible workbench shell and operator flows through the browser-hosted surface.
-- Future provider, orchestration, telemetry, and evaluation work must align with the planning docs before implementation begins.
-- `MLXSharp` is intentionally excluded from the first roadmap wave even though local runtimes are in scope through `LLamaSharp` and `ONNX Runtime`.
+- `DotPilot` owns XAML, routing, and startup composition only.
+- `DotPilot.Core` owns non-UI contracts and typed identifiers arranged by feature slice.
+- `DotPilot.Runtime` owns provider-independent runtime implementations and future integration seams, but not XAML or page logic.
+- `DotPilot.Tests` validates contracts, composition, deterministic runtime behavior, and conditional provider-availability checks through public boundaries.
+- `DotPilot.UITests` validates the visible workbench shell, runtime-foundation panel, and agent-builder flow through the browser-hosted UI.
 
 ## Key Decisions
 
-- `dotPilot` is now positioned as a general agent control plane rather than a coding-only shell.
-- The current shell layout is the basis for the future product and should be evolved rather than discarded.
-- The preferred runtime direction is an embedded `Orleans` host with `Microsoft Agent Framework`.
-- Provider integrations are SDK-first where viable.
-- Evaluation should use `Microsoft.Extensions.AI.Evaluation*`, and observability should be OpenTelemetry-first.
-- GitHub Actions now separates validation from release so normal CI stays fast and side-effect free while release automation owns desktop publishing and GitHub Release publication on `main`.
-- Desktop release versions are derived from the two-segment `ApplicationDisplayVersion` prefix in `DotPilot.csproj` plus the CI build number as the final segment.
+- The Uno app must remain a presentation-only host instead of becoming a dump for runtime logic.
+- Feature work should land as vertical slices with isolated contracts and implementations, not as shared horizontal folders.
+- Epic `#12` starts with contracts, sequencing, deterministic runtime coverage, and UI exposure before live Orleans or provider integration.
+- CI must stay meaningful without external provider CLIs by using the in-repo deterministic runtime client.
+- Real provider checks may run only when the corresponding toolchain is present and discoverable.
 
 ## Known Repository Risks
 
-- The current baseline `dotnet build DotPilot.slnx` is not fully green on this machine because `Uno.Resizetizer` hits a file lock on `icon_foreground.png` during the `net10.0` build. This is a known repo risk documented in [../agent-control-plane-backlog.plan.md](../agent-control-plane-backlog.plan.md).
+- Provider-dependent validation for real `Codex`, `Claude Code`, and `GitHub Copilot` toolchains is intentionally environment-gated; the deterministic runtime client is the mandatory CI baseline for agent-flow verification.
 
 ## Where To Go Next
 
 - Editing the Uno app shell: [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
-- Editing unit tests: [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md)
+- Editing contracts: [../DotPilot.Core/AGENTS.md](../DotPilot.Core/AGENTS.md)
+- Editing runtime services: [../DotPilot.Runtime/AGENTS.md](../DotPilot.Runtime/AGENTS.md)
+- Editing unit and API-style tests: [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md)
 - Editing UI tests: [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
-- Reviewing the architectural decision: [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
-- Reviewing the implementation-driving feature spec: [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)

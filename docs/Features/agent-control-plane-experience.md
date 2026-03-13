@@ -186,6 +186,9 @@ stateDiagram-v2
 ### Future Product Verification
 
 - `Uno.UITests` cover the workbench shell, toolchain center, session composition, approvals, and Git flows.
+- provider-independent runtime and session tests use an in-repo deterministic test client so CI can validate agent flows without external provider CLIs.
+- tests that require real `Codex`, `Claude Code`, or `GitHub Copilot` toolchains run only when the matching toolchain is available in the environment.
+- UI tests cover each feature's visible interactive elements plus at least one complete operator flow through the affected surface.
 - integration tests cover provider adapters, session persistence, replay, and orchestration flows.
 - local runtime smoke tests cover `LLamaSharp` and `ONNX Runtime`.
 - evaluation harness tests exercise transcript scoring and regression detection.

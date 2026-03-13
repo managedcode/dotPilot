@@ -91,6 +91,20 @@ public sealed class BrowserAutomationBootstrapTests
     }
 
     [Test]
+    public void WhenAnyCachedDriverDirectoryExistsThenResolverUsesItWithoutVersionMapping()
+    {
+        using var sandbox = new BrowserAutomationSandbox();
+        var cacheRootPath = sandbox.CreateDirectory("driver-cache");
+        var driverDirectory = Path.Combine(cacheRootPath, "145.0.7632.117", $"chromedriver-{GetExpectedDriverPlatform()}");
+        Directory.CreateDirectory(driverDirectory);
+        sandbox.CreateFile(Path.Combine(driverDirectory, GetChromeDriverExecutableFileName()));
+
+        var resolvedDirectory = BrowserAutomationBootstrap.ResolveAnyCachedChromeDriverDirectory(cacheRootPath);
+
+        Assert.That(resolvedDirectory, Is.EqualTo(driverDirectory));
+    }
+
+    [Test]
     public void WhenVersionProbeProcessTimesOutThenItFailsFast()
     {
         var startInfo = CreateSleepStartInfo();
