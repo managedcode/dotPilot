@@ -79,8 +79,8 @@ Fix the `DotPilot.UITests` GitHub Actions execution path so the required UI test
 - [x] `GitHub Actions job: UI Tests`
   Failure symptom: the PR validation run enters `Run UI Tests`, then fails to produce a terminal result and may later surface `Attempting to cancel the build... Error: The operation was canceled.`
   Suspected cause: the UI test harness had unbounded teardown calls for `_browserApp.Dispose()` and `BrowserTestHost.Stop()`, so a Windows-specific cleanup hang could leave the job running until GitHub eventually canceled it.
-  Intended fix path: bound teardown cleanup with explicit timeouts and convert cleanup hangs into deterministic test failures instead of infinite jobs.
-  Status: bounded cleanup is fixed locally; CI still needs instrumented logs to confirm whether any remaining hang is in driver/bootstrap, browser startup, host readiness, or teardown.
+  Intended fix path: bound teardown cleanup with explicit timeouts, add harness stage logging, bound Chrome version probing, and move the GitHub UI suite to the macOS browser environment that already ships Chrome and ChromeDriver.
+  Status: bounded cleanup is fixed locally; the remaining patch now also removes an unbounded browser-version probe and switches CI off the hanging Windows runner path, but GitHub still needs a fresh run to confirm the terminal result.
 
 ## Baseline Notes
 
@@ -95,7 +95,11 @@ Fix the `DotPilot.UITests` GitHub Actions execution path so the required UI test
 - Added bounded cleanup execution in `DotPilot.UITests` so teardown now fails fast if app disposal or browser-host shutdown hangs.
 - Added focused regression tests for the bounded-cleanup helper to prove success, exception, and timeout behavior.
 - Added harness logging around browser binary resolution, ChromeDriver resolution, host startup, setup, and cleanup so the next GitHub run exposes the exact blocking stage instead of sitting silent inside `Run UI Tests`.
+- Added a timeout around Chrome `--version` probing so browser bootstrap now fails fast instead of hanging the whole UI job when the version probe process stalls.
+- Added driver-version mapping reuse by browser build/platform so the harness can reuse a cached matching ChromeDriver without re-querying the Chrome-for-Testing patch endpoint every time.
+- Moved the GitHub Actions `UI Test Suite` job to `macos-latest` and injects the preinstalled Chrome and ChromeDriver paths through the existing Uno.UITest environment variables.
 - `dotnet test DotPilot.UITests/DotPilot.UITests.csproj --filter BoundedCleanupTests` passed.
+- `dotnet test DotPilot.UITests/DotPilot.UITests.csproj --filter BrowserAutomationBootstrapTests` passed.
 - `dotnet test DotPilot.UITests/DotPilot.UITests.csproj` passed with `9` tests green.
 - `dotnet test ./DotPilot.UITests/DotPilot.UITests.csproj --logger GitHubActions --blame-crash` passed with `9` tests green.
 - `dotnet test DotPilot.slnx` passed.

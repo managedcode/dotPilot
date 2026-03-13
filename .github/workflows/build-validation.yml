@@ -86,7 +86,7 @@ jobs:
 
   ui_tests:
     name: UI Test Suite
-    runs-on: windows-latest
+    runs-on: macos-latest
     timeout-minutes: 60
     needs:
       - build
@@ -100,5 +100,9 @@ jobs:
         uses: "./.github/steps/install_dependencies"
 
       - name: Run UI Tests
-        shell: pwsh
-        run: dotnet test ./DotPilot.UITests/DotPilot.UITests.csproj --logger GitHubActions --blame-crash
+        shell: bash
+        run: |
+          export UNO_UITEST_DRIVER_PATH="${CHROMEWEBDRIVER}"
+          export UNO_UITEST_CHROME_BINARY_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          export UNO_UITEST_BROWSER_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          dotnet test ./DotPilot.UITests/DotPilot.UITests.csproj --logger GitHubActions --blame-crash

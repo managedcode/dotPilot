@@ -25,6 +25,8 @@ internal static partial class BrowserAutomationBootstrap
         "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
     private const string BrowserVersionArgument = "--version";
     private const string BrowserVersionPattern = @"(\d+\.\d+\.\d+\.\d+)";
+    private const string BrowserVersionProbeTimeoutMessage =
+        "Timed out while probing the installed Chrome version for DotPilot UI smoke tests.";
     private const string BrowserBinaryNotFoundMessage =
         "Unable to locate a Chrome browser binary for DotPilot UI smoke tests. " +
         "Set UNO_UITEST_CHROME_BINARY_PATH or UNO_UITEST_BROWSER_PATH explicitly.";
@@ -40,6 +42,7 @@ internal static partial class BrowserAutomationBootstrap
         "ChromeDriver bootstrap completed without producing the expected executable.";
     private const string DriverCacheDirectoryName = "dotpilot-uitest-drivers";
     private const string ChromeDriverBundleNamePrefix = "chromedriver-";
+    private const string DriverVersionCacheFileNameSuffix = ".driver-version";
     private const string LatestPatchVersionsUrl =
         "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json";
     private const string ChromeForTestingDownloadBaseUrl =
@@ -53,6 +56,7 @@ internal static partial class BrowserAutomationBootstrap
     {
         Timeout = TimeSpan.FromMinutes(2),
     };
+    private static readonly TimeSpan BrowserVersionProbeTimeout = TimeSpan.FromSeconds(10);
 
     public static BrowserAutomationSettings Resolve()
     {
@@ -122,25 +126,38 @@ internal static partial class BrowserAutomationBootstrap
     private static string EnsureChromeDriverDownloaded(string browserBinaryPath)
     {
         var browserVersion = ResolveBrowserVersion(browserBinaryPath);
-        var driverVersion = ResolveChromeDriverVersion(browserVersion);
+        var browserBuild = BuildChromeVersionKey(browserVersion);
         var driverPlatform = ResolveChromeDriverPlatform();
-        var cacheRootPath = Path.Combine(Path.GetTempPath(), DriverCacheDirectoryName, driverVersion);
-        var driverDirectory = Path.Combine(cacheRootPath, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
-        var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
+        var cacheRootPath = GetDriverCacheRootPath();
 
         HarnessLog.Write($"Browser version '{browserVersion}' resolved for '{browserBinaryPath}'.");
+
+        var cachedDriverDirectory = ResolveCachedChromeDriverDirectory(cacheRootPath, browserBuild, driverPlatform);
+        if (!string.IsNullOrWhiteSpace(cachedDriverDirectory))
+        {
+            var cachedDriverExecutablePath = Path.Combine(cachedDriverDirectory, GetChromeDriverExecutableFileName());
+            EnsureDriverExecutablePermissions(cachedDriverExecutablePath);
+            HarnessLog.Write($"Reusing cached ChromeDriver at '{cachedDriverExecutablePath}'.");
+            return cachedDriverDirectory;
+        }
+
+        var driverVersion = ResolveChromeDriverVersion(browserBuild);
+        var driverVersionRootPath = Path.Combine(cacheRootPath, driverVersion);
+        var driverDirectory = Path.Combine(driverVersionRootPath, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
+        var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
         HarnessLog.Write($"Matching ChromeDriver version '{driverVersion}' on platform '{driverPlatform}'.");
 
         if (File.Exists(driverExecutablePath))
         {
             EnsureDriverExecutablePermissions(driverExecutablePath);
+            PersistDriverVersionMapping(cacheRootPath, browserBuild, driverPlatform, driverVersion);
             HarnessLog.Write($"Reusing cached ChromeDriver at '{driverExecutablePath}'.");
             return driverDirectory;
         }
 
-        Directory.CreateDirectory(cacheRootPath);
-        HarnessLog.Write($"Downloading ChromeDriver to '{cacheRootPath}'.");
-        DownloadChromeDriverArchive(driverVersion, driverPlatform, cacheRootPath);
+        Directory.CreateDirectory(driverVersionRootPath);
+        HarnessLog.Write($"Downloading ChromeDriver to '{driverVersionRootPath}'.");
+        DownloadChromeDriverArchive(driverVersion, driverPlatform, driverVersionRootPath);
         EnsureDriverExecutablePermissions(driverExecutablePath);
 
         if (!File.Exists(driverExecutablePath))
@@ -148,7 +165,37 @@ internal static partial class BrowserAutomationBootstrap
             throw new InvalidOperationException($"{DriverExecutableNotFoundMessage} Expected path: {driverExecutablePath}");
         }
 
+        PersistDriverVersionMapping(cacheRootPath, browserBuild, driverPlatform, driverVersion);
         return driverDirectory;
+    }
+
+    internal static string? ResolveCachedChromeDriverDirectory(string cacheRootPath, string browserBuild, string driverPlatform)
+    {
+        var driverVersionMappingPath = GetDriverVersionMappingPath(cacheRootPath, browserBuild, driverPlatform);
+        if (!File.Exists(driverVersionMappingPath))
+        {
+            return null;
+        }
+
+        var driverVersion = File.ReadAllText(driverVersionMappingPath).Trim();
+        if (string.IsNullOrWhiteSpace(driverVersion))
+        {
+            return null;
+        }
+
+        var driverDirectory = Path.Combine(cacheRootPath, driverVersion, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
+        var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
+        return File.Exists(driverExecutablePath) ? driverDirectory : null;
+    }
+
+    internal static void PersistDriverVersionMapping(
+        string cacheRootPath,
+        string browserBuild,
+        string driverPlatform,
+        string driverVersion)
+    {
+        Directory.CreateDirectory(cacheRootPath);
+        File.WriteAllText(GetDriverVersionMappingPath(cacheRootPath, browserBuild, driverPlatform), driverVersion);
     }
 
     private static void DownloadChromeDriverArchive(string driverVersion, string driverPlatform, string cacheRootPath)
@@ -194,11 +241,10 @@ internal static partial class BrowserAutomationBootstrap
             CreateNoWindow = true,
         };
 
-        using var process = Process.Start(processStartInfo)
-            ?? throw new InvalidOperationException(BrowserVersionNotFoundMessage);
-
-        var output = $"{process.StandardOutput.ReadToEnd()}{Environment.NewLine}{process.StandardError.ReadToEnd()}";
-        process.WaitForExit();
+        var output = RunProcessAndCaptureOutput(
+            processStartInfo,
+            BrowserVersionProbeTimeout,
+            BrowserVersionProbeTimeoutMessage);
 
         var match = BrowserVersionRegex().Match(output);
         if (!match.Success)
@@ -209,9 +255,8 @@ internal static partial class BrowserAutomationBootstrap
         return match.Groups[1].Value;
     }
 
-    private static string ResolveChromeDriverVersion(string browserVersion)
+    private static string ResolveChromeDriverVersion(string browserBuild)
     {
-        var browserBuild = BuildChromeVersionKey(browserVersion);
         var response = GetResponseBytes(LatestPatchVersionsUrl, DriverVersionNotFoundMessage);
         using var document = JsonDocument.Parse(response);
 
@@ -235,6 +280,34 @@ internal static partial class BrowserAutomationBootstrap
         }
 
         return string.Join('.', segments.Take(3));
+    }
+
+    internal static string RunProcessAndCaptureOutput(
+        ProcessStartInfo startInfo,
+        TimeSpan timeout,
+        string timeoutMessage)
+    {
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException(timeoutMessage);
+        var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        var standardErrorTask = process.StandardError.ReadToEndAsync();
+
+        if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Best-effort cleanup only.
+            }
+
+            throw new TimeoutException(timeoutMessage);
+        }
+
+        process.WaitForExit();
+        return $"{standardOutputTask.GetAwaiter().GetResult()}{Environment.NewLine}{standardErrorTask.GetAwaiter().GetResult()}";
     }
 
     private static string ResolveChromeDriverPlatform()
@@ -391,6 +464,16 @@ internal static partial class BrowserAutomationBootstrap
         return OperatingSystem.IsWindows()
             ? ChromeDriverExecutableNameWindows
             : ChromeDriverExecutableName;
+    }
+
+    private static string GetDriverCacheRootPath()
+    {
+        return Path.Combine(Path.GetTempPath(), DriverCacheDirectoryName);
+    }
+
+    private static string GetDriverVersionMappingPath(string cacheRootPath, string browserBuild, string driverPlatform)
+    {
+        return Path.Combine(cacheRootPath, $"{browserBuild}-{driverPlatform}{DriverVersionCacheFileNameSuffix}");
     }
 
     private static IEnumerable<string> GetBrowserBinaryEnvironmentVariableNames()
