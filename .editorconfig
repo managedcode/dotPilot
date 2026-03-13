@@ -143,6 +143,7 @@ dotnet_diagnostic.CA1010.severity = none
 
 # Use collection expressions (C# 12+)
 dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion
+dotnet_diagnostic.CA1502.severity = warning
 
 # Code block preferences
 csharp_prefer_simple_default_expression = true:suggestion

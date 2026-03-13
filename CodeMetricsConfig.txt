@@ -1,0 +1,3 @@
+# Tighten maintainability checks enough to catch genuinely overloaded methods
+# without turning the first pass into pure noise.
+CA1502(Method): 15

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Review the current GitHub Actions validation and release workflows, record concrete risks with line-level evidence, and capture any durable CI policy that emerged from the user conversation, including mandatory `-warnaserror` enforcement for local and CI builds and keeping formatting as a local pre-push concern instead of a CI gate.
+Review the current GitHub Actions validation and release workflows, record concrete risks with line-level evidence, and capture any durable CI policy that emerged from the user conversation, including mandatory `-warnaserror` enforcement for local and CI builds, keeping formatting as a local pre-push concern instead of a CI gate, and preferring analyzer-backed quality gates for overloaded methods.
 
 ## Scope
 
@@ -11,7 +11,7 @@ Review the current GitHub Actions validation and release workflows, record concr
 - `.github/workflows/build-validation.yml`
 - `.github/workflows/release-publish.yml`
 - shared workflow assumptions from `.github/steps/install_dependencies/action.yml`
-- root governance updates needed to capture durable CI runner policy, mandatory `-warnaserror` build usage, and local-only formatting policy
+- root governance updates needed to capture durable CI runner policy, mandatory `-warnaserror` build usage, local-only formatting policy, and analyzer-backed maintainability gates
 
 ### Out Of Scope
 
@@ -68,9 +68,17 @@ Review the current GitHub Actions validation and release workflows, record concr
   - findings are ordered by severity
   Done when: the user can act on the review without needing another pass to discover the real problems.
 
-- [x] Step 6: Validate touched YAML/policy files.
+- [x] Step 6: Add analyzer-backed maintainability gating for overloaded methods.
+  Verification:
+  - enable `CA1502` in `.editorconfig`
+  - attach a repo-level `CodeMetricsConfig.txt` threshold through `Directory.Build.props`
+  - `dotnet build DotPilot.slnx -warnaserror` stays green
+  Done when: excessive method complexity is enforced by the normal build gate instead of a standalone CI helper step.
+
+- [x] Step 7: Validate touched YAML/policy files.
   Verification:
   - `dotnet build DotPilot.slnx -warnaserror`
+  - `dotnet test DotPilot.slnx`
   - `actionlint .github/workflows/build-validation.yml`
   - `actionlint .github/workflows/release-publish.yml`
   Done when: touched workflow files still parse cleanly.

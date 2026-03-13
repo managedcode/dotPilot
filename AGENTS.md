@@ -138,6 +138,7 @@ For this app:
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
+- quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
