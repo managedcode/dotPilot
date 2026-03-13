@@ -87,7 +87,7 @@ Reshape the solution so `DotPilot` stays a presentation-only Uno app, while the 
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
   Done when: the commands are green or any remaining blocker is explicitly documented in this file.
 
-- [ ] Step 9: Create the PR for this slice, then open a fresh working branch for the next slice before continuing.
+- [x] Step 9: Create the PR for this slice, then open a fresh working branch for the next slice before continuing.
   Verification: the branch and PR flow match the new repo rule.
   Done when: the PR exists and follow-up work is no longer accumulating on the reviewed branch.
 
@@ -104,6 +104,7 @@ Reshape the solution so `DotPilot` stays a presentation-only Uno app, while the 
 - `dotnet test DotPilot.slnx` passed with `0` failed, `34` passed, and `0` skipped.
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"` passed with `0` failed, `20` passed, and `0` skipped.
 - Coverage from `DotPilot.Tests/TestResults/67ca7188-7eca-4fae-aa3e-893fd99a8e3c/coverage.cobertura.xml` is `99.29%` line coverage and `85.00%` branch coverage across the changed production surface.
+- PR created: `https://github.com/managedcode/dotPilot/pull/73`.
 
 ## Failing Tests Tracker
 
