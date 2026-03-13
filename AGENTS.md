@@ -120,7 +120,7 @@ Skill-management rules for this `.NET` solution:
 
 ### Commands
 
-- `build`: `dotnet build DotPilot.slnx`
+- `build`: `dotnet build DotPilot.slnx -warnaserror`
 - `test`: `dotnet test DotPilot.slnx`
 - `format`: `dotnet format DotPilot.slnx --verify-no-changes`
 - `analyze`: `dotnet build DotPilot.slnx -warnaserror`
@@ -137,6 +137,7 @@ For this app:
 - desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
+- local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
@@ -144,6 +145,7 @@ For this app:
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
+- desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
 - desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
 - the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
 - for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks

@@ -40,10 +40,6 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: dotnet build DotPilot.slnx
-
-      - name: Analyze
-        shell: pwsh
         run: dotnet build DotPilot.slnx -warnaserror
 
   unit_tests:
