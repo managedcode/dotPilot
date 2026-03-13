@@ -150,6 +150,9 @@ For this app:
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
+- when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out
+- epic implementation PRs must include automated tests for every direct child issue they claim to cover, plus the broader runtime and UI regressions required by the touched flows
+- the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; durable resume and replay can persist session data outside Orleans storage until a later issue explicitly upgrades the cluster topology
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
