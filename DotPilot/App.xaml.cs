@@ -113,6 +113,10 @@ public partial class App : Application
                                 DotPilot.Core.Features.RuntimeFoundation.IRuntimeFoundationCatalog,
                                 DotPilot.Runtime.Features.RuntimeFoundation.RuntimeFoundationCatalog>(services);
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                            .AddSingleton<
+                                DotPilot.Core.Features.ToolchainCenter.IToolchainCenterCatalog,
+                                DotPilot.Runtime.Features.ToolchainCenter.ToolchainCenterCatalog>(services);
+                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                             .AddTransient<ShellViewModel>(services);
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                             .AddTransient<MainViewModel>(services);

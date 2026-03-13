@@ -15,9 +15,8 @@ internal static class WorkbenchSeedData
     private const string MonacoRendererLabel = "Monaco-aligned preview";
     private const string ReadOnlyStatusSummary = "Read-only workspace reference";
     private const string DiffReviewNote = "workbench review baseline";
-    private const string ProviderCategoryKey = "providers";
-    private const string PolicyCategoryKey = "policies";
-    private const string StorageCategoryKey = "storage";
+    private const string ToolchainCategoryTitle = "Toolchain Center";
+    private const string ToolchainCategorySummary = "Install, connect, diagnose, and poll Codex, Claude Code, and GitHub Copilot.";
     private const string ProviderCategoryTitle = "Providers";
     private const string PolicyCategoryTitle = "Policies";
     private const string StorageCategoryTitle = "Storage";
@@ -195,7 +194,12 @@ internal static class WorkbenchSeedData
         return
         [
             new(
-                ProviderCategoryKey,
+                WorkbenchSettingsCategoryKeys.Toolchains,
+                ToolchainCategoryTitle,
+                ToolchainCategorySummary,
+                []),
+            new(
+                WorkbenchSettingsCategoryKeys.Providers,
                 ProviderCategoryTitle,
                 ProviderCategorySummary,
                 runtimeFoundationSnapshot.Providers
@@ -207,7 +211,7 @@ internal static class WorkbenchSeedData
                         IsActionable: provider.RequiresExternalToolchain))
                     .ToArray()),
             new(
-                PolicyCategoryKey,
+                WorkbenchSettingsCategoryKeys.Policies,
                 PolicyCategoryTitle,
                 PolicyCategorySummary,
                 [
@@ -215,7 +219,7 @@ internal static class WorkbenchSeedData
                     new(ReviewGateEntryName, ReviewGateEntryValue, "Agent proposals must stay reviewable before acceptance.", IsSensitive: false, IsActionable: true),
                 ]),
             new(
-                StorageCategoryKey,
+                WorkbenchSettingsCategoryKeys.Storage,
                 StorageCategoryTitle,
                 StorageCategorySummary,
                 [

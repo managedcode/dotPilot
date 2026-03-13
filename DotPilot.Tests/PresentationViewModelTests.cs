@@ -35,15 +35,20 @@ public class PresentationViewModelTests
     {
         using var workspace = TemporaryWorkbenchDirectory.Create();
         var runtimeFoundationCatalog = CreateRuntimeFoundationCatalog();
+        var toolchainCenterCatalog = CreateToolchainCenterCatalog();
         var viewModel = new SettingsViewModel(
             new WorkbenchCatalog(runtimeFoundationCatalog, workspace.Root),
-            runtimeFoundationCatalog);
+            runtimeFoundationCatalog,
+            toolchainCenterCatalog);
 
         viewModel.SettingsIssueLabel.Should().Be(WorkbenchIssues.FormatIssueLabel(WorkbenchIssues.SettingsShell));
-        viewModel.Categories.Should().HaveCountGreaterOrEqualTo(3);
-        viewModel.SelectedCategoryTitle.Should().NotBeEmpty();
-        viewModel.VisibleEntries.Should().NotBeEmpty();
-        viewModel.ProviderSummary.Should().Contain("provider checks");
+        viewModel.Categories.Should().HaveCountGreaterOrEqualTo(4);
+        viewModel.SelectedCategory?.Key.Should().Be(WorkbenchSettingsCategoryKeys.Toolchains);
+        viewModel.IsToolchainCenterVisible.Should().BeTrue();
+        viewModel.ToolchainProviders.Should().HaveCount(3);
+        viewModel.SelectedToolchainProviderSnapshot.Should().NotBeNull();
+        viewModel.ToolchainWorkstreams.Should().NotBeEmpty();
+        viewModel.ProviderSummary.Should().Contain("ready");
     }
 
     [Test]
@@ -70,5 +75,10 @@ public class PresentationViewModelTests
     private static RuntimeFoundationCatalog CreateRuntimeFoundationCatalog()
     {
         return new RuntimeFoundationCatalog();
+    }
+
+    private static ToolchainCenterCatalog CreateToolchainCenterCatalog()
+    {
+        return new ToolchainCenterCatalog(TimeProvider.System, startBackgroundPolling: false);
     }
 }

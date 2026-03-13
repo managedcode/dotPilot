@@ -16,9 +16,8 @@ internal sealed class WorkbenchWorkspaceSnapshotBuilder
     private const string StructuredRendererLabel = "Structured preview";
     private const string ReadOnlyStatusSummary = "Read-only workspace reference";
     private const string DiffReviewNote = "issue #13 runtime-backed review";
-    private const string ProvidersCategoryKey = "providers";
-    private const string PoliciesCategoryKey = "policies";
-    private const string StorageCategoryKey = "storage";
+    private const string ToolchainCategoryTitle = "Toolchain Center";
+    private const string ToolchainCategorySummary = "Install, connect, diagnose, and poll Codex, Claude Code, and GitHub Copilot.";
     private const string ProvidersCategoryTitle = "Providers";
     private const string PoliciesCategoryTitle = "Policies";
     private const string StorageCategoryTitle = "Storage";
@@ -239,7 +238,12 @@ internal sealed class WorkbenchWorkspaceSnapshotBuilder
         return
         [
             new(
-                ProvidersCategoryKey,
+                WorkbenchSettingsCategoryKeys.Toolchains,
+                ToolchainCategoryTitle,
+                ToolchainCategorySummary,
+                []),
+            new(
+                WorkbenchSettingsCategoryKeys.Providers,
                 ProvidersCategoryTitle,
                 ProvidersCategorySummary,
                 _runtimeFoundationSnapshot.Providers
@@ -251,7 +255,7 @@ internal sealed class WorkbenchWorkspaceSnapshotBuilder
                         IsActionable: provider.RequiresExternalToolchain))
                     .ToArray()),
             new(
-                PoliciesCategoryKey,
+                WorkbenchSettingsCategoryKeys.Policies,
                 PoliciesCategoryTitle,
                 PoliciesCategorySummary,
                 [
@@ -259,7 +263,7 @@ internal sealed class WorkbenchWorkspaceSnapshotBuilder
                     new(ReviewGateEntryName, ReviewGateEntryValue, "Agent proposals remain reviewable before acceptance.", IsSensitive: false, IsActionable: true),
                 ]),
             new(
-                StorageCategoryKey,
+                WorkbenchSettingsCategoryKeys.Storage,
                 StorageCategoryTitle,
                 StorageCategorySummary,
                 [

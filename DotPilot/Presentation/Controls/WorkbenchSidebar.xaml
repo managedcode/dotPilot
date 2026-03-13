@@ -57,7 +57,7 @@
                        Text="Workbench" />
           </StackPanel>
         </Button>
-        <Button AutomationProperties.AutomationId="SidebarAgentsButton"
+        <Button AutomationProperties.AutomationId="WorkbenchSidebarAgentsButton"
                 Style="{StaticResource SidebarButtonStyle}"
                 uen:Navigation.Request="Second">
           <StackPanel Orientation="Horizontal"
@@ -69,7 +69,7 @@
                        Text="Agents" />
           </StackPanel>
         </Button>
-        <Button AutomationProperties.AutomationId="SidebarSettingsButton"
+        <Button AutomationProperties.AutomationId="WorkbenchSidebarSettingsButton"
                 Style="{StaticResource SidebarButtonStyle}"
                 uen:Navigation.Request="Settings">
           <StackPanel Orientation="Horizontal"
@@ -130,47 +130,49 @@
                      Text="{Binding RepositoryResultSummary}" />
         </Grid>
 
-        <ScrollViewer AutomationProperties.AutomationId="RepositoryNodesList"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
-          <muxc:ItemsRepeater ItemsSource="{Binding FilteredRepositoryNodes}">
-            <muxc:ItemsRepeater.ItemTemplate>
-              <DataTemplate x:DataType="presentation:WorkbenchRepositoryNodeItem">
-                <Grid Margin="0,0,0,8"
-                      AutomationProperties.AutomationId="{x:Bind AutomationId}"
-                      Tapped="OnRepositoryNodeTapped">
-                  <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                          BorderBrush="{StaticResource AppOutlineBrush}"
-                          BorderThickness="1"
-                          CornerRadius="16"
-                          Padding="12,10">
-                    <Grid ColumnSpacing="10">
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock VerticalAlignment="Top"
-                                 Margin="{x:Bind IndentMargin}"
-                                 FontSize="12"
-                                 Foreground="{StaticResource AppMutedTextBrush}"
-                                 Text="{x:Bind KindGlyph}" />
-                      <StackPanel Grid.Column="1"
-                                  Spacing="2">
-                        <TextBlock FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Text="{x:Bind Name}" />
-                        <TextBlock FontSize="11"
-                                   Foreground="{StaticResource AppMutedTextBrush}"
-                                   Text="{x:Bind DisplayLabel}"
-                                   TextWrapping="WrapWholeWords" />
-                      </StackPanel>
-                    </Grid>
-                  </Border>
+        <ListView AutomationProperties.AutomationId="RepositoryNodesList"
+                  Background="Transparent"
+                  BorderBrush="Transparent"
+                  BorderThickness="0"
+                  HorizontalContentAlignment="Stretch"
+                  ItemsSource="{Binding FilteredRepositoryNodes}"
+                  SelectedItem="{Binding SelectedRepositoryNode, Mode=TwoWay}"
+                  SelectionMode="Single">
+          <ListView.ItemTemplate>
+            <DataTemplate x:DataType="presentation:WorkbenchRepositoryNodeItem">
+              <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                      BorderBrush="{StaticResource AppOutlineBrush}"
+                      BorderThickness="1"
+                      CornerRadius="16"
+                      Margin="0,0,0,8"
+                      Padding="12,10"
+                      AutomationProperties.AutomationId="{x:Bind AutomationId}">
+                <Grid ColumnSpacing="10">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock VerticalAlignment="Top"
+                             Margin="{x:Bind IndentMargin}"
+                             FontSize="12"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{x:Bind KindGlyph}" />
+                  <StackPanel Grid.Column="1"
+                              Spacing="2">
+                    <TextBlock FontSize="13"
+                               FontWeight="SemiBold"
+                               AutomationProperties.AutomationId="{x:Bind TapAutomationId}"
+                               Text="{x:Bind Name}" />
+                    <TextBlock FontSize="11"
+                               Foreground="{StaticResource AppMutedTextBrush}"
+                               Text="{x:Bind DisplayLabel}"
+                               TextWrapping="WrapWholeWords" />
+                  </StackPanel>
                 </Grid>
-              </DataTemplate>
-            </muxc:ItemsRepeater.ItemTemplate>
-          </muxc:ItemsRepeater>
-        </ScrollViewer>
+              </Border>
+            </DataTemplate>
+          </ListView.ItemTemplate>
+        </ListView>
       </StackPanel>
 
       <StackPanel Grid.Row="4">

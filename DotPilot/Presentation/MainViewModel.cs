@@ -195,6 +195,7 @@ public sealed class MainViewModel : ObservableObject
         var kindGlyph = node.IsDirectory ? "▾" : "•";
         var indentMargin = new Thickness(node.Depth * IndentSize, 0d, 0d, 0d);
         var automationId = PresentationAutomationIds.RepositoryNode(node.RelativePath);
+        var tapAutomationId = PresentationAutomationIds.RepositoryNodeTap(node.RelativePath);
 
         return new(
             node.RelativePath,
@@ -204,7 +205,8 @@ public sealed class MainViewModel : ObservableObject
             node.CanOpen,
             kindGlyph,
             indentMargin,
-            automationId);
+            automationId,
+            tapAutomationId);
     }
 
     private void UpdateFilteredRepositoryNodes()

@@ -35,7 +35,7 @@ internal sealed class ProviderToolchainProbe
         };
     }
 
-    private static string? ResolveExecutablePath(string commandName)
+    internal static string? ResolveExecutablePath(string commandName)
     {
         if (OperatingSystem.IsBrowser())
         {

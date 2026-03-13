@@ -207,7 +207,7 @@ public class TestBase
         }
     }
 
-    protected void WriteBrowserDomSnapshot(string context)
+    protected void WriteBrowserDomSnapshot(string context, string? automationId = null)
     {
         if (Constants.CurrentPlatform != Platform.Browser || _app is null)
         {
@@ -258,12 +258,23 @@ public class TestBase
                 "return Array.from(document.querySelectorAll('[aria-label]')).slice(0, 25).map(e => e.getAttribute('aria-label')).join(' | ');"));
             var bodyText = Normalize(ExecuteScript("return document.body.innerText;"));
             var bodyHtml = Normalize(ExecuteScript("return document.body.innerHTML;"));
-            var settingsNavHitTest = Normalize(ExecuteScript(
+            var inspectedAutomationId = automationId ?? string.Empty;
+            var escapedAutomationId = inspectedAutomationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var targetHitTest = Normalize(ExecuteScript(string.Concat(
                 """
                 return (() => {
-                    const target = document.querySelector('[xamlautomationid="SidebarSettingsButton"]');
+                    const automationId = '
+                """,
+                escapedAutomationId,
+                """
+                ';
+                    if (!automationId) {
+                        return 'no inspected automation id';
+                    }
+
+                    const target = document.querySelector(`[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`);
                     if (!target) {
-                        return 'missing SidebarSettingsButton';
+                        return `missing ${automationId}`;
                     }
 
                     const rect = target.getBoundingClientRect();
@@ -275,6 +286,7 @@ public class TestBase
                         targetTag: target.tagName,
                         targetClass: target.className,
                         targetId: target.getAttribute('xamlautomationid') ?? '',
+                        targetAria: target.getAttribute('aria-label') ?? '',
                         x,
                         y,
                         containsTop: top ? target.contains(top) : false,
@@ -285,12 +297,12 @@ public class TestBase
                         topAria: top?.getAttribute('aria-label') ?? ''
                     });
                 })();
-                """));
+                """)));
 
             HarnessLog.Write($"Browser DOM snapshot for '{context}': readyState='{readyState}', location='{location}', xamlautomationid-count='{automationCount}'.");
             HarnessLog.Write($"Browser DOM snapshot automation ids for '{context}': {automationIds}");
             HarnessLog.Write($"Browser DOM snapshot aria-labels for '{context}': {ariaLabels}");
-            HarnessLog.Write($"Browser DOM snapshot SidebarSettingsButton hit test for '{context}': {settingsNavHitTest}");
+            HarnessLog.Write($"Browser DOM snapshot target hit test for '{context}' and automation id '{inspectedAutomationId}': {targetHitTest}");
             HarnessLog.Write($"Browser DOM snapshot innerText for '{context}': {bodyText}");
             HarnessLog.Write($"Browser DOM snapshot innerHTML for '{context}': {bodyHtml}");
         }
@@ -303,7 +315,110 @@ public class TestBase
     protected void TapAutomationElement(string automationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
-        App.Tap(automationId);
+        try
+        {
+            App.Tap(automationId);
+        }
+        catch (InvalidOperationException exception)
+        {
+            HarnessLog.Write($"Tap failed for '{automationId}': {exception.Message}");
+
+            try
+            {
+                var matches = App.Query(automationId);
+                HarnessLog.Write($"Tap selector '{automationId}' returned {matches.Length} matches.");
+
+                for (var index = 0; index < matches.Length; index++)
+                {
+                    var match = matches[index];
+                    HarnessLog.Write(
+                        $"Tap selector '{automationId}' match[{index}] id='{match.Id}' text='{match.Text}' label='{match.Label}' rect='{match.Rect}'.");
+                }
+            }
+            catch (Exception diagnosticException)
+            {
+                HarnessLog.Write($"Tap selector diagnostics failed for '{automationId}': {diagnosticException.Message}");
+            }
+
+            WriteBrowserAutomationDiagnostics(automationId);
+            WriteBrowserDomSnapshot($"tap:{automationId}", automationId);
+            throw;
+        }
+    }
+
+    private void WriteBrowserAutomationDiagnostics(string automationId)
+    {
+        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                HarnessLog.Write($"Browser automation diagnostics skipped for '{automationId}': Selenium driver field was not found.");
+                return;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                HarnessLog.Write($"Browser automation diagnostics skipped for '{automationId}': ExecuteScript was not found.");
+                return;
+            }
+
+            var script = string.Concat(
+                """
+                return (() => {
+                    const automationId = 
+                """,
+                "'",
+                automationId.Replace("'", "\\'"),
+                "'",
+                """
+                ;
+                    const byAutomation = Array.from(document.querySelectorAll(`[xamlautomationid="${automationId}"]`))
+                        .map((element, index) => ({
+                            index,
+                            tag: element.tagName,
+                            className: element.className,
+                            ariaLabel: element.getAttribute('aria-label') ?? '',
+                            xamlAutomationId: element.getAttribute('xamlautomationid') ?? '',
+                            xamlType: element.getAttribute('xamltype') ?? '',
+                            text: (element.innerText ?? '').trim(),
+                            html: element.outerHTML.slice(0, 300)
+                        }));
+                    const byAria = Array.from(document.querySelectorAll(`[aria-label="${automationId}"]`))
+                        .map((element, index) => ({
+                            index,
+                            tag: element.tagName,
+                            className: element.className,
+                            ariaLabel: element.getAttribute('aria-label') ?? '',
+                            xamlAutomationId: element.getAttribute('xamlautomationid') ?? '',
+                            xamlType: element.getAttribute('xamltype') ?? '',
+                            text: (element.innerText ?? '').trim(),
+                            html: element.outerHTML.slice(0, 300)
+                        }));
+                    return JSON.stringify({ byAutomation, byAria });
+                })();
+                """);
+
+            var diagnostics = executeScriptMethod.Invoke(driver, [script, Array.Empty<object>()]);
+            HarnessLog.Write($"Browser automation diagnostics for '{automationId}': {diagnostics}");
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser automation diagnostics failed for '{automationId}': {exception.Message}");
+        }
     }
 
     private static bool ResolveBrowserHeadless()

@@ -1,5 +1,6 @@
 using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeFoundation;
+using DotPilot.Runtime.Features.ToolchainCenter;
 
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
 
@@ -78,18 +79,8 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
                 StatusSummary = DeterministicClientStatusSummary,
                 RequiresExternalToolchain = false,
             },
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.CodexDisplayName,
-                ProviderToolchainNames.CodexCommandName,
-                true),
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.ClaudeCodeDisplayName,
-                ProviderToolchainNames.ClaudeCodeCommandName,
-                true),
-            ProviderToolchainProbe.Probe(
-                ProviderToolchainNames.GitHubCopilotDisplayName,
-                ProviderToolchainNames.GitHubCopilotCommandName,
-                true),
+            .. ToolchainProviderSnapshotFactory.Create(TimeProvider.System.GetUtcNow())
+                .Select(snapshot => snapshot.Provider),
         ];
     }
 }

@@ -23,6 +23,8 @@ From the workbench, the operator should be able to:
 - read-only file inspection and diff-review surface
 - artifact dock and runtime log console
 - unified settings shell for providers, policies, and storage
+- a Toolchain Center for `Codex`, `Claude Code`, and `GitHub Copilot` readiness
+- provider diagnostics, environment and secret visibility, operator actions, and background polling summaries
 - dedicated agent-builder screen
 - deterministic runtime foundation panel for provider readiness and control-plane state
 - `NUnit` unit tests plus `Uno.UITest` browser UI coverage
@@ -44,6 +46,7 @@ What already exists:
 
 - the first runtime foundation slices in `DotPilot.Core` and `DotPilot.Runtime`
 - the first operator workbench slice for repository browsing, document inspection, artifacts, logs, and settings
+- the first Toolchain Center slice for pre-session provider readiness and operator diagnostics
 - a presentation-only `Uno Platform` app shell with separate non-UI class-library boundaries
 - unit, coverage, and UI automation validation paths
 - architecture docs, ADRs, feature specs, and GitHub backlog tracking
@@ -84,8 +87,10 @@ Start here if you want the current source of truth:
 - [ADR-0003: Vertical Slices And UI-Only Uno App](docs/ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - [Feature Spec: Agent Control Plane Experience](docs/Features/agent-control-plane-experience.md)
 - [Feature Spec: Workbench Foundation](docs/Features/workbench-foundation.md)
+- [Feature Spec: Toolchain Center](docs/Features/toolchain-center.md)
 - [Task Plan: Vertical Slice Runtime Foundation](vertical-slice-runtime-foundation.plan.md)
 - [Task Plan: Workbench Foundation](issue-13-workbench-foundation.plan.md)
+- [Task Plan: Toolchain Center](issue-14-toolchain-center.plan.md)
 - [Root Governance](AGENTS.md)
 
 GitHub tracking:
@@ -109,6 +114,7 @@ GitHub tracking:
 ├── AGENTS.md                 # root governance for humans and agents
 ├── vertical-slice-runtime-foundation.plan.md
 ├── issue-13-workbench-foundation.plan.md
+├── issue-14-toolchain-center.plan.md
 └── DotPilot.slnx             # solution entry point
 ```
 

@@ -44,9 +44,9 @@
       <StackPanel Grid.Row="1"
                   Margin="12,20,12,0"
                   Spacing="4">
-        <Button AutomationProperties.AutomationId="SidebarWorkbenchButton"
+        <Button AutomationProperties.AutomationId="SettingsSidebarWorkbenchButton"
                 Style="{StaticResource SidebarButtonStyle}"
-                uen:Navigation.Request="Main">
+                uen:Navigation.Request="-/Main">
           <StackPanel Orientation="Horizontal"
                       Spacing="8">
             <TextBlock VerticalAlignment="Center"
@@ -56,7 +56,7 @@
                        Text="Workbench" />
           </StackPanel>
         </Button>
-        <Button AutomationProperties.AutomationId="SidebarAgentsButton"
+        <Button AutomationProperties.AutomationId="SettingsSidebarAgentsButton"
                 Style="{StaticResource SidebarButtonStyle}"
                 uen:Navigation.Request="Second">
           <StackPanel Orientation="Horizontal"
@@ -68,7 +68,7 @@
                        Text="Agents" />
           </StackPanel>
         </Button>
-        <Button AutomationProperties.AutomationId="SidebarSettingsButton"
+        <Button AutomationProperties.AutomationId="SettingsSidebarSettingsButton"
                 Style="{StaticResource SidebarButtonSelectedStyle}">
           <StackPanel Orientation="Horizontal"
                       Spacing="8">

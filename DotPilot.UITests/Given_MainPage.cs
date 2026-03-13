@@ -24,15 +24,28 @@ public class GivenMainPage : TestBase
     private const string RuntimeLogListAutomationId = "RuntimeLogList";
     private const string RuntimeLogItemAutomationId = "RuntimeLogItem";
     private const string WorkbenchNavButtonAutomationId = "WorkbenchNavButton";
-    private const string SidebarWorkbenchButtonAutomationId = "SidebarWorkbenchButton";
-    private const string SidebarAgentsButtonAutomationId = "SidebarAgentsButton";
+    private const string AgentSidebarWorkbenchButtonAutomationId = "AgentSidebarWorkbenchButton";
+    private const string SettingsSidebarWorkbenchButtonAutomationId = "SettingsSidebarWorkbenchButton";
+    private const string WorkbenchSidebarAgentsButtonAutomationId = "WorkbenchSidebarAgentsButton";
+    private const string SettingsSidebarAgentsButtonAutomationId = "SettingsSidebarAgentsButton";
     private const string BackToWorkbenchButtonAutomationId = "BackToWorkbenchButton";
-    private const string SidebarSettingsButtonAutomationId = "SidebarSettingsButton";
+    private const string WorkbenchSidebarSettingsButtonAutomationId = "WorkbenchSidebarSettingsButton";
     private const string SettingsCategoryListAutomationId = "SettingsCategoryList";
     private const string SettingsEntriesListAutomationId = "SettingsEntriesList";
     private const string SelectedSettingsCategoryTitleAutomationId = "SelectedSettingsCategoryTitle";
     private const string StorageSettingsCategoryAutomationId = "SettingsCategory-storage";
-    private const string SettingsPageRepositoryNodeAutomationId = "RepositoryNode-dotpilot-presentation-settingspage-xaml";
+    private const string ToolchainSettingsCategoryAutomationId = "SettingsCategory-toolchains";
+    private const string ToolchainCenterPanelAutomationId = "ToolchainCenterPanel";
+    private const string ToolchainProviderListAutomationId = "ToolchainProviderList";
+    private const string SelectedToolchainProviderTitleAutomationId = "SelectedToolchainProviderTitle";
+    private const string ToolchainDiagnosticsListAutomationId = "ToolchainDiagnosticsList";
+    private const string ToolchainConfigurationListAutomationId = "ToolchainConfigurationList";
+    private const string ToolchainActionsListAutomationId = "ToolchainActionsList";
+    private const string ToolchainBackgroundPollingAutomationId = "ToolchainBackgroundPolling";
+    private const string ClaudeToolchainProviderAutomationId = "ToolchainProvider-claude";
+    private const string SettingsPageSearchText = "SettingsPage";
+    private const string SettingsPageDocumentTitle = "SettingsPage.xaml";
+    private const string SettingsPageRepositoryNodeAutomationId = "RepositoryNodeTap-dotpilot-presentation-settingspage-xaml";
     private const string RuntimeFoundationPanelAutomationId = "RuntimeFoundationPanel";
 
     [Test]
@@ -58,14 +71,7 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        App.ClearText(WorkbenchSearchInputAutomationId);
-        App.EnterText(WorkbenchSearchInputAutomationId, "SettingsPage");
-        WaitForElement(SettingsPageRepositoryNodeAutomationId);
-        App.Tap(SettingsPageRepositoryNodeAutomationId);
-        WaitForElement(SelectedDocumentTitleAutomationId);
-
-        var title = GetSingleTextContent(SelectedDocumentTitleAutomationId);
-        Assert.That(title, Is.EqualTo("SettingsPage.xaml"));
+        OpenSettingsPageDocumentFromRepositorySearch();
 
         TakeScreenshot("repository_search_open_file");
     }
@@ -102,11 +108,13 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        TapAutomationElement(SidebarSettingsButtonAutomationId);
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
         WaitForElement(SettingsCategoryListAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        WaitForElement(ToolchainProviderListAutomationId);
+        TapAutomationElement(StorageSettingsCategoryAutomationId);
         WaitForElement(SettingsEntriesListAutomationId);
-        App.Tap(StorageSettingsCategoryAutomationId);
 
         var categoryTitle = GetSingleTextContent(SelectedSettingsCategoryTitleAutomationId);
         Assert.That(categoryTitle, Is.EqualTo("Storage"));
@@ -120,13 +128,71 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        TapAutomationElement(SidebarSettingsButtonAutomationId);
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
-        TapAutomationElement(SidebarAgentsButtonAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
         WaitForElement(BackToWorkbenchButtonAutomationId);
 
         TakeScreenshot("settings_to_agents_navigation");
+    }
+
+    [Test]
+    public async Task WhenReturningFromSettingsToWorkbenchThenWorkbenchScreenIsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        TapAutomationElement(SettingsSidebarWorkbenchButtonAutomationId);
+        EnsureOnWorkbenchScreen();
+        WaitForElement(RuntimeFoundationPanelAutomationId);
+
+        TakeScreenshot("settings_to_workbench_navigation");
+    }
+
+    [Test]
+    public async Task WhenNavigatingToSettingsThenToolchainCenterProviderDetailsAreVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ToolchainSettingsCategoryAutomationId);
+        WaitForElement(ToolchainCenterPanelAutomationId);
+        WaitForElement(ToolchainProviderListAutomationId);
+        WaitForElement(SelectedToolchainProviderTitleAutomationId);
+        WaitForElement(ToolchainDiagnosticsListAutomationId);
+        WaitForElement(ToolchainConfigurationListAutomationId);
+        WaitForElement(ToolchainActionsListAutomationId);
+        WaitForElement(ToolchainBackgroundPollingAutomationId);
+
+        TakeScreenshot("toolchain_center_visible");
+    }
+
+    [Test]
+    public async Task WhenSwitchingToolchainProvidersThenProviderSpecificDetailsAreVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnWorkbenchScreen();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ClaudeToolchainProviderAutomationId);
+        TapAutomationElement(ClaudeToolchainProviderAutomationId);
+        WaitForElement(SelectedToolchainProviderTitleAutomationId);
+
+        var providerTitle = GetSingleTextContent(SelectedToolchainProviderTitleAutomationId);
+        Assert.That(providerTitle, Is.EqualTo("Claude Code"));
+
+        WaitForElement(ToolchainDiagnosticsListAutomationId);
+        WaitForElement(ToolchainConfigurationListAutomationId);
+        WaitForElement(ToolchainActionsListAutomationId);
+
+        TakeScreenshot("toolchain_center_claude_details");
     }
 
     [Test]
@@ -135,9 +201,8 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        App.Tap(SettingsPageRepositoryNodeAutomationId);
-        WaitForElement(SelectedDocumentTitleAutomationId);
-        TapAutomationElement(SidebarSettingsButtonAutomationId);
+        OpenSettingsPageDocumentFromRepositorySearch();
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
 
         TakeScreenshot("document_to_settings_navigation");
@@ -149,9 +214,8 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        App.Tap(SettingsPageRepositoryNodeAutomationId);
-        WaitForElement(SelectedDocumentTitleAutomationId);
-        TapAutomationElement(SidebarAgentsButtonAutomationId);
+        OpenSettingsPageDocumentFromRepositorySearch();
+        TapAutomationElement(WorkbenchSidebarAgentsButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
 
         TakeScreenshot("document_to_agents_navigation");
@@ -163,10 +227,10 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        App.Tap(SettingsPageRepositoryNodeAutomationId);
+        OpenSettingsPageDocumentFromRepositorySearch();
         EnsureDiffReviewVisible();
         EnsureRuntimeLogVisible();
-        TapAutomationElement(SidebarSettingsButtonAutomationId);
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
 
         TakeScreenshot("workbench_modes_to_settings_navigation");
@@ -178,15 +242,15 @@ public class GivenMainPage : TestBase
         await Task.CompletedTask;
 
         EnsureOnWorkbenchScreen();
-        App.Tap(SettingsPageRepositoryNodeAutomationId);
+        OpenSettingsPageDocumentFromRepositorySearch();
         EnsureDiffReviewVisible();
         EnsureRuntimeLogVisible();
-        TapAutomationElement(SidebarSettingsButtonAutomationId);
+        TapAutomationElement(WorkbenchSidebarSettingsButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
-        App.Tap(StorageSettingsCategoryAutomationId);
-        TapAutomationElement(SidebarAgentsButtonAutomationId);
+        TapAutomationElement(StorageSettingsCategoryAutomationId);
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
-        TapAutomationElement(BackToWorkbenchButtonAutomationId);
+        TapAutomationElement(AgentSidebarWorkbenchButtonAutomationId);
         EnsureOnWorkbenchScreen();
         WaitForElement(RuntimeFoundationPanelAutomationId);
 
@@ -200,13 +264,17 @@ public class GivenMainPage : TestBase
             return;
         }
 
-        if (TryWaitForElement(SidebarWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
+        if (TryWaitForElement(AgentSidebarWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
         {
-            TapAutomationElement(SidebarWorkbenchButtonAutomationId);
+            TapAutomationElement(AgentSidebarWorkbenchButtonAutomationId);
         }
         else if (TryWaitForElement(BackToWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
         {
             TapAutomationElement(BackToWorkbenchButtonAutomationId);
+        }
+        else if (TryWaitForElement(SettingsSidebarWorkbenchButtonAutomationId, InitialScreenProbeTimeout))
+        {
+            TapAutomationElement(SettingsSidebarWorkbenchButtonAutomationId);
         }
 
         WaitForElement(WorkbenchScreenAutomationId, "Timed out returning to the workbench screen.", ScreenTransitionTimeout);
@@ -258,6 +326,18 @@ public class GivenMainPage : TestBase
 
         App.Tap(InspectorModeToggleAutomationId);
         WaitForElement(RuntimeLogListAutomationId);
+    }
+
+    private void OpenSettingsPageDocumentFromRepositorySearch()
+    {
+        App.ClearText(WorkbenchSearchInputAutomationId);
+        App.EnterText(WorkbenchSearchInputAutomationId, SettingsPageSearchText);
+        WaitForElement(SettingsPageRepositoryNodeAutomationId);
+        TapAutomationElement(SettingsPageRepositoryNodeAutomationId);
+        WaitForElement(SelectedDocumentTitleAutomationId);
+
+        var title = GetSingleTextContent(SelectedDocumentTitleAutomationId);
+        Assert.That(title, Is.EqualTo(SettingsPageDocumentTitle));
     }
 
     private void EnsureDiffReviewVisible()
@@ -318,7 +398,7 @@ public class GivenMainPage : TestBase
     private void WriteTimeoutDiagnostics(string automationId)
     {
         WriteBrowserSystemLogs($"timeout:{automationId}");
-        WriteBrowserDomSnapshot($"timeout:{automationId}");
+        WriteBrowserDomSnapshot($"timeout:{automationId}", automationId);
         WriteSelectorDiagnostics(automationId);
 
         try
@@ -340,9 +420,11 @@ public class GivenMainPage : TestBase
             SettingsScreenAutomationId,
             AgentBuilderScreenAutomationId,
             WorkbenchNavButtonAutomationId,
-            SidebarWorkbenchButtonAutomationId,
-            SidebarAgentsButtonAutomationId,
-            SidebarSettingsButtonAutomationId,
+            AgentSidebarWorkbenchButtonAutomationId,
+            SettingsSidebarWorkbenchButtonAutomationId,
+            WorkbenchSidebarAgentsButtonAutomationId,
+            SettingsSidebarAgentsButtonAutomationId,
+            WorkbenchSidebarSettingsButtonAutomationId,
             WorkbenchSearchInputAutomationId,
             SelectedDocumentTitleAutomationId,
             RuntimeFoundationPanelAutomationId,

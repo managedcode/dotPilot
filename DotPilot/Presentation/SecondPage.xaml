@@ -33,76 +33,84 @@
 
       <controls:AgentSidebar />
 
-      <ScrollViewer Grid.Column="1"
-                    HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="1120"
-                    HorizontalAlignment="Stretch"
-                    Spacing="16">
-          <Grid Margin="0,28,0,8"
-                ColumnSpacing="16">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="8">
-              <TextBlock FontSize="22"
-                         FontWeight="SemiBold"
-                         Text="{Binding PageTitle}" />
-              <TextBlock FontSize="14"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="{Binding PageSubtitle}" />
-              <Border Style="{StaticResource GlassPanelStyle}"
-                      AutomationProperties.AutomationId="AgentBuilderRuntimeBanner"
-                      Padding="14,12">
-                <StackPanel Spacing="6">
-                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeIssueLabel"
-                             CharacterSpacing="80"
-                             FontSize="11"
-                             FontWeight="Medium"
-                             Foreground="{StaticResource AppMutedTextBrush}"
-                             Text="{Binding RuntimeFoundation.EpicLabel}" />
-                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeSummary"
-                             FontSize="13"
-                             FontWeight="SemiBold"
-                             Foreground="{StaticResource AppPrimaryTextBrush}"
-                             Text="{Binding RuntimeFoundation.Summary}"
-                             TextWrapping="WrapWholeWords" />
-                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeClient"
-                             FontSize="12"
-                             Foreground="{StaticResource AppMutedTextBrush}"
-                             Text="{Binding RuntimeFoundation.DeterministicClientName}" />
-                </StackPanel>
-              </Border>
-            </StackPanel>
-            <Button Grid.Column="1"
-                    Style="{StaticResource SidebarButtonStyle}"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center"
-                    AutomationProperties.AutomationId="BackToWorkbenchButton"
-                    uen:Navigation.Request="Main">
-              <StackPanel Orientation="Horizontal"
-                          Spacing="6">
-                <TextBlock FontSize="14"
-                           Text="←" />
-                <TextBlock Text="Back to workbench" />
+      <Grid Grid.Column="1"
+            RowSpacing="16">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,28,0,8"
+              ColumnSpacing="16">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Spacing="8">
+            <TextBlock FontSize="22"
+                       FontWeight="SemiBold"
+                       Text="{Binding PageTitle}" />
+            <TextBlock FontSize="14"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{Binding PageSubtitle}" />
+            <Border Style="{StaticResource GlassPanelStyle}"
+                    AutomationProperties.AutomationId="AgentBuilderRuntimeBanner"
+                    Padding="14,12">
+              <StackPanel Spacing="6">
+                <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeIssueLabel"
+                           CharacterSpacing="80"
+                           FontSize="11"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource AppMutedTextBrush}"
+                           Text="{Binding RuntimeFoundation.EpicLabel}" />
+                <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeSummary"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource AppPrimaryTextBrush}"
+                           Text="{Binding RuntimeFoundation.Summary}"
+                           TextWrapping="WrapWholeWords" />
+                <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeClient"
+                           FontSize="12"
+                           Foreground="{StaticResource AppMutedTextBrush}"
+                           Text="{Binding RuntimeFoundation.DeterministicClientName}" />
               </StackPanel>
-            </Button>
-          </Grid>
+            </Border>
+          </StackPanel>
+          <Button Grid.Column="1"
+                  Style="{StaticResource SidebarButtonStyle}"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Top"
+                  AutomationProperties.AutomationId="BackToWorkbenchButton"
+                  uen:Navigation.Request="-/Main">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="6">
+              <TextBlock FontSize="14"
+                         Text="←" />
+              <TextBlock Text="Back to workbench" />
+            </StackPanel>
+          </Button>
+        </Grid>
 
-          <controls:AgentBasicInfoSection />
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel MaxWidth="1120"
+                      HorizontalAlignment="Stretch"
+                      Spacing="16">
+            <controls:AgentBasicInfoSection />
 
-          <Grid ColumnSpacing="20">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="2*" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <Grid ColumnSpacing="20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
 
-            <controls:AgentPromptSection />
-            <controls:AgentSkillsSection Grid.Column="1" />
-          </Grid>
-        </StackPanel>
-      </ScrollViewer>
+              <controls:AgentPromptSection />
+              <controls:AgentSkillsSection Grid.Column="1" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
     </Grid>
   </Grid>
 </Page>

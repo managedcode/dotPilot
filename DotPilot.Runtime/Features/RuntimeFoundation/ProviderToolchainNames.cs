@@ -8,6 +8,6 @@ internal static class ProviderToolchainNames
     public const string CodexCommandName = "codex";
     public const string ClaudeCodeDisplayName = "Claude Code";
     public const string ClaudeCodeCommandName = "claude";
-    public const string GitHubCopilotDisplayName = "GitHub CLI / Copilot";
+    public const string GitHubCopilotDisplayName = "GitHub Copilot";
     public const string GitHubCopilotCommandName = "gh";
 }

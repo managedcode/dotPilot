@@ -138,7 +138,7 @@ For this app:
 - `format` uses `dotnet format --verify-no-changes` as a local pre-push check; GitHub Actions validation should not spend CI time rechecking formatting drift that must already be fixed before push
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
 - desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
-- `LangVersion` is pinned to `latest` at the root
+- `LangVersion` is pinned to `14` at the root
 - prefer the newest stable `.NET 10` and `C#` language features that are supported by the pinned SDK and do not weaken readability, determinism, or analyzability
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
@@ -153,6 +153,7 @@ For this app:
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
+- PR bodies for issue-backed work must use GitHub closing references such as `Closes #14` so merged work closes the tracked issue automatically
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
 - desktop release assets must be native installable or directly executable outputs for each OS, not archives of raw publish folders; package the real `.exe`, `.snap`, `.dmg`, `.pkg`, `Setup.exe`, or equivalent runnable installer/app artifact instead of zipping intermediate publish directories
