@@ -4,7 +4,7 @@
     <DataCollectors>
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
-          <Include>[DotPilot]*</Include>
+          <Include>[DotPilot*]*</Include>
           <Exclude>[DotPilot.Tests]*,[coverlet.*]*</Exclude>
           <ExcludeByAttribute>CompilerGeneratedAttribute,GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute,ObsoleteAttribute</ExcludeByAttribute>
           <ExcludeByFile>**/obj/**,**/*.g.cs,**/*.g.i.cs,**/*HotReloadInfo*.cs</ExcludeByFile>

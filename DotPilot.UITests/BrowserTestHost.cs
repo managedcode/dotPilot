@@ -16,6 +16,7 @@ internal static class BrowserTestHost
     private const string NoLaunchProfileOption = "--no-launch-profile";
     private const string UiAutomationProperty = "-p:IsUiAutomationMappingEnabled=True";
     private const string ProjectRelativePath = "DotPilot/DotPilot.csproj";
+    private const string BrowserOutputRelativePath = "DotPilot/bin/Release/net10.0-browserwasm/DotPilot.dll";
     private const string SolutionMarkerFileName = "DotPilot.slnx";
     private const string HostReadyTimeoutMessage = "Timed out waiting for the WebAssembly host to become reachable.";
     private const string BuildFailureMessage = "Failed to build the WebAssembly test host.";
@@ -58,8 +59,16 @@ internal static class BrowserTestHost
             var repoRoot = FindRepositoryRoot();
             var projectPath = Path.Combine(repoRoot, ProjectRelativePath);
 
-            HarnessLog.Write("Building browser host.");
-            EnsureBuilt(repoRoot, projectPath);
+            if (!IsBrowserHostBuilt(repoRoot))
+            {
+                HarnessLog.Write("Building browser host.");
+                EnsureBuilt(repoRoot, projectPath);
+            }
+            else
+            {
+                HarnessLog.Write("Reusing existing browser host build output.");
+            }
+
             HarnessLog.Write("Starting browser host process.");
             StartHostProcess(repoRoot, projectPath);
             WaitForHost(hostUri);
@@ -108,6 +117,11 @@ internal static class BrowserTestHost
         _hostProcess.BeginErrorReadLine();
         _startedHost = true;
         HarnessLog.Write($"Browser host process started with PID {_hostProcess.Id}.");
+    }
+
+    private static bool IsBrowserHostBuilt(string repoRoot)
+    {
+        return File.Exists(Path.Combine(repoRoot, BrowserOutputRelativePath));
     }
 
     private static void CaptureOutput(string? line)

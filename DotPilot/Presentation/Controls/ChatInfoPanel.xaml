@@ -1,6 +1,7 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.ChatInfoPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DotPilot.Presentation.Controls"
              xmlns:uen="using:Uno.Extensions.Navigation.UI"
              xmlns:presentation="using:DotPilot.Presentation"
              AutomationProperties.AutomationId="ChatInfoPanel">
@@ -275,6 +276,10 @@
                           ItemTemplate="{StaticResource AgentTemplate}"
                           ItemsSource="{Binding Agents}" />
           </StackPanel>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <controls:RuntimeFoundationPanel DataContext="{Binding RuntimeFoundation}" />
         </StackPanel>
       </ScrollViewer>
     </Grid>

@@ -84,14 +84,26 @@ public partial class App : Application
 #if DEBUG
                     // DelegatingHandler will be automatically injected
                     Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                        .AddTransient<DelegatingHandler, Services.Endpoints.DebugHttpHandler>(services);
+                        .AddTransient<DelegatingHandler, DotPilot.Runtime.Features.HttpDiagnostics.DebugHttpHandler>(services);
 #endif
 
                 })
                 .ConfigureServices((context, services) =>
                 {
-                    // TODO: Register your services
-                    //services.AddSingleton<IMyService, MyService>();
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddSingleton<
+                            DotPilot.Core.Features.RuntimeFoundation.IAgentRuntimeClient,
+                            DotPilot.Runtime.Features.RuntimeFoundation.DeterministicAgentRuntimeClient>(services);
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddSingleton<
+                            DotPilot.Core.Features.RuntimeFoundation.IRuntimeFoundationCatalog,
+                            DotPilot.Runtime.Features.RuntimeFoundation.RuntimeFoundationCatalog>(services);
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddTransient<ShellViewModel>(services);
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddTransient<MainViewModel>(services);
+                    Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
+                        .AddTransient<SecondViewModel>(services);
                 })
                 .UseNavigation(RegisterRoutes)
             );

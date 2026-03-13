@@ -20,4 +20,8 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DotPilot\DotPilot.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
 </Project>

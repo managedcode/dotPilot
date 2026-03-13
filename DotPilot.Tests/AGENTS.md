@@ -16,8 +16,11 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 ## Boundaries
 
 - Keep tests focused on behavior that can run reliably in-process.
+- Cover every caller-visible feature flow through public contracts or API-like composition seams; simple construction tests are insufficient.
 - Do not move browser, driver, or end-to-end smoke concerns into this project; those belong in `DotPilot.UITests`.
 - Prefer production-facing flows and public contracts over implementation-detail assertions.
+- Keep a deterministic in-repo test AI client available for CI so provider-independent agent flows remain testable even when Codex, Claude Code, or GitHub Copilot are unavailable.
+- Tests that require real provider CLIs or auth must detect availability and run only when the corresponding external toolchain is present.
 
 ## Local Commands
 
@@ -34,3 +37,4 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 
 - The current unit-test surface is thin, so new production behavior should raise coverage rather than relying on the existing baseline.
 - Keep assertions meaningful; do not add placeholder tests that only prove object construction with no behavioral value.
+- Treat broad flow coverage as mandatory; new non-UI functionality should land with positive, negative, and edge-path assertions.

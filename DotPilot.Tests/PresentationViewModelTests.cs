@@ -7,7 +7,7 @@ public class PresentationViewModelTests
     [Test]
     public void MainViewModelExposesChatScreenState()
     {
-        var viewModel = new MainViewModel();
+        var viewModel = new MainViewModel(CreateRuntimeFoundationCatalog());
 
         viewModel.Title.Should().Be("Design Automation Agent");
         viewModel.StatusSummary.Should().Be("3 members · GPT-4o");
@@ -17,12 +17,15 @@ public class PresentationViewModelTests
         viewModel.Messages.Should().ContainSingle(message => message.IsCurrentUser);
         viewModel.Members.Should().HaveCount(3);
         viewModel.Agents.Should().ContainSingle(agent => agent.Name == "Design Agent");
+        viewModel.RuntimeFoundation.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
+        viewModel.RuntimeFoundation.Slices.Should().HaveCount(4);
+        viewModel.RuntimeFoundation.Providers.Should().Contain(provider => !provider.RequiresExternalToolchain);
     }
 
     [Test]
     public void SecondViewModelExposesAgentBuilderState()
     {
-        var viewModel = new SecondViewModel();
+        var viewModel = new SecondViewModel(CreateRuntimeFoundationCatalog());
 
         viewModel.PageTitle.Should().Be("Create New Agent");
         viewModel.PageSubtitle.Should().Contain("AI agent");
@@ -36,5 +39,12 @@ public class PresentationViewModelTests
         viewModel.Skills.Should().HaveCount(5);
         viewModel.Skills.Should().Contain(skill => skill.IsEnabled);
         viewModel.Skills.Should().Contain(skill => !skill.IsEnabled);
+        viewModel.RuntimeFoundation.DeterministicClientName.Should().Be("In-Repo Test Client");
+        viewModel.RuntimeFoundation.Providers.Should().HaveCountGreaterOrEqualTo(4);
+    }
+
+    private static RuntimeFoundationCatalog CreateRuntimeFoundationCatalog()
+    {
+        return new RuntimeFoundationCatalog(new DeterministicAgentRuntimeClient());
     }
 }

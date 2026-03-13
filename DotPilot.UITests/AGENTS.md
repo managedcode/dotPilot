@@ -22,6 +22,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - Treat browser-driver setup and app-launch prerequisites as part of the harness, not as assumptions inside individual tests.
 - The harness must make `dotnet test DotPilot.UITests/DotPilot.UITests.csproj` runnable without manual driver-path export and must fail loudly instead of silently skipping coverage.
 - Keep the harness direct and minimal; prefer the smallest deterministic setup needed to run the suite and return a real result.
+- UI tests must cover each feature's interactive elements, expected behaviors, and full operator flows instead of only a top-level smoke path.
 
 ## Local Commands
 
@@ -38,3 +39,4 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 
 - The harness targets a browser flow and auto-starts the `net10.0-browserwasm` head on a loopback URI resolved by the harness; any driver discovery or bootstrap logic must stay deterministic across local and agent environments.
 - `Constants.cs` and `TestBase.cs` define environment assumptions for every UI test; update them carefully and only when the automation target actually changes.
+- Every new UI capability should arrive with assertions for the visible controls it adds and at least one complete end-to-end flow through the affected surface.

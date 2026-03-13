@@ -52,6 +52,28 @@
               <TextBlock FontSize="14"
                          Foreground="{StaticResource AppMutedTextBrush}"
                          Text="{Binding PageSubtitle}" />
+              <Border Style="{StaticResource GlassPanelStyle}"
+                      AutomationProperties.AutomationId="AgentBuilderRuntimeBanner"
+                      Padding="14,12">
+                <StackPanel Spacing="6">
+                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeIssueLabel"
+                             CharacterSpacing="80"
+                             FontSize="11"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding RuntimeFoundation.EpicLabel}" />
+                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeSummary"
+                             FontSize="13"
+                             FontWeight="SemiBold"
+                             Foreground="{StaticResource AppPrimaryTextBrush}"
+                             Text="{Binding RuntimeFoundation.Summary}"
+                             TextWrapping="WrapWholeWords" />
+                  <TextBlock AutomationProperties.AutomationId="AgentBuilderRuntimeClient"
+                             FontSize="12"
+                             Foreground="{StaticResource AppMutedTextBrush}"
+                             Text="{Binding RuntimeFoundation.DeterministicClientName}" />
+                </StackPanel>
+              </Border>
             </StackPanel>
             <Button Grid.Column="1"
                     Style="{StaticResource SidebarButtonStyle}"

@@ -57,4 +57,15 @@
         <DefineConstants>$(DefineConstants);USE_UITESTS</DefineConstants>
     </PropertyGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\DotPilot.Core\DotPilot.Core.csproj" />
+        <ProjectReference Include="..\DotPilot.Runtime\DotPilot.Runtime.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Remove="Models\AppConfig.cs" />
+        <Compile Remove="Models\Entity.cs" />
+        <Compile Remove="Services\Endpoints\DebugHandler.cs" />
+    </ItemGroup>
+
 </Project>

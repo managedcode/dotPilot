@@ -89,8 +89,14 @@ internal static partial class BrowserAutomationBootstrap
         string browserBinaryPath)
     {
         var configuredDriverPath = NormalizeBrowserDriverPath(environment);
-        return !string.IsNullOrWhiteSpace(configuredDriverPath)
-            ? configuredDriverPath
+        if (!string.IsNullOrWhiteSpace(configuredDriverPath))
+        {
+            return configuredDriverPath;
+        }
+
+        var cachedDriverPath = ResolveAnyCachedChromeDriverDirectory(GetDriverCacheRootPath());
+        return !string.IsNullOrWhiteSpace(cachedDriverPath)
+            ? cachedDriverPath
             : EnsureChromeDriverDownloaded(browserBinaryPath);
     }
 
@@ -186,6 +192,27 @@ internal static partial class BrowserAutomationBootstrap
         var driverDirectory = Path.Combine(cacheRootPath, driverVersion, $"{ChromeDriverBundleNamePrefix}{driverPlatform}");
         var driverExecutablePath = Path.Combine(driverDirectory, GetChromeDriverExecutableFileName());
         return File.Exists(driverExecutablePath) ? driverDirectory : null;
+    }
+
+    internal static string? ResolveAnyCachedChromeDriverDirectory(string cacheRootPath)
+    {
+        if (!Directory.Exists(cacheRootPath))
+        {
+            return null;
+        }
+
+        foreach (var executablePath in Directory
+                     .EnumerateFiles(cacheRootPath, GetChromeDriverExecutableFileName(), SearchOption.AllDirectories)
+                     .OrderByDescending(path => path, StringComparer.Ordinal))
+        {
+            var driverDirectory = Path.GetDirectoryName(executablePath);
+            if (!string.IsNullOrWhiteSpace(driverDirectory))
+            {
+                return driverDirectory;
+            }
+        }
+
+        return null;
     }
 
     internal static void PersistDriverVersionMapping(
@@ -287,12 +314,24 @@ internal static partial class BrowserAutomationBootstrap
         TimeSpan timeout,
         string timeoutMessage)
     {
+        return RunProcessAndCaptureOutputAsync(startInfo, timeout, timeoutMessage).GetAwaiter().GetResult();
+    }
+
+    private static async Task<string> RunProcessAndCaptureOutputAsync(
+        ProcessStartInfo startInfo,
+        TimeSpan timeout,
+        string timeoutMessage)
+    {
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException(timeoutMessage);
         var standardOutputTask = process.StandardOutput.ReadToEndAsync();
         var standardErrorTask = process.StandardError.ReadToEndAsync();
+        var completionTask = Task.WhenAll(standardOutputTask, standardErrorTask, process.WaitForExitAsync());
+        var completedTask = await Task
+            .WhenAny(completionTask, Task.Delay(timeout))
+            .ConfigureAwait(false);
 
-        if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+        if (completedTask != completionTask)
         {
             try
             {
@@ -306,8 +345,8 @@ internal static partial class BrowserAutomationBootstrap
             throw new TimeoutException(timeoutMessage);
         }
 
-        process.WaitForExit();
-        return $"{standardOutputTask.GetAwaiter().GetResult()}{Environment.NewLine}{standardErrorTask.GetAwaiter().GetResult()}";
+        await completionTask.ConfigureAwait(false);
+        return $"{await standardOutputTask.ConfigureAwait(false)}{Environment.NewLine}{await standardErrorTask.ConfigureAwait(false)}";
     }
 
     private static string ResolveChromeDriverPlatform()

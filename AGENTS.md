@@ -21,6 +21,8 @@ This file defines how AI agents work in this solution.
 - Solution root: `.` (`DotPilot.slnx`)
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
+  - `DotPilot.Core`
+  - `DotPilot.Runtime`
   - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
@@ -136,6 +138,7 @@ For this app:
 - coverage uses the `coverlet.collector` integration on `DotPilot.Tests` with the repo runsettings file to keep generated Uno artifacts out of the coverage path
 - desktop release publishing uses `dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop`; the validation workflow stays focused on build and automated tests, while the release workflow owns desktop publish outputs for macOS, Windows, and Linux
 - `LangVersion` is pinned to `latest` at the root
+- prefer the newest stable `.NET 10` and `C#` language features that are supported by the pinned SDK and do not weaken readability, determinism, or analyzability
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
@@ -143,6 +146,8 @@ For this app:
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
+- architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
+- keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
@@ -259,16 +264,20 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Tests must prove the real user flow or caller-visible system flow, not only internal implementation details.
 - Tests should be as realistic as possible and exercise the system through real flows, contracts, and dependencies.
 - Tests must cover positive flows, negative flows, edge cases, and unexpected paths from multiple relevant angles when the behaviour can fail in different ways.
+- All caller-visible feature flows must have API or integration-style automated coverage through public contracts; structure-only unit tests are not enough for this repository.
 - Prefer integration, API, and UI tests over isolated unit tests when behaviour crosses boundaries.
 - Do not use mocks, fakes, stubs, or service doubles in verification.
 - Exercise internal and external dependencies through real containers, test instances, or sandbox environments that match the real contract.
 - Flaky tests are failures. Fix the cause.
+- Because CI does not guarantee Codex, Claude Code, or GitHub Copilot availability, keep a deterministic test AI client in-repo so core agent flows stay testable without external provider CLIs.
+- Tests that require real Codex, Claude Code, or GitHub Copilot toolchains must run only when the corresponding toolchain and auth are available; their absence is an environment condition, not a reason to block the provider-independent test baseline.
 - Changed production code MUST reach at least 80% line coverage, and at least 70% branch coverage where branch coverage is available.
 - Critical flows and public contracts MUST reach at least 90% line coverage with explicit success and failure assertions.
 - Repository or module coverage must not decrease without an explicit written exception. Coverage after the change must stay at least at the previous baseline or improve.
 - Coverage is for finding gaps, not gaming a number. Coverage numbers do not replace scenario coverage or user-flow verification.
 - The task is not done until the full relevant test suite is green, not only the newly added tests.
 - UI tests are mandatory for this repository and must run in normal agent verification; missing local browser-driver setup is a harness bug to fix, not a reason to skip the suite.
+- UI coverage must validate complete end-to-end operator flows and also assert the presence and behavior of each interactive element introduced by a feature.
 - GitHub Actions PR validation is mandatory for every PR and must enforce the real repo verification path so test failures are caught in CI, not only locally.
 - GitHub Actions PR validation must run full automated test verification, especially the real UI suite; build-only or smoke-only checks are not an acceptable substitute for pull-request gating.
 - GitHub Actions validation must also produce downloadable app artifacts for macOS, Windows, and Linux so every PR and mainline run has test results plus installable build outputs.
@@ -322,6 +331,7 @@ Ask first:
 
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
+- After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
 - Keep the solution file name cased as `DotPilot.slnx`.
