@@ -10,4 +10,7 @@ public enum RuntimeCommunicationProblemCode
     RuntimeHostUnavailable,
     OrchestrationUnavailable,
     PolicyRejected,
+    SessionArchiveMissing,
+    ResumeCheckpointMissing,
+    SessionArchiveCorrupted,
 }

@@ -26,7 +26,7 @@ internal sealed class ProviderToolchainProbe
 
         return new ProviderDescriptor
         {
-            Id = ProviderId.New(),
+            Id = RuntimeFoundationDeterministicIdentity.CreateProviderId(commandName),
             DisplayName = displayName,
             CommandName = commandName,
             Status = status,
