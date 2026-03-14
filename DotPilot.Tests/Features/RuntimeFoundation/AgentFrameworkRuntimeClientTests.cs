@@ -9,8 +9,10 @@ public sealed class AgentFrameworkRuntimeClientTests
     private const string PlanPrompt = "Plan the embedded runtime rollout.";
     private const string ApprovedResumeSummary = "Approved by the operator.";
     private const string RejectedResumeSummary = "Rejected by the operator.";
+    private const string ResumeRejectedKind = "approval-rejected";
     private const string ArchiveFileName = "archive.json";
     private const string ReplayFileName = "replay.md";
+    private static readonly DateTimeOffset FixedTimestamp = new(2026, 3, 14, 9, 30, 0, TimeSpan.Zero);
 
     [Test]
     public async Task ExecuteAsyncPersistsAReplayArchiveForPlanMode()
@@ -96,7 +98,39 @@ public sealed class AgentFrameworkRuntimeClientTests
         rejectedResult.Value.ApprovalState.Should().Be(ApprovalState.Rejected);
         archiveResult.IsSuccess.Should().BeTrue();
         archiveResult.Value!.Phase.Should().Be(SessionPhase.Failed);
+        archiveResult.Value.Replay.Should().Contain(entry => entry.Kind == ResumeRejectedKind && entry.Phase == SessionPhase.Failed);
         archiveResult.Value.Replay.Should().Contain(entry => entry.Kind == "run-completed" && entry.Phase == SessionPhase.Failed);
+    }
+
+    [Test]
+    public async Task ResumeAsyncRejectsArchivedSessionsThatAreNoLongerPausedForApproval()
+    {
+        using var runtimeDirectory = new TemporaryRuntimePersistenceDirectory();
+        var request = CreateRequest(ApprovalPrompt, AgentExecutionMode.Execute);
+
+        {
+            using var firstHost = CreateHost(runtimeDirectory.Root);
+            await firstHost.StartAsync();
+            var firstClient = firstHost.Services.GetRequiredService<IAgentRuntimeClient>();
+            _ = await firstClient.ExecuteAsync(request, CancellationToken.None);
+            _ = await firstClient.ResumeAsync(
+                new AgentTurnResumeRequest(request.SessionId, ApprovalState.Approved, ApprovedResumeSummary),
+                CancellationToken.None);
+        }
+
+        {
+            using var secondHost = CreateHost(runtimeDirectory.Root);
+            await secondHost.StartAsync();
+            var secondClient = secondHost.Services.GetRequiredService<IAgentRuntimeClient>();
+
+            var result = await secondClient.ResumeAsync(
+                new AgentTurnResumeRequest(request.SessionId, ApprovalState.Approved, ApprovedResumeSummary),
+                CancellationToken.None);
+
+            result.IsFailed.Should().BeTrue();
+            result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.ResumeCheckpointMissing).Should().BeTrue();
+            result.Problem.Detail.Should().Contain("cannot be resumed");
+        }
     }
 
     [Test]
@@ -131,6 +165,52 @@ public sealed class AgentFrameworkRuntimeClientTests
 
         result.IsFailed.Should().BeTrue();
         result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.SessionArchiveCorrupted).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ResumeAsyncReturnsCorruptionProblemForInvalidArchivePayload()
+    {
+        using var runtimeDirectory = new TemporaryRuntimePersistenceDirectory();
+        var sessionId = SessionId.New();
+        var sessionDirectory = Path.Combine(runtimeDirectory.Root, sessionId.ToString());
+        Directory.CreateDirectory(sessionDirectory);
+        await File.WriteAllTextAsync(Path.Combine(sessionDirectory, ArchiveFileName), "{ invalid json", CancellationToken.None);
+
+        using var host = CreateHost(runtimeDirectory.Root);
+        await host.StartAsync();
+        var client = host.Services.GetRequiredService<IAgentRuntimeClient>();
+
+        var result = await client.ResumeAsync(
+            new AgentTurnResumeRequest(sessionId, ApprovalState.Approved, ApprovedResumeSummary),
+            CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.SessionArchiveCorrupted).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task AgentFrameworkRuntimeClientUsesTheInjectedTimeProviderForReplayArchiveAndSessionTimestamps()
+    {
+        using var runtimeDirectory = new TemporaryRuntimePersistenceDirectory();
+        using var host = CreateHost(runtimeDirectory.Root);
+        await host.StartAsync();
+        var client = CreateClient(host.Services, runtimeDirectory.Root, new FixedTimeProvider(FixedTimestamp));
+        var request = CreateRequest(PlanPrompt, AgentExecutionMode.Plan);
+
+        var result = await client.ExecuteAsync(request, CancellationToken.None);
+        var archiveResult = await client.GetSessionArchiveAsync(request.SessionId, CancellationToken.None);
+        var session = await host.Services
+            .GetRequiredService<IGrainFactory>()
+            .GetGrain<ISessionGrain>(request.SessionId.ToString())
+            .GetAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        archiveResult.IsSuccess.Should().BeTrue();
+        archiveResult.Value!.UpdatedAt.Should().Be(FixedTimestamp);
+        archiveResult.Value.Replay.Should().OnlyContain(entry => entry.RecordedAt == FixedTimestamp);
+        session.Should().NotBeNull();
+        session!.CreatedAt.Should().Be(FixedTimestamp);
+        session.UpdatedAt.Should().Be(FixedTimestamp);
     }
 
     [Test]
@@ -212,6 +292,24 @@ public sealed class AgentFrameworkRuntimeClientTests
         return new AgentTurnRequest(SessionId.New(), AgentProfileId.New(), prompt, mode, ProviderConnectionStatus.Available);
     }
 
+    private static AgentFrameworkRuntimeClient CreateClient(IServiceProvider services, string rootDirectory, TimeProvider timeProvider)
+    {
+        return (AgentFrameworkRuntimeClient)Activator.CreateInstance(
+            typeof(AgentFrameworkRuntimeClient),
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            args:
+            [
+                services.GetRequiredService<IGrainFactory>(),
+                new RuntimeSessionArchiveStore(new RuntimePersistenceOptions
+                {
+                    RootDirectoryPath = rootDirectory,
+                }),
+                timeProvider,
+            ],
+            culture: null)!;
+    }
+
     private static Microsoft.Agents.AI.Workflows.Workflow CreateNoCheckpointWorkflow()
     {
         var executor = new Microsoft.Agents.AI.Workflows.FunctionExecutor<string>(
@@ -246,6 +344,11 @@ public sealed class AgentFrameworkRuntimeClientTests
         listener.Start();
         return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
     }
+}
+
+internal sealed class FixedTimeProvider(DateTimeOffset timestamp) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => timestamp;
 }
 
 internal sealed class TemporaryRuntimePersistenceDirectory : IDisposable

@@ -9,7 +9,6 @@ internal static class EmbeddedRuntimeTrafficPolicy
     private const string MermaidHeader = "flowchart LR";
     private const string MermaidArrow = " --> ";
     private const string MermaidActiveArrow = " ==> ";
-    private const string ClientTargetMethods = "GetAsync, UpsertAsync";
 
     public static string Summary => PolicySummary;
 
@@ -109,9 +108,6 @@ internal static class EmbeddedRuntimeTrafficPolicy
                 transition.SourceMethods.Contains(activeTransition.Value.SourceMethod, StringComparer.Ordinal) &&
                 transition.TargetMethods.Contains(activeTransition.Value.TargetMethod, StringComparer.Ordinal);
             var arrow = isActive ? MermaidActiveArrow : MermaidArrow;
-            var targetMethods = transition.Target == EmbeddedRuntimeHostNames.ClientSourceName
-                ? ClientTargetMethods
-                : string.Join(", ", transition.TargetMethods);
             lines.Add(
                 string.Concat(
                     transition.Source,
@@ -120,7 +116,7 @@ internal static class EmbeddedRuntimeTrafficPolicy
                     " : ",
                     string.Join(", ", transition.SourceMethods),
                     " -> ",
-                    targetMethods));
+                    string.Join(", ", transition.TargetMethods)));
         }
 
         return string.Join(Environment.NewLine, lines);

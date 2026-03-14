@@ -25,6 +25,11 @@ public class RuntimeFoundationCatalogTests
             RuntimeFoundationIssues.AgentFrameworkRuntime,
             RuntimeFoundationIssues.GrainTrafficPolicy,
             RuntimeFoundationIssues.SessionPersistence);
+        snapshot.Slices.Single(slice => slice.IssueNumber == RuntimeFoundationIssues.GrainTrafficPolicy)
+            .Summary
+            .Should()
+            .Contain("Mermaid")
+            .And.NotContain("Orleans.Graph");
     }
 
     [Test]

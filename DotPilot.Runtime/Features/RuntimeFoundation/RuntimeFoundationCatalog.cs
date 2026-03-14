@@ -25,7 +25,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         "Agent Framework orchestrates local runs, approvals, and checkpoints without moving execution logic into the Uno app.";
     private const string TrafficPolicyName = "Traffic policy";
     private const string TrafficPolicySummary =
-        "Allowed grain transitions are explicit, testable, and visualized through Orleans.Graph instead of hidden conventions.";
+        "Allowed grain transitions are explicit, testable, and surfaced through the embedded traffic-policy Mermaid catalog instead of hidden conventions.";
     private const string SessionPersistenceName = "Session persistence";
     private const string SessionPersistenceSummary =
         "Checkpoint, replay, and resume data survive host restarts in local session archives without changing the Orleans storage topology.";

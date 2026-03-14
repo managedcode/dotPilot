@@ -18,11 +18,17 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
     private const string StartReplayKind = "run-started";
     private const string PauseReplayKind = "approval-pending";
     private const string ResumeReplayKind = "run-resumed";
+    private const string RejectedReplayKind = "approval-rejected";
     private const string CompletedReplayKind = "run-completed";
+    private const string ResumeNotAllowedDetailFormat =
+        "Session {0} is not paused with pending approval and cannot be resumed.";
+    private static readonly System.Text.CompositeFormat ResumeNotAllowedDetailCompositeFormat =
+        System.Text.CompositeFormat.Parse(ResumeNotAllowedDetailFormat);
     private readonly IGrainFactory _grainFactory;
     private readonly RuntimeSessionArchiveStore _archiveStore;
     private readonly DeterministicAgentTurnEngine _turnEngine;
     private readonly Workflow _workflow;
+    private readonly TimeProvider _timeProvider;
 
     public AgentFrameworkRuntimeClient(IGrainFactory grainFactory, RuntimeSessionArchiveStore archiveStore)
         : this(grainFactory, archiveStore, TimeProvider.System)
@@ -36,6 +42,7 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
     {
         _grainFactory = grainFactory;
         _archiveStore = archiveStore;
+        _timeProvider = timeProvider;
         _turnEngine = new DeterministicAgentTurnEngine(timeProvider);
         _workflow = BuildWorkflow();
     }
@@ -81,10 +88,24 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var archive = await _archiveStore.LoadAsync(request.SessionId, cancellationToken);
+        StoredRuntimeSessionArchive? archive;
+        try
+        {
+            archive = await _archiveStore.LoadAsync(request.SessionId, cancellationToken);
+        }
+        catch (JsonException)
+        {
+            return Result<AgentTurnResult>.Fail(RuntimeCommunicationProblems.SessionArchiveCorrupted(request.SessionId));
+        }
+
         if (archive is null)
         {
             return Result<AgentTurnResult>.Fail(RuntimeCommunicationProblems.SessionArchiveMissing(request.SessionId));
+        }
+
+        if (archive.Phase is not SessionPhase.Paused || archive.ApprovalState is not ApprovalState.Pending)
+        {
+            return Result<AgentTurnResult>.Fail(CreateResumeNotAllowedProblem(request.SessionId));
         }
 
         if (string.IsNullOrWhiteSpace(archive.CheckpointId))
@@ -115,7 +136,7 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
             archive.OriginalRequest,
             result,
             resolvedCheckpoint,
-            request.ApprovalState is ApprovalState.Approved ? ResumeReplayKind : PauseReplayKind,
+            ResolveResumeReplayKind(request.ApprovalState),
             cancellationToken);
 
         return Result<AgentTurnResult>.Succeed(result);
@@ -232,13 +253,14 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
     {
         var existingArchive = await _archiveStore.LoadAsync(originalRequest.SessionId, cancellationToken);
         var replay = existingArchive?.Replay.ToList() ?? [];
+        var recordedAt = _timeProvider.GetUtcNow();
         replay.Add(
             new RuntimeSessionReplayEntry(
                 replayKind,
                 result.Summary,
                 result.NextPhase,
                 result.ApprovalState,
-                DateTimeOffset.UtcNow));
+                recordedAt));
         if (result.NextPhase is SessionPhase.Execute or SessionPhase.Review or SessionPhase.Failed)
         {
             replay.Add(
@@ -247,7 +269,7 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
                     result.Summary,
                     result.NextPhase,
                     result.ApprovalState,
-                    DateTimeOffset.UtcNow));
+                    recordedAt));
         }
 
         var archive = new StoredRuntimeSessionArchive(
@@ -257,16 +279,16 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
             originalRequest,
             result.NextPhase,
             result.ApprovalState,
-            DateTimeOffset.UtcNow,
+            recordedAt,
             replay,
             result.ProducedArtifacts);
 
         await _archiveStore.SaveAsync(archive, cancellationToken);
-        await UpsertSessionStateAsync(originalRequest, result);
+        await UpsertSessionStateAsync(originalRequest, result, recordedAt);
         await UpsertArtifactsAsync(result.ProducedArtifacts);
     }
 
-    private async ValueTask UpsertSessionStateAsync(AgentTurnRequest request, AgentTurnResult result)
+    private async ValueTask UpsertSessionStateAsync(AgentTurnRequest request, AgentTurnResult result, DateTimeOffset timestamp)
     {
         var session = new SessionDescriptor
         {
@@ -276,8 +298,8 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
             Phase = result.NextPhase,
             ApprovalState = result.ApprovalState,
             AgentProfileIds = [request.AgentProfileId],
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = timestamp,
+            UpdatedAt = timestamp,
         };
 
         await _grainFactory.GetGrain<ISessionGrain>(request.SessionId.ToString()).UpsertAsync(session);
@@ -350,6 +372,27 @@ public sealed class AgentFrameworkRuntimeClient : IAgentRuntimeClient
             cancellationToken);
         await context.YieldOutputAsync(output, cancellationToken);
         await context.RequestHaltAsync();
+    }
+
+    private static string ResolveResumeReplayKind(ApprovalState approvalState)
+    {
+        return approvalState switch
+        {
+            ApprovalState.Approved => ResumeReplayKind,
+            ApprovalState.Rejected => RejectedReplayKind,
+            _ => PauseReplayKind,
+        };
+    }
+
+    private static Problem CreateResumeNotAllowedProblem(SessionId sessionId)
+    {
+        return Problem.Create(
+            RuntimeCommunicationProblemCode.ResumeCheckpointMissing,
+            string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                ResumeNotAllowedDetailCompositeFormat,
+                sessionId),
+            (int)System.Net.HttpStatusCode.Conflict);
     }
 
     private async ValueTask HandleResumeAsync(
