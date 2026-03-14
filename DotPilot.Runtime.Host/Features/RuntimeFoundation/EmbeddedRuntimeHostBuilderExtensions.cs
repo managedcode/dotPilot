@@ -20,6 +20,7 @@ public static class EmbeddedRuntimeHostBuilderExtensions
             services.AddSingleton(resolvedOptions);
             services.AddSingleton<EmbeddedRuntimeHostCatalog>();
             services.AddSingleton<IEmbeddedRuntimeHostCatalog>(serviceProvider => serviceProvider.GetRequiredService<EmbeddedRuntimeHostCatalog>());
+            services.AddSingleton<IEmbeddedRuntimeTrafficPolicyCatalog, EmbeddedRuntimeTrafficPolicyCatalog>();
             services.AddHostedService<EmbeddedRuntimeHostLifecycleService>();
         });
 

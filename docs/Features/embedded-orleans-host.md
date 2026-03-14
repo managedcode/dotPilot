@@ -18,7 +18,7 @@ Issue [#24](https://github.com/managedcode/dotPilot/issues/24) embeds the first 
 
 - remote clusters
 - external durable storage providers
-- Agent Framework orchestration
+- Agent Framework orchestration and session-archive flows beyond the host boundary
 - UI redesign around the runtime host
 
 ## Flow
@@ -47,6 +47,7 @@ flowchart LR
   - Orleans host configuration
   - host lifecycle catalog state
   - grain implementations
+- Agent Framework orchestration, replay archives, and resume logic live in the sibling runtime slice document: [Embedded Runtime Orchestration](./embedded-runtime-orchestration.md).
 - The initial cluster configuration is intentionally local:
   - `UseLocalhostClustering`
   - named in-memory grain storage
@@ -63,6 +64,7 @@ flowchart LR
 ## References
 
 - [Architecture Overview](../Architecture.md)
+- [Embedded Runtime Orchestration](./embedded-runtime-orchestration.md)
 - [ADR-0003: Keep the Uno App Presentation-Only and Move Feature Work into Vertical-Slice Class Libraries](../ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - [Local development configuration](https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/local-development-configuration)
 - [Quickstart: Build your first Orleans app with ASP.NET Core](https://learn.microsoft.com/dotnet/orleans/quickstarts/build-your-first-orleans-app)

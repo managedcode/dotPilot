@@ -16,6 +16,9 @@ public static class RuntimeCommunicationProblems
     private const string RuntimeHostUnavailableDetail = "The embedded runtime host is unavailable for the requested operation.";
     private const string OrchestrationUnavailableDetail = "The orchestration runtime is unavailable for the requested operation.";
     private const string PolicyRejectedFormat = "The requested action was rejected by policy: {0}.";
+    private const string SessionArchiveMissingFormat = "No persisted runtime session archive exists for session {0}.";
+    private const string ResumeCheckpointMissingFormat = "Session {0} does not have a checkpoint that can be resumed.";
+    private const string SessionArchiveCorruptedFormat = "Session {0} has corrupted persisted runtime state.";
 
     public static Problem InvalidPrompt()
     {
@@ -84,6 +87,33 @@ public static class RuntimeCommunicationProblems
             PolicyRejectedFormat,
             policyName,
             HttpStatusCode.Forbidden);
+    }
+
+    public static Problem SessionArchiveMissing(SessionId sessionId)
+    {
+        return CreateProblem(
+            RuntimeCommunicationProblemCode.SessionArchiveMissing,
+            SessionArchiveMissingFormat,
+            sessionId.ToString(),
+            HttpStatusCode.NotFound);
+    }
+
+    public static Problem ResumeCheckpointMissing(SessionId sessionId)
+    {
+        return CreateProblem(
+            RuntimeCommunicationProblemCode.ResumeCheckpointMissing,
+            ResumeCheckpointMissingFormat,
+            sessionId.ToString(),
+            HttpStatusCode.Conflict);
+    }
+
+    public static Problem SessionArchiveCorrupted(SessionId sessionId)
+    {
+        return CreateProblem(
+            RuntimeCommunicationProblemCode.SessionArchiveCorrupted,
+            SessionArchiveCorruptedFormat,
+            sessionId.ToString(),
+            HttpStatusCode.InternalServerError);
     }
 
     private static Problem CreateProblem(

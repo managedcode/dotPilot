@@ -9,20 +9,33 @@ public class RuntimeFoundationCatalogTests
     private static readonly DateTimeOffset DeterministicArtifactCreatedAt = new(2026, 3, 13, 0, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public void CatalogGroupsEpicTwelveIntoFourSequencedSlices()
+    public void CatalogGroupsEpicTwelveIntoSixSequencedSlices()
     {
         var catalog = CreateCatalog();
 
         var snapshot = catalog.GetSnapshot();
 
         snapshot.EpicLabel.Should().Be(RuntimeEpicLabel);
-        snapshot.Slices.Should().HaveCount(4);
-        snapshot.Slices.Select(slice => slice.IssueLabel).Should().ContainInOrder("DOMAIN", "CONTRACTS", "HOST", "ORCHESTRATION");
+        snapshot.Slices.Should().HaveCount(6);
+        snapshot.Slices.Select(slice => slice.IssueLabel).Should().ContainInOrder(
+            "DOMAIN",
+            "CONTRACTS",
+            "HOST",
+            "ORCHESTRATION",
+            RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.GrainTrafficPolicy),
+            RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.SessionPersistence));
         snapshot.Slices.Select(slice => slice.IssueNumber).Should().ContainInOrder(
             RuntimeFoundationIssues.DomainModel,
             RuntimeFoundationIssues.CommunicationContracts,
             RuntimeFoundationIssues.EmbeddedOrleansHost,
-            RuntimeFoundationIssues.AgentFrameworkRuntime);
+            RuntimeFoundationIssues.AgentFrameworkRuntime,
+            RuntimeFoundationIssues.GrainTrafficPolicy,
+            RuntimeFoundationIssues.SessionPersistence);
+        snapshot.Slices.Single(slice => slice.IssueNumber == RuntimeFoundationIssues.GrainTrafficPolicy)
+            .Summary
+            .Should()
+            .Contain("Mermaid")
+            .And.NotContain("Orleans.Graph");
     }
 
     [Test]
@@ -166,6 +179,31 @@ public class RuntimeFoundationCatalogTests
         problem.HasErrorCode(RuntimeCommunicationProblemCode.ProviderUnavailable).Should().BeTrue();
         problem.StatusCode.Should().Be((int)System.Net.HttpStatusCode.ServiceUnavailable);
         problem.Detail.Should().Contain(snapshot.DeterministicClientName);
+    }
+
+    [Test]
+    public async Task DeterministicClientReturnsOrchestrationUnavailableForResume()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+
+        var result = await client.ResumeAsync(
+            new AgentTurnResumeRequest(SessionId.New(), ApprovalState.Approved, "Approved."),
+            CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.OrchestrationUnavailable).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task DeterministicClientReturnsMissingArchiveProblemForArchiveQueries()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var sessionId = SessionId.New();
+
+        var result = await client.GetSessionArchiveAsync(sessionId, CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.SessionArchiveMissing).Should().BeTrue();
     }
 
     [Test]

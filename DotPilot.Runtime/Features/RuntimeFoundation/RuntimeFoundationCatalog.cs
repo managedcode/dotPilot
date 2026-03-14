@@ -1,11 +1,12 @@
 using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeFoundation;
+
 namespace DotPilot.Runtime.Features.RuntimeFoundation;
 
 public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
 {
     private const string EpicSummary =
-        "Runtime contracts, host sequencing, and orchestration seams stay isolated so the Uno app can remain presentation-only.";
+        "The embedded runtime stays local-first by isolating contracts, host wiring, orchestration, policy, and durable session archives away from the Uno presentation layer.";
     private const string EpicLabelValue = "LOCAL RUNTIME READINESS";
     private const string DeterministicProbePrompt =
         "Summarize the runtime foundation readiness for a local-first session that may require approval.";
@@ -25,7 +26,13 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
     private const string OrchestrationLabel = "ORCHESTRATION";
     private const string OrchestrationName = "Orchestration runtime";
     private const string OrchestrationSummary =
-        "Agent Framework integration is prepared as a separate slice that can plug into the embedded host without reshaping the UI layer.";
+        "Agent Framework orchestrates local runs, approvals, and checkpoints without moving execution logic into the Uno app.";
+    private const string TrafficPolicyName = "Traffic policy";
+    private const string TrafficPolicySummary =
+        "Allowed grain transitions are explicit, testable, and surfaced through the embedded traffic-policy Mermaid catalog instead of hidden conventions.";
+    private const string SessionPersistenceName = "Session persistence";
+    private const string SessionPersistenceSummary =
+        "Checkpoint, replay, and resume data survive host restarts in local session archives without changing the Orleans storage topology.";
     private readonly IReadOnlyList<ProviderDescriptor> _providers;
 
     public RuntimeFoundationCatalog() => _providers = Array.AsReadOnly(CreateProviders());
@@ -68,6 +75,18 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
                 OrchestrationLabel,
                 OrchestrationName,
                 OrchestrationSummary,
+                RuntimeSliceState.Sequenced),
+            new(
+                RuntimeFoundationIssues.GrainTrafficPolicy,
+                RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.GrainTrafficPolicy),
+                TrafficPolicyName,
+                TrafficPolicySummary,
+                RuntimeSliceState.Sequenced),
+            new(
+                RuntimeFoundationIssues.SessionPersistence,
+                RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.SessionPersistence),
+                SessionPersistenceName,
+                SessionPersistenceSummary,
                 RuntimeSliceState.Sequenced),
         ];
     }

@@ -12,6 +12,7 @@
     <PackageVersion Include="coverlet.collector" Version="8.0.0" />
     <PackageVersion Include="FluentAssertions" Version="6.12.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc4" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.0.1" />
