@@ -1,13 +1,13 @@
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Runtime.Features.AgentSessions;
 
 internal sealed class AgentSessionService(
     IDbContextFactory<LocalAgentSessionDbContext> dbContextFactory,
+    AgentRuntimeConversationFactory runtimeConversationFactory,
     IServiceProvider serviceProvider,
     TimeProvider timeProvider)
     : IAgentSessionService, IDisposable
@@ -44,12 +44,14 @@ internal sealed class AgentSessionService(
         var agents = await dbContext.AgentProfiles
             .OrderBy(record => record.Name)
             .ToListAsync(cancellationToken);
-        var sessions = await dbContext.Sessions
+        var sessions = (await dbContext.Sessions
+                .ToListAsync(cancellationToken))
             .OrderByDescending(record => record.UpdatedAt)
-            .ToListAsync(cancellationToken);
-        var entries = await dbContext.SessionEntries
+            .ToList();
+        var entries = (await dbContext.SessionEntries
+                .ToListAsync(cancellationToken))
             .OrderBy(record => record.Timestamp)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var agentsById = agents.ToDictionary(record => record.Id);
         var sessionItems = sessions
@@ -79,10 +81,11 @@ internal sealed class AgentSessionService(
             .Where(record => record.Id == session.PrimaryAgentProfileId)
             .ToListAsync(cancellationToken);
         var agentsById = agents.ToDictionary(record => record.Id);
-        var entries = await dbContext.SessionEntries
-            .Where(record => record.SessionId == sessionId.Value)
+        var entries = (await dbContext.SessionEntries
+                .Where(record => record.SessionId == sessionId.Value)
+                .ToListAsync(cancellationToken))
             .OrderBy(record => record.Timestamp)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return new SessionTranscriptSnapshot(
             MapSessionListItem(session, agentsById, entries),
@@ -149,6 +152,7 @@ internal sealed class AgentSessionService(
         dbContext.Sessions.Add(session);
         dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
         await dbContext.SaveChangesAsync(cancellationToken);
+        await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
         await UpsertSessionGrainAsync(session);
 
         return await GetSessionAsync(sessionId, cancellationToken) ??
@@ -197,6 +201,7 @@ internal sealed class AgentSessionService(
         var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
         var providerStatuses = await BuildProviderStatusesAsync(dbContext, cancellationToken);
         var providerStatus = providerStatuses.First(status => status.Kind == providerProfile.Kind);
+        var runtimeConversation = await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
 
         var userEntry = CreateEntryRecord(command.SessionId, SessionStreamEntryKind.UserMessage, UserAuthor, command.Message.Trim(), now);
@@ -247,13 +252,23 @@ internal sealed class AgentSessionService(
         await dbContext.SaveChangesAsync(cancellationToken);
         yield return MapEntry(toolStartEntry);
 
-        var debugClient = new DebugChatClient(agent.Name, timeProvider);
-        var messageHistory = await BuildMessageHistoryAsync(dbContext, command.SessionId, cancellationToken);
-        var streamedMessageId = Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+        string? streamedMessageId = null;
         var accumulated = new System.Text.StringBuilder();
 
-        await foreach (var update in debugClient.GetStreamingResponseAsync(messageHistory, cancellationToken: cancellationToken))
+        await foreach (var update in runtimeConversation.Agent.RunStreamingAsync(
+                           command.Message.Trim(),
+                           runtimeConversation.Session,
+                           options: null,
+                           cancellationToken))
         {
+            if (string.IsNullOrEmpty(update.Text))
+            {
+                continue;
+            }
+
+            streamedMessageId ??= string.IsNullOrWhiteSpace(update.MessageId)
+                ? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
+                : update.MessageId;
             accumulated.Append(update.Text);
             yield return new SessionStreamEntry(
                 streamedMessageId,
@@ -265,9 +280,11 @@ internal sealed class AgentSessionService(
                 new AgentProfileId(agent.Id));
         }
 
+        await runtimeConversationFactory.SaveAsync(runtimeConversation, command.SessionId, cancellationToken);
+
         var assistantEntry = new SessionEntryRecord
         {
-            Id = streamedMessageId,
+            Id = streamedMessageId ?? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture),
             SessionId = command.SessionId.Value,
             AgentProfileId = agent.Id,
             Kind = (int)SessionStreamEntryKind.AssistantMessage,
@@ -403,29 +420,6 @@ internal sealed class AgentSessionService(
             preference.IsEnabled,
             canCreateAgents,
             actions);
-    }
-
-    private static async Task<IReadOnlyList<ChatMessage>> BuildMessageHistoryAsync(
-        LocalAgentSessionDbContext dbContext,
-        SessionId sessionId,
-        CancellationToken cancellationToken)
-    {
-        var entries = await dbContext.SessionEntries
-            .Where(record => record.SessionId == sessionId.Value)
-            .OrderBy(record => record.Timestamp)
-            .ToListAsync(cancellationToken);
-
-        return entries
-            .Where(record => record.Kind is (int)SessionStreamEntryKind.UserMessage or (int)SessionStreamEntryKind.AssistantMessage)
-            .Select(record => new ChatMessage(
-                record.Kind == (int)SessionStreamEntryKind.UserMessage ? ChatRole.User : ChatRole.Assistant,
-                record.Text)
-            {
-                AuthorName = record.Author,
-                CreatedAt = record.Timestamp,
-                MessageId = record.Id,
-            })
-            .ToArray();
     }
 
     private static SessionEntryRecord CreateEntryRecord(

@@ -19,6 +19,9 @@ Stack: `.NET 10`, class library, provider-backed runtime services, local persist
 - Keep this project free of `Uno Platform`, XAML, and page/view-model logic.
 - Implement feature slices against `DotPilot.Core` contracts instead of reaching back into the app project.
 - Prefer deterministic runtime behavior, provider readiness probing, and `SQLite`-backed persistence here so tests can exercise real flows without mocks.
+- When conversation continuity is required, keep the durable chat/session runtime state split correctly:
+  - transcript and operator-facing projections can stay in `SQLite`
+  - the opaque `AgentSession` and chat-history provider state should persist in a local folder-backed Agent Framework store
 - Keep external-provider assumptions soft: absence of Codex, Claude Code, or GitHub Copilot in CI must not break the provider-independent baseline.
 - For the first embedded Orleans host implementation, stay local-first with `UseLocalhostClustering` and in-memory storage/reminders so the desktop runtime remains self-contained.
 

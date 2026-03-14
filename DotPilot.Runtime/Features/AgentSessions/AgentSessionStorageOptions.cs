@@ -7,4 +7,8 @@ public sealed class AgentSessionStorageOptions
     public string InMemoryDatabaseName { get; init; } = "DotPilotAgentSessions";
 
     public string? DatabasePath { get; init; }
+
+    public string? RuntimeSessionDirectoryPath { get; init; }
+
+    public string? ChatHistoryDirectoryPath { get; init; }
 }

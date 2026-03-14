@@ -1,0 +1,174 @@
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Runtime.Features.AgentSessions;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace DotPilot.Tests.Features.AgentSessions;
+
+public sealed class AgentSessionPersistenceTests
+{
+    private static readonly JsonSerializerOptions HistorySerializerOptions = new()
+    {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+    };
+
+    [Test]
+    public async Task SendMessageAsyncPersistsFolderBackedAgentSessionAndHistoryAcrossServiceRestart()
+    {
+        var root = CreateRootPath();
+
+        try
+        {
+            SessionId sessionId;
+            AgentSessionStorageOptions storageOptions = CreateStorageOptions(root);
+
+            await using (var firstFixture = CreateFixture(storageOptions))
+            {
+                var agent = await EnableDebugAndCreateAgentAsync(firstFixture.Service, "Persistent Agent");
+                var session = await firstFixture.Service.CreateSessionAsync(
+                    new CreateSessionCommand("Persistent session", agent.Id),
+                    CancellationToken.None);
+                sessionId = session.Session.Id;
+
+                await DrainAsync(
+                    firstFixture.Service.SendMessageAsync(
+                        new SendSessionMessageCommand(sessionId, "first persisted prompt"),
+                        CancellationToken.None));
+            }
+
+            var sessionFile = Path.Combine(
+                storageOptions.RuntimeSessionDirectoryPath!,
+                sessionId.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".json");
+            var historyFile = Path.Combine(
+                storageOptions.ChatHistoryDirectoryPath!,
+                sessionId.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".json");
+
+            File.Exists(sessionFile).Should().BeTrue();
+            File.Exists(historyFile).Should().BeTrue();
+
+            var firstHistory = await ReadHistoryAsync(historyFile);
+            firstHistory.Should().ContainSingle(message =>
+                message.Role == ChatRole.User &&
+                message.Text == "first persisted prompt");
+            firstHistory.Should().ContainSingle(message =>
+                message.Role == ChatRole.Assistant &&
+                message.Text.Contains("Debug provider received: first persisted prompt", StringComparison.Ordinal));
+
+            await using (var secondFixture = CreateFixture(storageOptions))
+            {
+                var reloaded = await secondFixture.Service.GetSessionAsync(sessionId, CancellationToken.None);
+                reloaded.Should().NotBeNull();
+                reloaded!.Entries.Should().Contain(entry =>
+                    entry.Kind == SessionStreamEntryKind.AssistantMessage &&
+                    entry.Text.Contains("Debug provider received: first persisted prompt", StringComparison.Ordinal));
+
+                await DrainAsync(
+                    secondFixture.Service.SendMessageAsync(
+                        new SendSessionMessageCommand(sessionId, "second persisted prompt"),
+                        CancellationToken.None));
+            }
+
+            var secondHistory = await ReadHistoryAsync(historyFile);
+            secondHistory.Should().ContainSingle(message =>
+                message.Role == ChatRole.User &&
+                message.Text == "first persisted prompt");
+            secondHistory.Should().ContainSingle(message =>
+                message.Role == ChatRole.User &&
+                message.Text == "second persisted prompt");
+            secondHistory.Should().Contain(message =>
+                message.Role == ChatRole.Assistant &&
+                message.Text.Contains("Debug provider received: second persisted prompt", StringComparison.Ordinal));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    private static AgentSessionStorageOptions CreateStorageOptions(string root)
+    {
+        return new AgentSessionStorageOptions
+        {
+            DatabasePath = Path.Combine(root, "sqlite", "agent-sessions.db"),
+            RuntimeSessionDirectoryPath = Path.Combine(root, "runtime-sessions"),
+            ChatHistoryDirectoryPath = Path.Combine(root, "chat-history"),
+        };
+    }
+
+    private static TestFixture CreateFixture(AgentSessionStorageOptions storageOptions)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(TimeProvider.System);
+        services.AddAgentSessions(storageOptions);
+
+        var provider = services.BuildServiceProvider();
+        var service = provider.GetRequiredService<IAgentSessionService>();
+        return new TestFixture(provider, service);
+    }
+
+    private static async Task DrainAsync(IAsyncEnumerable<SessionStreamEntry> stream)
+    {
+        await foreach (var _ in stream)
+        {
+        }
+    }
+
+    private static async Task<IReadOnlyList<ChatMessage>> ReadHistoryAsync(string path)
+    {
+        await using var stream = File.OpenRead(path);
+        var messages = await JsonSerializer.DeserializeAsync<ChatMessage[]>(
+            stream,
+            HistorySerializerOptions,
+            CancellationToken.None);
+
+        return messages ?? [];
+    }
+
+    private static async Task<AgentProfileSummary> EnableDebugAndCreateAgentAsync(
+        IAgentSessionService service,
+        string name)
+    {
+        await service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
+            CancellationToken.None);
+
+        return await service.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                name,
+                AgentRoleKind.Operator,
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Be deterministic for automated verification.",
+                ["Shell"]),
+            CancellationToken.None);
+    }
+
+    private static string CreateRootPath()
+    {
+        return Path.Combine(
+            Path.GetTempPath(),
+            "DotPilot.Tests",
+            nameof(AgentSessionPersistenceTests),
+            Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static void DeleteDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    private sealed class TestFixture(ServiceProvider provider, IAgentSessionService service) : IAsyncDisposable
+    {
+        public IAgentSessionService Service { get; } = service;
+
+        public ValueTask DisposeAsync()
+        {
+            return provider.DisposeAsync();
+        }
+    }
+}

@@ -7,7 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Persistence.Memory" />
+        <PackageReference Include="ManagedCode.Storage.FileSystem" />
+        <PackageReference Include="ManagedCode.Storage.Orleans" />
         <PackageReference Include="Microsoft.Orleans.Reminders" />
         <PackageReference Include="Microsoft.Orleans.Server" />
     </ItemGroup>

@@ -5,15 +5,15 @@ namespace DotPilot.Runtime.Features.AgentSessions;
 
 public static class AgentSessionServiceCollectionExtensions
 {
-    private const string DatabaseFileName = "dotpilot-agent-sessions.db";
-    private const string DatabaseFolderName = "DotPilot";
-
     public static IServiceCollection AddAgentSessions(
         this IServiceCollection services,
         AgentSessionStorageOptions? storageOptions = null)
     {
         services.AddSingleton(storageOptions ?? new AgentSessionStorageOptions());
         services.AddDbContextFactory<LocalAgentSessionDbContext>(ConfigureDbContext);
+        services.AddSingleton<LocalAgentSessionStateStore>();
+        services.AddSingleton<LocalAgentChatHistoryStore>();
+        services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<DotPilot.Core.Features.AgentSessions.IAgentSessionService, AgentSessionService>();
         return services;
     }
@@ -28,22 +28,11 @@ public static class AgentSessionServiceCollectionExtensions
             return;
         }
 
-        var databasePath = storageOptions.DatabasePath;
-        if (string.IsNullOrWhiteSpace(databasePath))
+        var databasePath = AgentSessionStoragePaths.ResolveDatabasePath(storageOptions);
+        var databaseDirectory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrWhiteSpace(databaseDirectory))
         {
-            var rootPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                DatabaseFolderName);
-            Directory.CreateDirectory(rootPath);
-            databasePath = Path.Combine(rootPath, DatabaseFileName);
-        }
-        else
-        {
-            var databaseDirectory = Path.GetDirectoryName(databasePath);
-            if (!string.IsNullOrWhiteSpace(databaseDirectory))
-            {
-                Directory.CreateDirectory(databaseDirectory);
-            }
+            Directory.CreateDirectory(databaseDirectory);
         }
 
         builder.UseSqlite($"Data Source={databasePath}");

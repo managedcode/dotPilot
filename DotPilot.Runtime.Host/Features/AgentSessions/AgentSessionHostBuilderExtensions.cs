@@ -1,3 +1,5 @@
+using ManagedCode.Storage.FileSystem;
+using ManagedCode.Storage.FileSystem.Extensions;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 
@@ -32,8 +34,17 @@ public static class AgentSessionHostBuilderExtensions
             cluster.ClusterId = options.ClusterId;
             cluster.ServiceId = options.ServiceId;
         });
-        siloBuilder.AddMemoryGrainStorage(AgentSessionHostNames.GrainStorageProviderName);
+        siloBuilder.ConfigureServices(services =>
+        {
+            services.AddFileSystemStorageAsDefault(storage =>
+            {
+                storage.BaseFolder = AgentSessionHostStoragePaths.ResolveStorageBasePath(options);
+            });
+        });
+        siloBuilder.AddGrainStorage<IFileSystemStorage>(AgentSessionHostNames.GrainStorageProviderName, storage =>
+        {
+            storage.StateDirectory = options.GrainStateDirectory;
+        });
         siloBuilder.UseInMemoryReminderService();
     }
 }
-
