@@ -101,7 +101,7 @@ public class ControlPlaneDomainContractsTests
             Id = WorkspaceId.New(),
             Name = "dotPilot",
             RootPath = SyntheticWorkspaceRootPath,
-            BranchName = "codex/issue-22-domain-model",
+            BranchName = "main",
         };
 
         var codingAgent = new AgentProfileDescriptor

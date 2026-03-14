@@ -58,12 +58,13 @@ flowchart LR
 
 ## Verification
 
+- `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~ControlPlaneDomain`
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
 - `dotnet test DotPilot.slnx`
 
 ## Dependencies
 
-- Parent epic: [#12](https://github.com/managedcode/dotPilot/issues/12)
+- Parent epic: [#11](https://github.com/managedcode/dotPilot/issues/11)
 - Runtime communication follow-up: [#23](https://github.com/managedcode/dotPilot/issues/23)
 - Embedded host follow-up: [#24](https://github.com/managedcode/dotPilot/issues/24)
 - Agent Framework follow-up: [#25](https://github.com/managedcode/dotPilot/issues/25)
