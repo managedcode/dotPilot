@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-`dotPilot` currently ships as a desktop-first `Uno Platform` shell with a three-pane chat screen and a separate agent-builder view. The repository already expresses the future product IA through this shell, but the application still uses static sample data and has no durable runtime contracts for providers, sessions, agent orchestration, or evaluation.
+`dotPilot` currently ships as a desktop-first `Uno Platform` shell with a chat screen, agent-builder view, and provider settings path. The application is moving away from static sample data toward durable runtime contracts for providers, sessions, agent orchestration, and persistence.
 
 The approved product direction is broader than a coding-only assistant:
 
@@ -25,9 +25,9 @@ The main architectural choice is how to shape the long-term product platform wit
 
 We will treat `dotPilot` as a **local-first desktop agent control plane** with these architectural defaults:
 
-1. The desktop app remains the primary operator surface and keeps the existing left navigation, central chat/session pane, right inspector pane, and agent-builder concepts.
+1. The desktop app remains the primary operator surface and is shaped as a session-first chat client with session list, active transcript, streaming activity, provider settings, and agent-builder concepts.
 2. The v1 runtime is built around an **embedded Orleans silo** hosted inside the desktop app.
-3. Each operator session is modeled as a durable **session grain**, with related grains for workspace, fleet, artifact, and policy state.
+3. Each operator session is modeled as a durable **session grain**, and each durable agent profile is modeled as an **agent-profile grain**.
 4. **Microsoft Agent Framework** is the preferred orchestration layer for agent sessions, workflows, HITL, MCP-aware tool use, and OpenTelemetry-friendly observability.
 5. Provider integrations are **SDK-first**:
    - `ManagedCode.CodexSharpSDK`
@@ -42,10 +42,10 @@ We will treat `dotPilot` as a **local-first desktop agent control plane** with t
 
 ```mermaid
 flowchart LR
-  Workbench["dotPilot desktop workbench"]
+  Client["dotPilot desktop chat client"]
   Silo["Embedded Orleans silo"]
   Session["Session grains"]
-  Fleet["Fleet / policy / artifact grains"]
+  AgentProfiles["Agent-profile grains"]
   MAF["Microsoft Agent Framework"]
   Providers["Provider adapters"]
   Tools["MCPGateway + built-in tools + RagSharp"]
@@ -53,9 +53,9 @@ flowchart LR
   Eval["Microsoft.Extensions.AI.Evaluation*"]
   OTel["OpenTelemetry-first observability"]
 
-  Workbench --> Silo
+  Client --> Silo
   Silo --> Session
-  Silo --> Fleet
+  Silo --> AgentProfiles
   Session --> MAF
   MAF --> Providers
   MAF --> Tools
@@ -72,11 +72,11 @@ Rejected.
 
 This would underserve the approved product scope and force future non-coding agent scenarios into an architecture that already assumed the wrong domain boundaries.
 
-### 2. Replace the current Uno shell with a wholly new navigation and workbench concept
+### 2. Replace the current Uno shell with a wholly new product layout
 
 Rejected.
 
-The current shell already encodes the future product information architecture. Throwing it away would create churn in planning artifacts and disconnect the backlog from the repository’s visible surface.
+The current shell already encodes the future chat/session product direction. Throwing it away would create churn in planning artifacts and disconnect the backlog from the repository’s visible surface.
 
 ### 3. Use provider-specific process wrappers instead of typed SDKs where SDKs already exist
 

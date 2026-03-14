@@ -18,7 +18,7 @@ public sealed class ChatMessageTemplateSelector : DataTemplateSelector
 
     protected override DataTemplate SelectTemplateCore(object item)
     {
-        return item is ChatMessageItem { IsCurrentUser: true }
+        return item is ChatTimelineItem { IsCurrentUser: true }
             ? OutgoingTemplate ?? IncomingTemplate ?? throw new InvalidOperationException(MissingTemplateMessage)
             : IncomingTemplate ?? OutgoingTemplate ?? throw new InvalidOperationException(MissingTemplateMessage);
     }

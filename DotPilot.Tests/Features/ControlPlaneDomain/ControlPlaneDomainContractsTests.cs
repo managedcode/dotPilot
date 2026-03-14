@@ -172,8 +172,8 @@ public class ControlPlaneDomainContractsTests
             Id = TelemetryRecordId.New(),
             SessionId = session.Id,
             Kind = TelemetrySignalKind.Trace,
-            Name = "RuntimeFoundation.Execute",
-            Summary = "Deterministic provider-independent trace",
+            Name = "AgentSession.Execute",
+            Summary = "Deterministic local session trace",
             RecordedAt = UpdatedAt,
         };
 

@@ -1,6 +1,7 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.AgentSkillsSection"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="using:DotPilot.Presentation"
              FontFamily="{StaticResource AppBodyFontFamily}">
   <Border Style="{StaticResource SectionCardStyle}"
           AutomationProperties.AutomationId="AgentSkillsSection">
@@ -26,13 +27,18 @@
                    VerticalAlignment="Center"
                    FontSize="14"
                    FontWeight="SemiBold"
-                   Text="Skills" />
+                   Text="Capabilities" />
       </Grid>
 
+      <TextBlock FontSize="12"
+                 Foreground="{StaticResource AppMutedTextBrush}"
+                 Text="Capabilities define what the local workflow grain is expected to do inside each session."
+                 TextWrapping="WrapWholeWords" />
+
       <ItemsControl AutomationProperties.AutomationId="SkillsList"
-                    ItemsSource="{Binding Skills}">
+                    ItemsSource="{Binding Capabilities}">
         <ItemsControl.ItemTemplate>
-          <DataTemplate>
+          <DataTemplate x:DataType="presentation:CapabilityOption">
             <StackPanel Spacing="0">
               <Grid Margin="0,0,0,12"
                     ColumnSpacing="12">
@@ -49,22 +55,22 @@
                   <TextBlock HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              FontSize="14"
-                             Text="{Binding IconGlyph}" />
+                             Text="*" />
                 </Border>
                 <StackPanel Grid.Column="1"
                             VerticalAlignment="Center"
                             Spacing="2">
                   <TextBlock FontSize="13"
                              FontWeight="SemiBold"
-                             Text="{Binding Name}" />
+                             Text="{x:Bind Name}" />
                   <TextBlock FontSize="11.5"
                              Foreground="{StaticResource AppMutedTextBrush}"
-                             Text="{Binding Description}"
+                             Text="{x:Bind Description}"
                              TextWrapping="Wrap" />
                 </StackPanel>
                 <ToggleSwitch Grid.Column="2"
                               HorizontalAlignment="Right"
-                              IsOn="{Binding IsEnabled, Mode=OneWay}"
+                              IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
                               OnContent=""
                               OffContent=""
                               VerticalAlignment="Center" />

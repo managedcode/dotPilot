@@ -145,6 +145,7 @@ For this app:
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
 - do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
 - do not commit user-specific local paths, usernames, or machine-specific identifiers in tests, docs, snapshots, or fixtures; use neutral synthetic values so the repo stays portable and does not leak personal machine details
+- keep local planning artifacts and analyzer scratch files out of git history: ignore `*.plan.md` and `CodeMetricsConfig.txt`, and do not commit or re-stage them because they are operator-local working files
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
@@ -161,6 +162,12 @@ For this app:
 - never claim an epic is complete until its current GitHub scope is verified against the live issue graph; check which issues are real children versus issues that merely depend on the epic or belong to a different parent epic
 - Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
 - Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
+- The primary product IA is a desktop chat client for local agents: session list, active session transcript, terminal-like streaming activity, agent management, and provider settings must be the default mental model instead of workbench, issue-tracking, domain-browser, or toolchain-center concepts
+- User-facing UI must not expose backlog numbers, issue labels, workstream labels, "workbench", "domain", or similar internal planning and architecture language unless a feature explicitly exists to show source-control metadata
+- Provider integrations should stay SDK-first: when Codex, Claude Code, GitHub Copilot, or debug/test providers already expose an `IChatClient`-style abstraction, build agent orchestration on top of that instead of inventing parallel request/result wrappers without a clear gap
+- Persist app models and durable session state through `SQLite` plus `EF Core` when the data must survive restarts; do not keep the core chat/session experience trapped in seed data or transient in-memory catalogs
+- Model agents and sessions as Orleans grains, with each session acting as the workflow container that coordinates participant agents and streams messages, tool activity, and status updates into the UI
+- Do not keep legacy product slices alive during a rewrite: when `Workbench`, `ToolchainCenter`, legacy runtime demos, or similar prototype surfaces are being replaced, remove them instead of leaving a parallel legacy path in the codebase
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
@@ -363,7 +370,7 @@ Ask first:
 - Keep validation and release GitHub Actions separate, with descriptive names and filenames instead of a generic `ci.yml`.
 - Keep the validation workflow focused on build and automated test feedback, and keep release responsibilities in a dedicated workflow that bumps versioning, publishes desktop artifacts, and creates the GitHub Release with feature notes.
 - Keep `dotPilot` positioned as a general agent control plane, not a coding-only shell.
-- Reuse the current Uno desktop shell direction instead of replacing it with a wholly different layout when evolving the product.
+- Keep the visible product direction aligned with desktop chat apps such as Codex and Claude: sessions first, chat first, streaming first, with repo and git actions as optional utilities inside a session instead of the primary navigation model.
 - Keep provider integrations SDK-first where good typed SDKs already exist.
 - Keep evaluation and observability aligned with official Microsoft `.NET` AI guidance when building agent-quality and trust features.
 
@@ -378,3 +385,5 @@ Ask first:
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
 - Planning `MLXSharp` into the first product wave before it is ready for real use.
+- Letting internal implementation labels such as `Workbench`, issue numbers, or architecture slice names leak into the visible product wording or navigation when the app should behave like a clean desktop chat client.
+- Leaving deprecated product slices, pages, view models, or contracts in place "for later cleanup" after the replacement direction is already chosen.

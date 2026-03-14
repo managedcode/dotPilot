@@ -1,5 +1,4 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.AgentPromptSection"
-             x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{StaticResource AppBodyFontFamily}">
@@ -27,77 +26,48 @@
                    VerticalAlignment="Center"
                    FontSize="14"
                    FontWeight="SemiBold"
-                   Text="System Prompt" />
+                   Text="System prompt" />
+      </Grid>
+
+      <Grid ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Button
+                AutomationProperties.AutomationId="CreateAgentButton"
+                Background="{StaticResource AppAccentBrush}"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                Command="{Binding CreateAgentCommand}"
+                CornerRadius="18"
+                Padding="16,10">
+          <TextBlock FontSize="12"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="Create agent" />
+        </Button>
+        <TextBlock Grid.Column="1"
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="AgentCreateStatusMessage"
+                   FontSize="12"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="WrapWholeWords" />
       </Grid>
 
       <Border Style="{StaticResource LargeInputSurfaceStyle}"
               MinHeight="176">
-        <TextBox AcceptsReturn="True"
+        <TextBox AutomationProperties.AutomationId="AgentSystemPromptInput"
+                 AcceptsReturn="True"
                  Background="Transparent"
                  BorderThickness="0"
                  FontSize="12"
                  Foreground="{StaticResource AppPrimaryTextBrush}"
-                 IsReadOnly="True"
-                 Text="{Binding SystemPrompt, Mode=OneWay}"
+                 Text="{Binding SystemPrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                  TextWrapping="Wrap" />
       </Border>
-
-      <Grid ColumnSpacing="12">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <TextBlock VerticalAlignment="Center"
-                   FontFamily="{StaticResource AppAccentFontFamily}"
-                   FontSize="14"
-                   Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="{Binding TokenSummary}" />
-        <Button Grid.Column="1"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                Padding="0"
-                AutomationProperties.AutomationId="PromptTemplateButton">
-          <Button.Flyout>
-            <Flyout Placement="Bottom">
-              <Border Style="{StaticResource GlassPanelStyle}"
-                      AutomationProperties.AutomationId="PromptTemplatesFlyout"
-                      DataContext="{Binding DataContext, ElementName=Root}"
-                      Padding="12"
-                      Width="280">
-                <StackPanel Spacing="10">
-                  <TextBlock FontSize="12"
-                             FontWeight="SemiBold"
-                             Text="Prompt Templates" />
-                  <ItemsControl ItemsSource="{Binding PromptTemplates}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Border Style="{StaticResource SearchSurfaceStyle}"
-                                Margin="0,0,0,6">
-                          <StackPanel Orientation="Horizontal"
-                                      Spacing="8">
-                            <TextBlock FontSize="12"
-                                       Foreground="{StaticResource AppMutedTextBrush}"
-                                       Text="✦" />
-                            <TextBlock FontSize="12"
-                                       Text="{Binding}" />
-                          </StackPanel>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-              </Border>
-            </Flyout>
-          </Button.Flyout>
-          <Border Style="{StaticResource SearchSurfaceStyle}"
-                  Padding="12,6">
-            <TextBlock FontSize="14"
-                       FontWeight="Medium"
-                       Foreground="{StaticResource AppSecondaryTextBrush}"
-                       Text="Use template ↓" />
-          </Border>
-        </Button>
-      </Grid>
     </StackPanel>
   </Border>
 </UserControl>

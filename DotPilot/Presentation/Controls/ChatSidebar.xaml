@@ -68,6 +68,18 @@
                        Text="Agents" />
           </StackPanel>
         </Button>
+        <Button AutomationProperties.AutomationId="ProvidersNavButton"
+                Style="{StaticResource SidebarButtonStyle}"
+                uen:Navigation.Request="Settings">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="8">
+            <TextBlock VerticalAlignment="Center"
+                       FontSize="13"
+                       Text="=" />
+            <TextBlock VerticalAlignment="Center"
+                       Text="Providers" />
+          </StackPanel>
+        </Button>
       </StackPanel>
 
       <Rectangle Grid.Row="2"
@@ -75,7 +87,6 @@
                  Style="{StaticResource SectionDividerStyle}" />
 
       <ScrollViewer Grid.Row="3"
-                    Margin="0"
                     VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12,20,12,20"
                     AutomationProperties.AutomationId="ChatSidebarContent"
@@ -85,60 +96,66 @@
                      FontSize="12"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="RECENT CHATS" />
-
-          <Border AutomationProperties.AutomationId="ChatSearchSurface"
-                  Style="{StaticResource SearchSurfaceStyle}">
-            <StackPanel Orientation="Horizontal"
-                        Spacing="8">
-              <TextBlock FontSize="12"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="?" />
-              <TextBlock FontSize="12"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="Search chats" />
-            </StackPanel>
-          </Border>
+                     Text="SESSIONS" />
 
           <Button AutomationProperties.AutomationId="ChatStartNewButton"
+                  Command="{Binding StartNewSessionCommand}"
                   Style="{StaticResource SidebarButtonStyle}">
             <StackPanel Orientation="Horizontal"
                         Spacing="8">
               <TextBlock FontSize="13"
                          Text="+" />
-              <TextBlock Text="Start new chat" />
+              <TextBlock Text="Start new session" />
             </StackPanel>
           </Button>
 
-          <ItemsControl AutomationProperties.AutomationId="ChatRecentChatsList"
-                        ItemsSource="{Binding RecentChats}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="presentation:SidebarChatItem">
-                <Grid Margin="0,0,0,8"
-                      AutomationProperties.AutomationId="ChatRecentChatItem">
-                  <Border Background="Transparent"
-                          CornerRadius="16" />
-                  <Border Background="{StaticResource AppSelectionBrush}"
-                          CornerRadius="16"
-                          Visibility="{Binding IsSelected}" />
-                  <Grid Margin="12,10">
-                    <Grid.RowDefinitions>
-                      <RowDefinition Height="Auto" />
-                      <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock FontSize="14"
+          <Button AutomationProperties.AutomationId="ChatRefreshButton"
+                  Command="{Binding RefreshCommand}"
+                  Style="{StaticResource SidebarButtonStyle}">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8">
+              <TextBlock FontSize="13"
+                         Text="o" />
+              <TextBlock Text="Refresh sessions" />
+            </StackPanel>
+          </Button>
+
+          <TextBlock AutomationProperties.AutomationId="ChatSidebarFeedback"
+                     FontSize="12"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding FeedbackMessage}"
+                     TextWrapping="WrapWholeWords" />
+
+          <ListView AutomationProperties.AutomationId="ChatRecentChatsList"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    ItemsSource="{Binding RecentChats}"
+                    SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+                    SelectionMode="Single">
+            <ListView.ItemTemplate>
+              <DataTemplate x:DataType="presentation:SessionSidebarItem">
+                <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                        BorderBrush="{StaticResource AppOutlineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Margin="0,0,0,10"
+                        Padding="12,10"
+                        AutomationProperties.AutomationId="ChatRecentChatItem">
+                  <StackPanel Spacing="4">
+                    <TextBlock FontSize="13"
+                               FontWeight="SemiBold"
                                Text="{x:Bind Title}" />
-                    <TextBlock Grid.Row="1"
-                               Margin="0,2,0,0"
-                               FontSize="12"
+                    <TextBlock FontSize="11"
                                Foreground="{StaticResource AppMutedTextBrush}"
                                Text="{x:Bind Preview}"
-                               TextTrimming="CharacterEllipsis" />
-                  </Grid>
-                </Grid>
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="WrapWholeWords" />
+                  </StackPanel>
+                </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+            </ListView.ItemTemplate>
+          </ListView>
         </StackPanel>
       </ScrollViewer>
 
@@ -163,17 +180,17 @@
                        FontSize="12"
                        FontWeight="SemiBold"
                        Foreground="White"
-                       Text="J" />
+                       Text="L" />
           </Border>
 
           <StackPanel Grid.Column="1"
                       Spacing="0">
             <TextBlock FontSize="12"
                        FontWeight="SemiBold"
-                       Text="Jordan Lee" />
+                       Text="Local operator" />
             <TextBlock FontSize="11"
                        Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="Pro plan - Active" />
+                       Text="Desktop session host" />
           </StackPanel>
 
           <TextBlock Grid.Column="2"

@@ -317,6 +317,20 @@ public class TestBase
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
         try
         {
+            var matches = App.Query(automationId);
+            if (matches.Length > 0)
+            {
+                var target = matches[0];
+                HarnessLog.Write(
+                    $"Tap target '{automationId}' enabled='{target.Enabled}' rect='{target.Rect}' text='{target.Text}' label='{target.Label}'.");
+
+                if (Constants.CurrentPlatform == Platform.Browser)
+                {
+                    App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
+                    return;
+                }
+            }
+
             App.Tap(automationId);
         }
         catch (InvalidOperationException exception)
@@ -340,13 +354,237 @@ public class TestBase
                 HarnessLog.Write($"Tap selector diagnostics failed for '{automationId}': {diagnosticException.Message}");
             }
 
+            if (Constants.CurrentPlatform == Platform.Browser)
+            {
+                var fallbackMatches = App.Query(automationId);
+                if (fallbackMatches.Length > 0)
+                {
+                    var fallbackTarget = fallbackMatches[0];
+                    HarnessLog.Write(
+                        $"Falling back to coordinate tap for '{automationId}' at '{fallbackTarget.Rect.CenterX},{fallbackTarget.Rect.CenterY}'.");
+                    App.TapCoordinates(fallbackTarget.Rect.CenterX, fallbackTarget.Rect.CenterY);
+                    return;
+                }
+            }
+
             WriteBrowserAutomationDiagnostics(automationId);
             WriteBrowserDomSnapshot($"tap:{automationId}", automationId);
             throw;
         }
     }
 
-    private void WriteBrowserAutomationDiagnostics(string automationId)
+    protected void ReplaceTextAutomationElement(string automationId, string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        ArgumentNullException.ThrowIfNull(text);
+
+        if (TrySetBrowserInputValue(automationId, text))
+        {
+            return;
+        }
+
+        App.ClearText(automationId);
+        App.EnterText(automationId, text);
+    }
+
+    protected void ClickActionAutomationElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (TryClickBrowserAutomationElement(automationId))
+        {
+            return;
+        }
+
+        TapAutomationElement(automationId);
+    }
+
+    private bool TryClickBrowserAutomationElement(string automationId)
+    {
+        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var outcome = executeScriptMethod.Invoke(
+                driver,
+                [
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const host = document.querySelector(selector);
+                            if (!host) {
+                                return 'missing';
+                            }
+
+                            const element = host.matches('button, [role="button"], input[type="button"], input[type="submit"]')
+                                ? host
+                                : host.querySelector('button, [role="button"], input[type="button"], input[type="submit"]') ?? host;
+
+                            element.scrollIntoView({ block: 'center', inline: 'center' });
+                            const rect = element.getBoundingClientRect();
+                            const eventInit = {
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true,
+                                view: window,
+                                clientX: rect.left + (rect.width / 2),
+                                clientY: rect.top + (rect.height / 2),
+                                button: 0
+                            };
+
+                            element.dispatchEvent(new PointerEvent('pointerover', eventInit));
+                            element.dispatchEvent(new PointerEvent('pointerenter', eventInit));
+                            element.dispatchEvent(new MouseEvent('mouseover', eventInit));
+                            element.dispatchEvent(new MouseEvent('mouseenter', eventInit));
+                            element.dispatchEvent(new PointerEvent('pointerdown', eventInit));
+                            element.dispatchEvent(new MouseEvent('mousedown', eventInit));
+                            element.dispatchEvent(new PointerEvent('pointerup', eventInit));
+                            element.dispatchEvent(new MouseEvent('mouseup', eventInit));
+                            element.dispatchEvent(new MouseEvent('click', eventInit));
+                            return 'clicked';
+                        })();
+                        """),
+                    Array.Empty<object>(),
+                ]);
+
+            HarnessLog.Write($"Browser action click outcome for '{automationId}': {outcome}");
+            return string.Equals(
+                Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+                "clicked",
+                StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser action click failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TrySetBrowserInputValue(string automationId, string text)
+    {
+        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var escapedText = text
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("'", "\\'", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+            var outcome = executeScriptMethod.Invoke(
+                driver,
+                [
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const value = '
+                        """,
+                        escapedText,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const host = document.querySelector(selector);
+                            if (!host) {
+                                return 'missing';
+                            }
+
+                            const element = host.matches('input, textarea, [contenteditable="true"]')
+                                ? host
+                                : host.querySelector('input, textarea, [contenteditable="true"]');
+                            if (!element) {
+                                return 'not-an-input';
+                            }
+
+                            element.scrollIntoView({ block: 'center', inline: 'center' });
+                            element.focus();
+
+                            if ('value' in element) {
+                                element.value = value;
+                            } else {
+                                element.textContent = value;
+                            }
+
+                            const options = { bubbles: true, cancelable: true, composed: true };
+                            element.dispatchEvent(new Event('input', options));
+                            element.dispatchEvent(new Event('change', options));
+                            element.blur();
+                            return 'set';
+                        })();
+                        """),
+                    Array.Empty<object>(),
+                ]);
+
+            HarnessLog.Write($"Browser input replacement outcome for '{automationId}': {outcome}");
+            return string.Equals(
+                Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+                "set",
+                StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser input replacement failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    protected void WriteBrowserAutomationDiagnostics(string automationId)
     {
         if (Constants.CurrentPlatform != Platform.Browser || _app is null)
         {

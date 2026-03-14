@@ -1,7 +1,6 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.ChatInfoPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="using:DotPilot.Presentation.Controls"
              xmlns:uen="using:Uno.Extensions.Navigation.UI"
              xmlns:presentation="using:DotPilot.Presentation"
              AutomationProperties.AutomationId="ChatInfoPanel">
@@ -109,7 +108,7 @@
         <TextBlock FontSize="15"
                    FontWeight="Medium"
                    Foreground="{StaticResource AppPrimaryTextBrush}"
-                   Text="Chat Information" />
+                   Text="Session details" />
 
         <Button Grid.Column="1"
                 AutomationProperties.AutomationId="ChatInfoPanelCloseButton"
@@ -133,70 +132,46 @@
                        FontSize="12"
                        FontWeight="Medium"
                        Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="CHAT NAME" />
+                       Text="SESSION" />
             <TextBlock FontSize="14"
                        FontWeight="Medium"
                        Foreground="{StaticResource AppPrimaryTextBrush}"
                        Text="{Binding Title}" />
+            <TextBlock FontSize="12"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{Binding StatusSummary}"
+                       TextWrapping="WrapWholeWords" />
           </StackPanel>
 
           <Rectangle Style="{StaticResource SectionDividerStyle}" />
 
-          <StackPanel Spacing="8">
-            <Button AutomationProperties.AutomationId="ChatFilesButton"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    BorderThickness="0"
-                    Padding="0">
-              <Grid Padding="0,10"
-                    ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center"
-                           FontSize="12"
-                           Text="[]" />
-                <TextBlock Grid.Column="1"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           FontWeight="Medium"
-                           Text="Files" />
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           Foreground="{StaticResource AppMutedTextBrush}"
-                           Text=">" />
-              </Grid>
+          <StackPanel Spacing="10">
+            <TextBlock CharacterSpacing="80"
+                       FontSize="12"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="QUICK ACTIONS" />
+            <Button AutomationProperties.AutomationId="ChatInfoAgentsButton"
+                    Background="{StaticResource AppSoftSurfaceBrush}"
+                    BorderBrush="{StaticResource AppOutlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="12,10"
+                    uen:Navigation.Request="Second">
+              <TextBlock FontSize="13"
+                         FontWeight="SemiBold"
+                         Text="Create or edit agents" />
             </Button>
-
-            <Button AutomationProperties.AutomationId="ChatPhotosButton"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    BorderThickness="0"
-                    Padding="0">
-              <Grid Padding="0,10"
-                    ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center"
-                           FontSize="12"
-                           Text="o" />
-                <TextBlock Grid.Column="1"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           FontWeight="Medium"
-                           Text="Photos" />
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           Foreground="{StaticResource AppMutedTextBrush}"
-                           Text=">" />
-              </Grid>
+            <Button AutomationProperties.AutomationId="ChatInfoProvidersButton"
+                    Background="{StaticResource AppSoftSurfaceBrush}"
+                    BorderBrush="{StaticResource AppOutlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="12,10"
+                    uen:Navigation.Request="Settings">
+              <TextBlock FontSize="13"
+                         FontWeight="SemiBold"
+                         Text="Open provider settings" />
             </Button>
           </StackPanel>
 
@@ -216,20 +191,16 @@
                          Text="MEMBERS" />
 
               <Button Grid.Column="1"
-                      AutomationProperties.AutomationId="ChatAddMemberButton"
+                      AutomationProperties.AutomationId="ChatOpenSettingsButton"
                       Background="{StaticResource AppSoftSurfaceBrush}"
                       BorderBrush="{StaticResource AppOutlineBrush}"
                       BorderThickness="1"
                       CornerRadius="100"
-                      Padding="8,4">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="4">
-                  <TextBlock FontSize="11"
-                             Text="+" />
-                  <TextBlock FontSize="11"
-                             FontWeight="Medium"
-                             Text="Add member" />
-                </StackPanel>
+                      Padding="8,4"
+                      uen:Navigation.Request="Settings">
+                <TextBlock FontSize="11"
+                           FontWeight="Medium"
+                           Text="Settings" />
               </Button>
             </Grid>
 
@@ -279,7 +250,24 @@
 
           <Rectangle Style="{StaticResource SectionDividerStyle}" />
 
-          <controls:RuntimeFoundationPanel DataContext="{Binding RuntimeFoundation}" />
+          <StackPanel Spacing="8">
+            <TextBlock CharacterSpacing="80"
+                       FontSize="12"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="FEEDBACK" />
+            <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                    BorderBrush="{StaticResource AppOutlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="12,10">
+              <TextBlock AutomationProperties.AutomationId="ChatInfoFeedback"
+                         FontSize="12"
+                         Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding FeedbackMessage}"
+                         TextWrapping="WrapWholeWords" />
+            </Border>
+          </StackPanel>
         </StackPanel>
       </ScrollViewer>
     </Grid>

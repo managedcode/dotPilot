@@ -1,122 +1,156 @@
-using DotPilot.Core.Features.ToolchainCenter;
+using System.Collections.ObjectModel;
+using DotPilot.Core.Features.AgentSessions;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace DotPilot.Presentation;
 
 public sealed class SettingsViewModel : ObservableObject
 {
-    private const string PageTitleValue = "Unified settings shell";
-    private const string PageSubtitleValue =
-        "Toolchains, provider readiness, policies, and storage stay visible from one operator-oriented surface.";
-    private const string DefaultCategoryTitle = "Select a settings category";
-    private const string DefaultCategorySummary = "Choose a category to inspect its current entries.";
-    private const string ToolchainProviderSummaryFormat = "{0} ready • {1} need attention";
-    private static readonly System.Text.CompositeFormat ToolchainProviderSummaryCompositeFormat =
-        System.Text.CompositeFormat.Parse(ToolchainProviderSummaryFormat);
+    private readonly IAgentSessionService _agentSessionService;
+    private readonly AsyncCommand _refreshCommand;
+    private readonly AsyncCommand _toggleProviderCommand;
+    private readonly AsyncCommand _providerActionCommand;
+    private readonly ObservableCollection<ProviderStatusItem> _providers;
+    private ProviderStatusItem? _selectedProvider;
+    private string _statusMessage = string.Empty;
 
-    private WorkbenchSettingsCategoryItem? _selectedCategory;
-    private ToolchainProviderItem? _selectedToolchainProvider;
-
-    public SettingsViewModel(
-        IWorkbenchCatalog workbenchCatalog,
-        IRuntimeFoundationCatalog runtimeFoundationCatalog,
-        IToolchainCenterCatalog toolchainCenterCatalog)
+    public SettingsViewModel(IAgentSessionService agentSessionService)
     {
-        ArgumentNullException.ThrowIfNull(workbenchCatalog);
-        ArgumentNullException.ThrowIfNull(runtimeFoundationCatalog);
-        ArgumentNullException.ThrowIfNull(toolchainCenterCatalog);
-
-        Snapshot = workbenchCatalog.GetSnapshot();
-        RuntimeFoundation = runtimeFoundationCatalog.GetSnapshot();
-        ToolchainCenter = toolchainCenterCatalog.GetSnapshot();
-        Categories = Snapshot.SettingsCategories
-            .Select(category => new WorkbenchSettingsCategoryItem(
-                category.Key,
-                category.Title,
-                category.Summary,
-                PresentationAutomationIds.SettingsCategory(category.Key),
-                category.Entries))
-            .ToArray();
-        ToolchainProviders = ToolchainCenter.Providers
-            .Select(provider => new ToolchainProviderItem(
-                provider,
-                PresentationAutomationIds.ToolchainProvider(provider.Provider.CommandName)))
-            .ToArray();
-        ToolchainWorkstreams = ToolchainCenter.Workstreams
-            .Select(workstream => new ToolchainWorkstreamItem(
-                workstream,
-                PresentationAutomationIds.ToolchainWorkstream(workstream.IssueNumber)))
-            .ToArray();
-        _selectedCategory = Categories.FirstOrDefault(category => category.Key == WorkbenchSettingsCategoryKeys.Toolchains) ??
-            (Categories.Count > 0 ? Categories[0] : null);
-        _selectedToolchainProvider = ToolchainProviders.Count > 0 ? ToolchainProviders[0] : null;
-        SettingsIssueLabel = WorkbenchIssues.FormatIssueLabel(WorkbenchIssues.SettingsShell);
+        _agentSessionService = agentSessionService;
+        _providers = [];
+        _refreshCommand = new AsyncCommand(LoadProvidersAsync);
+        _toggleProviderCommand = new AsyncCommand(ToggleSelectedProviderAsync, CanToggleSelectedProvider);
+        _providerActionCommand = new AsyncCommand(ExecuteProviderActionAsync, CanExecuteProviderAction);
+        _ = LoadProvidersAsync();
     }
 
-    public WorkbenchSnapshot Snapshot { get; }
+    public ObservableCollection<ProviderStatusItem> Providers => _providers;
 
-    public RuntimeFoundationSnapshot RuntimeFoundation { get; }
+    public ICommand RefreshCommand => _refreshCommand;
 
-    public ToolchainCenterSnapshot ToolchainCenter { get; }
+    public ICommand ToggleProviderCommand => _toggleProviderCommand;
 
-    public string SettingsIssueLabel { get; }
+    public ICommand ProviderActionCommand => _providerActionCommand;
 
-    public string PageTitle => PageTitleValue;
+    public string PageTitle => "Providers";
 
-    public string PageSubtitle => PageSubtitleValue;
+    public string PageSubtitle => "Enable the built-in debug client or connect local CLI providers before creating agents.";
 
-    public IReadOnlyList<WorkbenchSettingsCategoryItem> Categories { get; }
-
-    public IReadOnlyList<ToolchainProviderItem> ToolchainProviders { get; }
-
-    public IReadOnlyList<ToolchainWorkstreamItem> ToolchainWorkstreams { get; }
-
-    public WorkbenchSettingsCategoryItem? SelectedCategory
+    public ProviderStatusItem? SelectedProvider
     {
-        get => _selectedCategory;
+        get => _selectedProvider;
         set
         {
-            if (!SetProperty(ref _selectedCategory, value))
+            if (!SetProperty(ref _selectedProvider, value))
             {
                 return;
             }
 
-            RaisePropertyChanged(nameof(SelectedCategoryTitle));
-            RaisePropertyChanged(nameof(SelectedCategorySummary));
-            RaisePropertyChanged(nameof(VisibleEntries));
-            RaisePropertyChanged(nameof(IsToolchainCenterVisible));
-            RaisePropertyChanged(nameof(AreGenericSettingsVisible));
+            RaisePropertyChanged(nameof(SelectedProviderTitle));
+            RaisePropertyChanged(nameof(SelectedProviderSummary));
+            RaisePropertyChanged(nameof(SelectedProviderInstallCommand));
+            RaisePropertyChanged(nameof(SelectedProviderActions));
+            RaisePropertyChanged(nameof(HasSelectedProviderActions));
+            RaisePropertyChanged(nameof(ToggleActionLabel));
+            _toggleProviderCommand.RaiseCanExecuteChanged();
+            _providerActionCommand.RaiseCanExecuteChanged();
         }
     }
 
-    public ToolchainProviderItem? SelectedToolchainProvider
+    public string SelectedProviderTitle => SelectedProvider?.DisplayName ?? "Select a provider";
+
+    public string SelectedProviderSummary => SelectedProvider?.StatusSummary ?? "Choose a provider to inspect readiness and install guidance.";
+
+    public string SelectedProviderInstallCommand => SelectedProvider?.InstallCommand ?? string.Empty;
+
+    public IReadOnlyList<ProviderActionItem> SelectedProviderActions => SelectedProvider?.Actions ?? [];
+
+    public bool HasSelectedProviderActions => SelectedProviderActions.Count > 0;
+
+    public string ToggleActionLabel => SelectedProvider?.IsEnabled == true ? "Disable provider" : "Enable provider";
+
+    public string StatusMessage
     {
-        get => _selectedToolchainProvider;
-        set
-        {
-            if (!SetProperty(ref _selectedToolchainProvider, value))
-            {
-                return;
-            }
-
-            RaisePropertyChanged(nameof(SelectedToolchainProviderSnapshot));
-        }
+        get => _statusMessage;
+        private set => SetProperty(ref _statusMessage, value);
     }
 
-    public string SelectedCategoryTitle => SelectedCategory?.Title ?? DefaultCategoryTitle;
+    private async Task LoadProvidersAsync()
+    {
+        var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
+        _providers.Clear();
 
-    public string SelectedCategorySummary => SelectedCategory?.Summary ?? DefaultCategorySummary;
+        foreach (var provider in workspace.Providers)
+        {
+            _providers.Add(
+                new ProviderStatusItem(
+                    provider.Kind,
+                    provider.DisplayName,
+                    provider.CommandName,
+                    provider.StatusSummary,
+                    provider.InstalledVersion,
+                    provider.IsEnabled,
+                    provider.CanCreateAgents,
+                    provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
+                    provider.Actions
+                        .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
+                        .ToArray()));
+        }
 
-    public bool IsToolchainCenterVisible => SelectedCategory?.Key == WorkbenchSettingsCategoryKeys.Toolchains;
+        SelectedProvider = _providers.FirstOrDefault(provider => provider.IsEnabled) ??
+            _providers.FirstOrDefault();
+    }
 
-    public bool AreGenericSettingsVisible => !IsToolchainCenterVisible;
+    private async Task ToggleSelectedProviderAsync()
+    {
+        if (SelectedProvider is null)
+        {
+            return;
+        }
 
-    public IReadOnlyList<WorkbenchSettingEntry> VisibleEntries => SelectedCategory?.Entries ?? [];
+        await _agentSessionService.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(SelectedProvider.Kind, !SelectedProvider.IsEnabled),
+            CancellationToken.None);
+        await LoadProvidersAsync();
+        StatusMessage = $"{SelectedProviderTitle} updated.";
+    }
 
-    public ToolchainProviderSnapshot? SelectedToolchainProviderSnapshot => SelectedToolchainProvider?.Snapshot;
+    private bool CanToggleSelectedProvider()
+    {
+        return SelectedProvider is not null;
+    }
 
-    public string ProviderSummary => string.Format(
-        System.Globalization.CultureInfo.InvariantCulture,
-        ToolchainProviderSummaryCompositeFormat,
-        ToolchainCenter.ReadyProviderCount,
-        ToolchainCenter.AttentionRequiredProviderCount);
+    private Task ExecuteProviderActionAsync(object? parameter)
+    {
+        if (parameter is not ProviderActionItem action)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (string.IsNullOrWhiteSpace(action.Command))
+        {
+            StatusMessage = action.Summary;
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            var dataPackage = new DataPackage();
+            dataPackage.SetText(action.Command);
+            Clipboard.SetContent(dataPackage);
+            Clipboard.Flush();
+            StatusMessage = $"Copied command: {action.Command}";
+        }
+        catch (Exception)
+        {
+            StatusMessage = $"Run this command in your terminal: {action.Command}";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static bool CanExecuteProviderAction(object? parameter)
+    {
+        return parameter is ProviderActionItem;
+    }
 }

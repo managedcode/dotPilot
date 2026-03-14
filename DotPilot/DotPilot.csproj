@@ -54,6 +54,15 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
+    <Target Name="RemoveBrowserSqliteNativeReference"
+            Condition="'$(TargetFramework)'=='net10.0-browserwasm' and '$(RuntimeIdentifier)'=='browser-wasm'"
+            BeforeTargets="_CheckBrowserWorkloadNeededButNotAvailable">
+        <ItemGroup>
+            <NativeFileReference Remove="@(NativeFileReference)"
+                                 Condition="'%(NativeFileReference.Filename)%(NativeFileReference.Extension)'=='e_sqlite3.a'" />
+        </ItemGroup>
+    </Target>
+
     <PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(IsUiAutomationMappingEnabled)'=='True'">
         <IsUiAutomationMappingEnabled>True</IsUiAutomationMappingEnabled>
         <DefineConstants>$(DefineConstants);USE_UITESTS</DefineConstants>

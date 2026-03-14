@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Project: `DotPilot.Runtime`
-Stack: `.NET 10`, class library, provider-independent runtime services and diagnostics
+Stack: `.NET 10`, class library, provider-backed runtime services, local persistence, and deterministic session orchestration
 
 ## Purpose
 
@@ -11,21 +11,21 @@ Stack: `.NET 10`, class library, provider-independent runtime services and diagn
 ## Entry Points
 
 - `DotPilot.Runtime.csproj`
-- `Features/RuntimeFoundation/*`
+- `Features/AgentSessions/*`
 - `Features/HttpDiagnostics/DebugHttpHandler.cs`
 
 ## Boundaries
 
 - Keep this project free of `Uno Platform`, XAML, and page/view-model logic.
 - Implement feature slices against `DotPilot.Core` contracts instead of reaching back into the app project.
-- Prefer deterministic runtime behavior and environment probing here so tests can exercise real flows without mocks.
+- Prefer deterministic runtime behavior, provider readiness probing, and `SQLite`-backed persistence here so tests can exercise real flows without mocks.
 - Keep external-provider assumptions soft: absence of Codex, Claude Code, or GitHub Copilot in CI must not break the provider-independent baseline.
 - For the first embedded Orleans host implementation, stay local-first with `UseLocalhostClustering` and in-memory storage/reminders so the desktop runtime remains self-contained.
 
 ## Local Commands
 
 - `build-runtime`: `dotnet build DotPilot.Runtime/DotPilot.Runtime.csproj`
-- `test-runtime`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~RuntimeFoundation`
+- `test-runtime`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~AgentSessions`
 
 ## Applicable Skills
 
@@ -37,5 +37,5 @@ Stack: `.NET 10`, class library, provider-independent runtime services and diagn
 
 ## Local Risks Or Protected Areas
 
-- Runtime services introduced here will become composition roots for later Orleans and Agent Framework work, so keep boundaries explicit.
-- Toolchain probing must stay deterministic and side-effect free; do not turn startup checks into live external calls.
+- Runtime services introduced here are the composition root for provider readiness, agent creation, session persistence, and streaming transcript state, so keep boundaries explicit.
+- CLI probing must stay deterministic and side-effect free; do not turn startup checks into live external calls.

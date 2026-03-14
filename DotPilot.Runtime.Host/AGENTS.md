@@ -11,7 +11,7 @@ Stack: `.NET 10`, class library, embedded Orleans host and local runtime-host se
 ## Entry Points
 
 - `DotPilot.Runtime.Host.csproj`
-- `Features/RuntimeFoundation/*`
+- `Features/AgentSessions/*`
 
 ## Boundaries
 
@@ -23,7 +23,7 @@ Stack: `.NET 10`, class library, embedded Orleans host and local runtime-host se
 ## Local Commands
 
 - `build-host`: `dotnet build DotPilot.Runtime.Host/DotPilot.Runtime.Host.csproj`
-- `test-runtime-host`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~EmbeddedRuntimeHost`
+- `test-runtime-host`: `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~AgentSessions`
 
 ## Applicable Skills
 
@@ -37,3 +37,4 @@ Stack: `.NET 10`, class library, embedded Orleans host and local runtime-host se
 
 - This project must remain invisible to the browserwasm path; keep app references conditional so UI tests stay green.
 - Grain contracts belong in `DotPilot.Core`; do not let this project become the source of truth for shared runtime abstractions.
+- Keep the host focused on agent-profile and session grains for the active chat workflow; do not reintroduce old demo host catalogs.

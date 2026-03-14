@@ -1,281 +1,338 @@
-using System.Collections.Frozen;
+using System.Collections.ObjectModel;
+using System.Globalization;
+using DotPilot.Core.Features.AgentSessions;
 
 namespace DotPilot.Presentation;
 
 public sealed class MainViewModel : ObservableObject
 {
-    private const double IndentSize = 16d;
-    private const string DefaultDocumentTitle = "Select a file";
-    private const string DefaultDocumentPath = "Choose a repository item from the left sidebar.";
-    private const string DefaultDocumentStatus = "The file surface becomes active after you open a file.";
-    private const string DefaultInspectorArtifactsTitle = "Artifacts";
-    private const string DefaultInspectorLogsTitle = "Runtime log console";
-    private const string DefaultInspectorArtifactsSummary = "Generated files, plans, screenshots, and session outputs stay attached to the current workbench.";
-    private const string DefaultInspectorLogsSummary = "Runtime logs remain visible without leaving the main workbench.";
-    private const string DefaultLanguageLabel = "No document";
-    private const string DefaultRendererLabel = "Select a repository item";
-    private const string DefaultPreviewContent = "Open a file from the repository tree to inspect it here.";
+    private const string EmptyTitleValue = "No active session";
+    private const string EmptyStatusValue = "Create an agent, start a session, then chat from here.";
+    private const string DefaultComposerPlaceholder = "Message your local agent session";
+    private const string SendInProgressMessage = "Sending message to the local workflow...";
+    private const string LocalMemberName = "Local operator";
+    private const string LocalMemberSummary = "This desktop instance";
+    private readonly IAgentSessionService _agentSessionService;
+    private readonly AsyncCommand _sendMessageCommand;
+    private readonly AsyncCommand _startNewSessionCommand;
+    private readonly AsyncCommand _refreshCommand;
+    private readonly Dictionary<string, int> _timelineIndexById = new(StringComparer.Ordinal);
+    private IReadOnlyList<AgentProfileSummary> _agents = [];
+    private SessionSidebarItem? _selectedChat;
+    private string _title = EmptyTitleValue;
+    private string _statusSummary = EmptyStatusValue;
+    private string _composerText = string.Empty;
+    private string _feedbackMessage = string.Empty;
 
-    private readonly FrozenDictionary<string, WorkbenchDocumentDescriptor> _documentsByPath;
-    private readonly IReadOnlyList<WorkbenchRepositoryNodeItem> _allRepositoryNodes;
-    private IReadOnlyList<WorkbenchRepositoryNodeItem> _filteredRepositoryNodes;
-    private string _repositorySearchText = string.Empty;
-    private WorkbenchRepositoryNodeItem? _selectedRepositoryNode;
-    private WorkbenchDocumentDescriptor? _selectedDocument;
-    private string _editablePreviewContent = DefaultPreviewContent;
-    private bool _isDiffReviewMode;
-    private bool _isLogConsoleVisible;
+    public MainViewModel(IAgentSessionService agentSessionService)
+    {
+        _agentSessionService = agentSessionService;
+        RecentChats = [];
+        Messages = [];
+        Members = [new ParticipantItem(LocalMemberName, LocalMemberSummary, "L", DesignBrushPalette.UserAvatarBrush)];
+        Agents = [];
 
-    public MainViewModel(
-        IWorkbenchCatalog workbenchCatalog,
-        IRuntimeFoundationCatalog runtimeFoundationCatalog)
+        _sendMessageCommand = new AsyncCommand(SendMessageAsync, CanSendMessage);
+        _startNewSessionCommand = new AsyncCommand(StartNewSessionAsync, CanStartNewSession);
+        _refreshCommand = new AsyncCommand(LoadWorkspaceAsync);
+
+        _ = LoadWorkspaceAsync();
+    }
+
+    public ObservableCollection<SessionSidebarItem> RecentChats { get; }
+
+    public ObservableCollection<ChatTimelineItem> Messages { get; }
+
+    public ObservableCollection<ParticipantItem> Members { get; }
+
+    public ObservableCollection<ParticipantItem> Agents { get; }
+
+    public ICommand SendMessageCommand => _sendMessageCommand;
+
+    public ICommand StartNewSessionCommand => _startNewSessionCommand;
+
+    public ICommand RefreshCommand => _refreshCommand;
+
+    public string Title
+    {
+        get => _title;
+        private set => SetProperty(ref _title, value);
+    }
+
+    public string StatusSummary
+    {
+        get => _statusSummary;
+        private set => SetProperty(ref _statusSummary, value);
+    }
+
+    public string ComposerPlaceholder => DefaultComposerPlaceholder;
+
+    public string ComposerText
+    {
+        get => _composerText;
+        set
+        {
+            if (!SetProperty(ref _composerText, value))
+            {
+                return;
+            }
+
+            _sendMessageCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public string FeedbackMessage
+    {
+        get => _feedbackMessage;
+        private set => SetProperty(ref _feedbackMessage, value);
+    }
+
+    public bool HasActiveSession => _selectedChat is not null;
+
+    public bool HasAgents => _agents.Count > 0;
+
+    public SessionSidebarItem? SelectedChat
+    {
+        get => _selectedChat;
+        set
+        {
+            if (!SetProperty(ref _selectedChat, value))
+            {
+                return;
+            }
+
+            RaisePropertyChanged(nameof(HasActiveSession));
+            _ = LoadSelectedSessionAsync();
+        }
+    }
+
+    private async Task LoadWorkspaceAsync()
     {
         try
         {
-            BrowserConsoleDiagnostics.Info("[DotPilot.Startup] MainViewModel constructor started.");
-            ArgumentNullException.ThrowIfNull(workbenchCatalog);
-            ArgumentNullException.ThrowIfNull(runtimeFoundationCatalog);
+            var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
+            _agents = workspace.Agents;
+            RebuildRecentChats(workspace.Sessions);
+            _startNewSessionCommand.RaiseCanExecuteChanged();
+            _sendMessageCommand.RaiseCanExecuteChanged();
 
-            Snapshot = workbenchCatalog.GetSnapshot();
-            BrowserConsoleDiagnostics.Info(
-                $"[DotPilot.Startup] MainViewModel workbench snapshot loaded. Nodes={Snapshot.RepositoryNodes.Count}, Documents={Snapshot.Documents.Count}.");
-            RuntimeFoundation = runtimeFoundationCatalog.GetSnapshot();
-            BrowserConsoleDiagnostics.Info(
-                $"[DotPilot.Startup] MainViewModel runtime foundation snapshot loaded. Providers={RuntimeFoundation.Providers.Count}.");
-            EpicLabel = WorkbenchIssues.FormatIssueLabel(WorkbenchIssues.DesktopWorkbenchEpic);
-            _documentsByPath = Snapshot.Documents.ToFrozenDictionary(document => document.RelativePath, StringComparer.OrdinalIgnoreCase);
-            _allRepositoryNodes = Snapshot.RepositoryNodes
-                .Select(MapRepositoryNode)
-                .ToArray();
-            _filteredRepositoryNodes = _allRepositoryNodes;
-
-            _selectedDocument = Snapshot.Documents.Count > 0 ? Snapshot.Documents[0] : null;
-            _editablePreviewContent = _selectedDocument?.PreviewContent ?? DefaultPreviewContent;
-
-            var initialNode = _selectedDocument is null
-                ? FindFirstOpenableNode(_allRepositoryNodes)
-                : FindNodeByRelativePath(_allRepositoryNodes, _selectedDocument.RelativePath);
-
-            if (initialNode is not null)
+            if (workspace.SelectedSessionId is { } selectedSessionId)
             {
-                SetSelectedRepositoryNode(initialNode);
+                SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == selectedSessionId);
             }
-
-            BrowserConsoleDiagnostics.Info("[DotPilot.Startup] MainViewModel constructor completed.");
+            else if (RecentChats.Count > 0)
+            {
+                SelectedChat = RecentChats[0];
+            }
+            else
+            {
+                ClearTimeline();
+                RebuildAgentPanel([]);
+                Title = EmptyTitleValue;
+                StatusSummary = HasAgents
+                    ? "Start a new session from the sidebar or send the first message."
+                    : EmptyStatusValue;
+            }
         }
         catch (Exception exception)
         {
-            BrowserConsoleDiagnostics.Error($"[DotPilot.Startup] MainViewModel constructor failed: {exception}");
-            throw;
+            FeedbackMessage = exception.Message;
         }
     }
 
-    public WorkbenchSnapshot Snapshot { get; }
-
-    public RuntimeFoundationSnapshot RuntimeFoundation { get; }
-
-    public string EpicLabel { get; }
-
-    public string PageTitle => Snapshot.SessionTitle;
-
-    public string WorkspaceName => Snapshot.WorkspaceName;
-
-    public string WorkspaceRoot => Snapshot.WorkspaceRoot;
-
-    public string SearchPlaceholder => Snapshot.SearchPlaceholder;
-
-    public string SessionStage => Snapshot.SessionStage;
-
-    public string SessionSummary => Snapshot.SessionSummary;
-
-    public IReadOnlyList<WorkbenchSessionEntry> SessionEntries => Snapshot.SessionEntries;
-
-    public IReadOnlyList<WorkbenchArtifactDescriptor> Artifacts => Snapshot.Artifacts;
-
-    public IReadOnlyList<WorkbenchLogEntry> Logs => Snapshot.Logs;
-
-    public IReadOnlyList<WorkbenchRepositoryNodeItem> FilteredRepositoryNodes
+    private async Task LoadSelectedSessionAsync()
     {
-        get => _filteredRepositoryNodes;
-        private set
+        if (_selectedChat is null)
         {
-            if (ReferenceEquals(_filteredRepositoryNodes, value))
-            {
-                return;
-            }
-
-            _filteredRepositoryNodes = value;
-            RaisePropertyChanged();
-            RaisePropertyChanged(nameof(RepositoryResultSummary));
-        }
-    }
-
-    public string RepositoryResultSummary => $"{FilteredRepositoryNodes.Count} items";
-
-    public string RepositorySearchText
-    {
-        get => _repositorySearchText;
-        set
-        {
-            if (!SetProperty(ref _repositorySearchText, value))
-            {
-                return;
-            }
-
-            UpdateFilteredRepositoryNodes();
-        }
-    }
-
-    public WorkbenchRepositoryNodeItem? SelectedRepositoryNode
-    {
-        get => _selectedRepositoryNode;
-        set => SetSelectedRepositoryNode(value);
-    }
-
-    public string SelectedDocumentTitle => _selectedDocument?.Title ?? DefaultDocumentTitle;
-
-    public string SelectedDocumentPath => _selectedDocument?.RelativePath ?? DefaultDocumentPath;
-
-    public string SelectedDocumentStatus => _selectedDocument?.StatusSummary ?? DefaultDocumentStatus;
-
-    public string SelectedDocumentLanguage => _selectedDocument?.LanguageLabel ?? DefaultLanguageLabel;
-
-    public string SelectedDocumentRenderer => _selectedDocument?.RendererLabel ?? DefaultRendererLabel;
-
-    public bool SelectedDocumentIsReadOnly => _selectedDocument?.IsReadOnly ?? true;
-
-    public IReadOnlyList<WorkbenchDiffLine> SelectedDocumentDiffLines => _selectedDocument?.DiffLines ?? [];
-
-    public string EditablePreviewContent
-    {
-        get => _editablePreviewContent;
-        set => SetProperty(ref _editablePreviewContent, value);
-    }
-
-    public bool IsDiffReviewMode
-    {
-        get => _isDiffReviewMode;
-        set
-        {
-            if (!SetProperty(ref _isDiffReviewMode, value))
-            {
-                return;
-            }
-
-            RaisePropertyChanged(nameof(IsPreviewMode));
-        }
-    }
-
-    public bool IsPreviewMode => !IsDiffReviewMode;
-
-    public bool IsLogConsoleVisible
-    {
-        get => _isLogConsoleVisible;
-        set
-        {
-            if (!SetProperty(ref _isLogConsoleVisible, value))
-            {
-                return;
-            }
-
-            RaisePropertyChanged(nameof(IsArtifactsVisible));
-            RaisePropertyChanged(nameof(InspectorTitle));
-            RaisePropertyChanged(nameof(InspectorSummary));
-        }
-    }
-
-    public bool IsArtifactsVisible => !IsLogConsoleVisible;
-
-    public string InspectorTitle => IsLogConsoleVisible ? DefaultInspectorLogsTitle : DefaultInspectorArtifactsTitle;
-
-    public string InspectorSummary => IsLogConsoleVisible ? DefaultInspectorLogsSummary : DefaultInspectorArtifactsSummary;
-
-    private static WorkbenchRepositoryNodeItem MapRepositoryNode(WorkbenchRepositoryNode node)
-    {
-        var kindGlyph = node.IsDirectory ? "▾" : "•";
-        var indentMargin = new Thickness(node.Depth * IndentSize, 0d, 0d, 0d);
-        var automationId = PresentationAutomationIds.RepositoryNode(node.RelativePath);
-        var tapAutomationId = PresentationAutomationIds.RepositoryNodeTap(node.RelativePath);
-
-        return new(
-            node.RelativePath,
-            node.Name,
-            node.DisplayLabel,
-            node.IsDirectory,
-            node.CanOpen,
-            kindGlyph,
-            indentMargin,
-            automationId,
-            tapAutomationId);
-    }
-
-    private void UpdateFilteredRepositoryNodes()
-    {
-        var searchTerms = RepositorySearchText.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        FilteredRepositoryNodes = searchTerms.Length is 0
-            ? _allRepositoryNodes
-            : _allRepositoryNodes
-                .Where(node => searchTerms.All(term =>
-                    node.DisplayLabel.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    node.Name.Contains(term, StringComparison.OrdinalIgnoreCase)))
-                .ToArray();
-
-        if (_selectedRepositoryNode is null ||
-            !FilteredRepositoryNodes.Contains(_selectedRepositoryNode))
-        {
-            SetSelectedRepositoryNode(FindFirstOpenableNode(FilteredRepositoryNodes));
-        }
-    }
-
-    private static WorkbenchRepositoryNodeItem? FindFirstOpenableNode(IReadOnlyList<WorkbenchRepositoryNodeItem> nodes)
-    {
-        for (var index = 0; index < nodes.Count; index++)
-        {
-            if (nodes[index].CanOpen)
-            {
-                return nodes[index];
-            }
+            ClearTimeline();
+            RebuildAgentPanel([]);
+            Title = EmptyTitleValue;
+            StatusSummary = HasAgents
+                ? "Start a new session from the sidebar or send the first message."
+                : EmptyStatusValue;
+            _sendMessageCommand.RaiseCanExecuteChanged();
+            return;
         }
 
-        return nodes.Count > 0 ? nodes[0] : null;
-    }
-
-    private static WorkbenchRepositoryNodeItem? FindNodeByRelativePath(
-        IReadOnlyList<WorkbenchRepositoryNodeItem> nodes,
-        string relativePath)
-    {
-        for (var index = 0; index < nodes.Count; index++)
-        {
-            if (nodes[index].RelativePath.Equals(relativePath, StringComparison.OrdinalIgnoreCase))
-            {
-                return nodes[index];
-            }
-        }
-
-        return null;
-    }
-
-    private void SetSelectedRepositoryNode(WorkbenchRepositoryNodeItem? value)
-    {
-        if (!SetProperty(ref _selectedRepositoryNode, value, nameof(SelectedRepositoryNode)))
+        var snapshot = await _agentSessionService.GetSessionAsync(_selectedChat.Id, CancellationToken.None);
+        if (snapshot is null)
         {
             return;
         }
 
-        if (value?.CanOpen != true ||
-            !_documentsByPath.TryGetValue(value.RelativePath, out var selectedDocument))
+        Title = snapshot.Session.Title;
+        StatusSummary = $"{snapshot.Session.PrimaryAgentName} · {snapshot.Session.ProviderDisplayName}";
+        RebuildTimeline(snapshot.Entries);
+        RebuildAgentPanel(snapshot.Participants);
+    }
+
+    private async Task StartNewSessionAsync()
+    {
+        if (_agents.Count == 0)
+        {
+            FeedbackMessage = "Create at least one agent before starting a session.";
+            return;
+        }
+
+        var agent = _agents[0];
+        var session = await _agentSessionService.CreateSessionAsync(
+            new CreateSessionCommand($"Session with {agent.Name}", agent.Id),
+            CancellationToken.None);
+        await LoadWorkspaceAsync();
+        SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == session.Session.Id);
+    }
+
+    private async Task SendMessageAsync()
+    {
+        var message = ComposerText.Trim();
+        if (string.IsNullOrWhiteSpace(message))
         {
             return;
         }
 
-        _selectedDocument = selectedDocument;
-        EditablePreviewContent = selectedDocument.PreviewContent;
-        RaisePropertyChanged(nameof(SelectedDocumentTitle));
-        RaisePropertyChanged(nameof(SelectedDocumentPath));
-        RaisePropertyChanged(nameof(SelectedDocumentStatus));
-        RaisePropertyChanged(nameof(SelectedDocumentLanguage));
-        RaisePropertyChanged(nameof(SelectedDocumentRenderer));
-        RaisePropertyChanged(nameof(SelectedDocumentIsReadOnly));
-        RaisePropertyChanged(nameof(SelectedDocumentDiffLines));
+        ComposerText = string.Empty;
+        FeedbackMessage = SendInProgressMessage;
+
+        try
+        {
+            if (SelectedChat is null)
+            {
+                await StartNewSessionAsync();
+                if (SelectedChat is null)
+                {
+                    return;
+                }
+            }
+
+            await foreach (var entry in _agentSessionService.SendMessageAsync(
+                               new SendSessionMessageCommand(SelectedChat.Id, message),
+                               CancellationToken.None))
+            {
+                ApplyTimelineEntry(entry);
+            }
+
+            await LoadWorkspaceAsync();
+            SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == SelectedChat?.Id);
+            FeedbackMessage = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            FeedbackMessage = exception.Message;
+        }
+    }
+
+    private bool CanSendMessage()
+    {
+        return !string.IsNullOrWhiteSpace(ComposerText) && HasAgents;
+    }
+
+    private bool CanStartNewSession()
+    {
+        return HasAgents;
+    }
+
+    private void RebuildRecentChats(IReadOnlyList<SessionListItem> sessions)
+    {
+        RecentChats.Clear();
+        foreach (var session in sessions)
+        {
+            RecentChats.Add(new SessionSidebarItem(session.Id, session.Title, session.Preview));
+        }
+    }
+
+    private void RebuildTimeline(IReadOnlyList<SessionStreamEntry> entries)
+    {
+        Messages.Clear();
+        _timelineIndexById.Clear();
+        foreach (var entry in entries)
+        {
+            ApplyTimelineEntry(entry);
+        }
+    }
+
+    private void ClearTimeline()
+    {
+        Messages.Clear();
+        _timelineIndexById.Clear();
+    }
+
+    private void ApplyTimelineEntry(SessionStreamEntry entry)
+    {
+        var timelineItem = MapTimelineItem(entry);
+        if (_timelineIndexById.TryGetValue(entry.Id, out var existingIndex))
+        {
+            Messages[existingIndex] = timelineItem;
+            return;
+        }
+
+        _timelineIndexById[entry.Id] = Messages.Count;
+        Messages.Add(timelineItem);
+    }
+
+    private void RebuildAgentPanel(IReadOnlyList<AgentProfileSummary> agents)
+    {
+        Agents.Clear();
+        foreach (var agent in agents)
+        {
+            Agents.Add(
+                new ParticipantItem(
+                    agent.Name,
+                    $"{agent.ProviderDisplayName} · {agent.ModelName}",
+                    GetInitial(agent.Name),
+                    ResolveAgentBrush(agent.ProviderKind),
+                    agent.Role.ToString(),
+                    DesignBrushPalette.BadgeSurfaceBrush));
+        }
+    }
+
+    private static ChatTimelineItem MapTimelineItem(SessionStreamEntry entry)
+    {
+        var isCurrentUser = entry.Kind == SessionStreamEntryKind.UserMessage;
+        var author = entry.Author;
+        var initial = GetInitial(author);
+        var avatarBrush = ResolveTimelineBrush(entry);
+        var accentLabel = entry.AccentLabel;
+
+        return new ChatTimelineItem(
+            entry.Id,
+            entry.Kind,
+            author,
+            entry.Timestamp.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture),
+            entry.Text,
+            initial,
+            avatarBrush,
+            isCurrentUser,
+            accentLabel);
+    }
+
+    private static string GetInitial(string value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? "?"
+            : value.Trim()[0].ToString(CultureInfo.InvariantCulture).ToUpperInvariant();
+    }
+
+    private static Brush? ResolveTimelineBrush(SessionStreamEntry entry)
+    {
+        return entry.Kind switch
+        {
+            SessionStreamEntryKind.UserMessage => DesignBrushPalette.UserAvatarBrush,
+            SessionStreamEntryKind.ToolStarted or SessionStreamEntryKind.ToolCompleted => DesignBrushPalette.AnalyticsAvatarBrush,
+            SessionStreamEntryKind.Status => DesignBrushPalette.AvatarVariantEmilyBrush,
+            SessionStreamEntryKind.Error => DesignBrushPalette.AvatarVariantFrankBrush,
+            _ => DesignBrushPalette.CodeAvatarBrush,
+        };
+    }
+
+    private static Brush? ResolveAgentBrush(AgentProviderKind providerKind)
+    {
+        return providerKind switch
+        {
+            AgentProviderKind.Debug => DesignBrushPalette.DesignAvatarBrush,
+            AgentProviderKind.Codex => DesignBrushPalette.CodeAvatarBrush,
+            AgentProviderKind.ClaudeCode => DesignBrushPalette.AnalyticsAvatarBrush,
+            AgentProviderKind.GitHubCopilot => DesignBrushPalette.AvatarVariantDanishBrush,
+            _ => DesignBrushPalette.CodeAvatarBrush,
+        };
     }
 }

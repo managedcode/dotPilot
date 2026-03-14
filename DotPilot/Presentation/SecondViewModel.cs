@@ -1,70 +1,205 @@
+using System.Collections.ObjectModel;
+using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
+
 namespace DotPilot.Presentation;
 
-public sealed class SecondViewModel
+public sealed class SecondViewModel : ObservableObject
 {
-    public SecondViewModel(IRuntimeFoundationCatalog runtimeFoundationCatalog)
+    private const string AgentValidationMessage = "Enter an agent name and model before creating the profile.";
+    private const string AgentCreationProgressMessage = "Creating agent profile...";
+    private readonly IAgentSessionService _agentSessionService;
+    private readonly AsyncCommand _createAgentCommand;
+    private readonly ObservableCollection<RoleOption> _roleOptions;
+    private readonly ObservableCollection<CapabilityOption> _capabilityOptions;
+    private readonly ObservableCollection<AgentProviderOption> _providerOptions;
+    private string _agentName = "Debug Agent";
+    private string _modelName = "debug-echo";
+    private string _systemPrompt =
+        "You are a helpful local desktop agent. Be explicit about what you are doing and stream visible progress.";
+    private string _statusMessage = "Loading provider readiness...";
+    private AgentProviderOption? _selectedProvider;
+
+    public SecondViewModel(IAgentSessionService agentSessionService)
     {
-        ArgumentNullException.ThrowIfNull(runtimeFoundationCatalog);
-        RuntimeFoundation = runtimeFoundationCatalog.GetSnapshot();
+        _agentSessionService = agentSessionService;
+        _providerOptions = [];
+        _roleOptions =
+        [
+            new RoleOption("Assistant", AgentRoleKind.Operator, true),
+            new RoleOption("Coder", AgentRoleKind.Coding, false),
+            new RoleOption("Researcher", AgentRoleKind.Research, false),
+            new RoleOption("Reviewer", AgentRoleKind.Reviewer, false),
+        ];
+        _capabilityOptions =
+        [
+            new CapabilityOption("Web", "Web research and browsing workflows.", true),
+            new CapabilityOption("Shell", "Terminal-style command execution.", true),
+            new CapabilityOption("Git", "Repository status, diff, and branch operations.", true),
+            new CapabilityOption("Files", "Read and update local files.", true),
+        ];
+
+        _createAgentCommand = new AsyncCommand(CreateAgentAsync);
+        _ = LoadProvidersAsync();
     }
 
-    public string PageTitle { get; } = "Create New Agent";
+    public ObservableCollection<AgentProviderOption> Providers => _providerOptions;
 
-    public string PageSubtitle { get; } = "Configure your AI agent's capabilities, model, and behavior";
+    public ObservableCollection<RoleOption> Roles => _roleOptions;
 
-    public RuntimeFoundationSnapshot RuntimeFoundation { get; }
+    public ObservableCollection<CapabilityOption> Capabilities => _capabilityOptions;
 
-    public string SystemPrompt { get; } =
-        """
-        You are a helpful AI assistant. Your role is to...
+    public ICommand CreateAgentCommand => _createAgentCommand;
 
-        Key behaviors:
-        • Be concise, clear, and accurate
-        • Ask clarifying questions when requirements are ambiguous
-        • Always cite sources when providing facts or statistics
-        • Format responses using markdown when appropriate
-        """;
+    public string PageTitle => "Create agent";
 
-    public string TokenSummary { get; } = "0 / 4,096 tokens";
+    public string PageSubtitle => "Choose a provider, role, model, and capabilities for a local agent profile.";
 
-    public IReadOnlyList<AgentMenuItem> ExistingAgents { get; } =
-    [
-        new("Design Agent", "Claude 3.5 · v1.0", "D", DesignBrushPalette.DesignAvatarBrush),
-        new("Code Agent", "GPT-4o", "C", DesignBrushPalette.CodeAvatarBrush),
-        new("Analytics Agent", "Claude 3.5 · v1.0", "A", DesignBrushPalette.AnalyticsAvatarBrush),
-    ];
+    public string AgentName
+    {
+        get => _agentName;
+        set
+        {
+            if (!SetProperty(ref _agentName, value))
+            {
+                return;
+            }
 
-    public IReadOnlyList<AgentTypeOption> AgentTypes { get; } =
-    [
-        new("Assistant", true),
-        new("Analyst", false),
-        new("Executor", false),
-        new("Orchestrator", false),
-    ];
+            _createAgentCommand.RaiseCanExecuteChanged();
+        }
+    }
 
-    public IReadOnlyList<AvatarOption> AvatarOptions { get; } =
-    [
-        new("A", DesignBrushPalette.DesignAvatarBrush),
-        new("B", DesignBrushPalette.CodeAvatarBrush),
-        new("C", DesignBrushPalette.AnalyticsAvatarBrush),
-        new("D", DesignBrushPalette.AvatarVariantDanishBrush),
-        new("E", DesignBrushPalette.AvatarVariantEmilyBrush),
-        new("F", DesignBrushPalette.AvatarVariantFrankBrush),
-    ];
+    public string ModelName
+    {
+        get => _modelName;
+        set
+        {
+            if (!SetProperty(ref _modelName, value))
+            {
+                return;
+            }
 
-    public IReadOnlyList<string> PromptTemplates { get; } =
-    [
-        "Research assistant",
-        "Customer support specialist",
-        "Code review expert",
-    ];
+            _createAgentCommand.RaiseCanExecuteChanged();
+        }
+    }
 
-    public IReadOnlyList<SkillToggleItem> Skills { get; } =
-    [
-        new("Web Search", "Search the internet for current information and news", "⌘", true),
-        new("Code Execution", "Run Python, JavaScript, and shell scripts in sandbox", "</>", true),
-        new("File Analysis", "Read, parse, and summarize uploaded documents", "▣", false),
-        new("Database Access", "Query and modify SQL/NoSQL database records", "◫", false),
-        new("API Calls", "Connect to external REST APIs and webhooks", "⇄", true),
-    ];
+    public string SystemPrompt
+    {
+        get => _systemPrompt;
+        set => SetProperty(ref _systemPrompt, value);
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetProperty(ref _statusMessage, value);
+    }
+
+    public AgentProviderOption? SelectedProvider
+    {
+        get => _selectedProvider;
+        set
+        {
+            if (!SetProperty(ref _selectedProvider, value))
+            {
+                return;
+            }
+
+            if (value is not null)
+            {
+                ModelName = string.IsNullOrWhiteSpace(value.InstalledVersion)
+                    ? ResolveDefaultModel(value.Kind)
+                    : ModelName;
+
+                StatusMessage = value.CanCreateAgents
+                    ? $"Ready to create an agent with {value.DisplayName}."
+                    : value.StatusSummary;
+            }
+
+            _createAgentCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
+        _providerOptions.Clear();
+
+        foreach (var provider in workspace.Providers)
+        {
+            _providerOptions.Add(
+                new AgentProviderOption(
+                    provider.Kind,
+                    provider.DisplayName,
+                    provider.CommandName,
+                    provider.StatusSummary,
+                    provider.InstalledVersion,
+                    provider.CanCreateAgents));
+        }
+
+        SelectedProvider = _providerOptions.FirstOrDefault(option => option.CanCreateAgents) ??
+            _providerOptions.FirstOrDefault();
+    }
+
+    private async Task CreateAgentAsync()
+    {
+        if (SelectedProvider is null)
+        {
+            StatusMessage = "Wait for provider readiness before creating an agent.";
+            return;
+        }
+
+        if (!SelectedProvider.CanCreateAgents)
+        {
+            StatusMessage = SelectedProvider.StatusSummary;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(AgentName) || string.IsNullOrWhiteSpace(ModelName))
+        {
+            StatusMessage = AgentValidationMessage;
+            return;
+        }
+
+        StatusMessage = AgentCreationProgressMessage;
+
+        try
+        {
+            var created = await _agentSessionService.CreateAgentAsync(
+                new CreateAgentProfileCommand(
+                    AgentName.Trim(),
+                    ResolveSelectedRole(),
+                    SelectedProvider.Kind,
+                    ModelName.Trim(),
+                    SystemPrompt.Trim(),
+                    _capabilityOptions
+                        .Where(option => option.IsEnabled)
+                        .Select(option => option.Name)
+                        .ToArray()),
+                CancellationToken.None);
+
+            StatusMessage = $"Created {created.Name} using {created.ProviderDisplayName}.";
+            AgentName = $"{created.Name} Copy";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = exception.Message;
+        }
+    }
+
+    private AgentRoleKind ResolveSelectedRole()
+    {
+        return _roleOptions.FirstOrDefault(option => option.IsSelected)?.Role ?? AgentRoleKind.Operator;
+    }
+
+    private static string ResolveDefaultModel(AgentProviderKind kind)
+    {
+        return kind switch
+        {
+            AgentProviderKind.Codex => "gpt-5",
+            AgentProviderKind.ClaudeCode => "claude-sonnet-4-5",
+            AgentProviderKind.GitHubCopilot => "gpt-5",
+            _ => "debug-echo",
+        };
+    }
 }

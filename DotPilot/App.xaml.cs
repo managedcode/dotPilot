@@ -1,9 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using DotPilot.Runtime.Features.RuntimeFoundation;
+using DotPilot.Runtime.Features.AgentSessions;
 #if !__WASM__
-using DotPilot.Runtime.Host.Features.RuntimeFoundation;
+using DotPilot.Runtime.Host.Features.AgentSessions;
 #endif
 
 namespace DotPilot;
@@ -57,7 +57,7 @@ public partial class App : Application
                     .UseEnvironment(Environments.Development)
 #endif
 #if !__WASM__
-                    .UseDotPilotEmbeddedRuntime()
+                    .UseDotPilotAgentSessions()
 #endif
                     .UseLogging(configure: (context, logBuilder) =>
                     {
@@ -108,18 +108,8 @@ public partial class App : Application
                     .ConfigureServices((context, services) =>
                     {
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.Workbench.IWorkbenchCatalog,
-                                DotPilot.Runtime.Features.Workbench.WorkbenchCatalog>(services);
-#if !__WASM__
-                        services.AddDesktopRuntimeFoundation();
-#else
-                        services.AddBrowserRuntimeFoundation();
-#endif
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.ToolchainCenter.IToolchainCenterCatalog,
-                                DotPilot.Runtime.Features.ToolchainCenter.ToolchainCenterCatalog>(services);
+                            .AddSingleton(services, TimeProvider.System);
+                        services.AddAgentSessions();
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                             .AddTransient<ShellViewModel>(services);
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
