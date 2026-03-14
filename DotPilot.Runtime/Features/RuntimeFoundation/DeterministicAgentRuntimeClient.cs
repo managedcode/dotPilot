@@ -1,5 +1,4 @@
 using DotPilot.Core.Features.ControlPlaneDomain;
-using DotPilot.Core.Features.RuntimeCommunication;
 using DotPilot.Core.Features.RuntimeFoundation;
 using ManagedCode.Communication;
 
@@ -7,82 +6,34 @@ namespace DotPilot.Runtime.Features.RuntimeFoundation;
 
 public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
 {
-    private const string ApprovalKeyword = "approval";
-    private const string DeterministicProviderDisplayName = "Deterministic Runtime Client";
-    private const string PlanSummary =
-        "Planned the runtime foundation flow with contracts first, then communication, host lifecycle, and orchestration.";
-    private const string ExecuteSummary =
-        "Executed the provider-independent runtime path with the deterministic client and produced the expected artifact manifest.";
-    private const string PendingApprovalSummary =
-        "The deterministic runtime path paused because the prompt explicitly requested an approval checkpoint.";
-    private const string ReviewSummary =
-        "Reviewed the runtime foundation output and confirmed the slice is ready for the next implementation branch.";
-    private const string PlanArtifact = "runtime-foundation.plan.md";
-    private const string ExecuteArtifact = "runtime-foundation.snapshot.json";
-    private const string ReviewArtifact = "runtime-foundation.review.md";
+    private readonly DeterministicAgentTurnEngine _engine;
+
+    public DeterministicAgentRuntimeClient()
+        : this(TimeProvider.System)
+    {
+    }
+
+    internal DeterministicAgentRuntimeClient(TimeProvider timeProvider)
+    {
+        _engine = new DeterministicAgentTurnEngine(timeProvider);
+    }
 
     public ValueTask<Result<AgentTurnResult>> ExecuteAsync(AgentTurnRequest request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(request.Prompt))
-        {
-            return ValueTask.FromResult(Result<AgentTurnResult>.Fail(RuntimeCommunicationProblems.InvalidPrompt()));
-        }
-
-        if (request.ProviderStatus is not ProviderConnectionStatus.Available)
-        {
-            return ValueTask.FromResult(
-                Result<AgentTurnResult>.Fail(
-                    RuntimeCommunicationProblems.ProviderUnavailable(
-                        request.ProviderStatus,
-                        DeterministicProviderDisplayName)));
-        }
-
-        return ValueTask.FromResult(request.Mode switch
-        {
-            AgentExecutionMode.Plan => Result<AgentTurnResult>.Succeed(
-                new AgentTurnResult(
-                    PlanSummary,
-                    SessionPhase.Plan,
-                    ApprovalState.NotRequired,
-                    [CreateArtifact(request.SessionId, PlanArtifact, ArtifactKind.Plan)])),
-            AgentExecutionMode.Execute when RequiresApproval(request.Prompt) => Result<AgentTurnResult>.Succeed(
-                new AgentTurnResult(
-                    PendingApprovalSummary,
-                    SessionPhase.Paused,
-                    ApprovalState.Pending,
-                    [CreateArtifact(request.SessionId, ExecuteArtifact, ArtifactKind.Snapshot)])),
-            AgentExecutionMode.Execute => Result<AgentTurnResult>.Succeed(
-                new AgentTurnResult(
-                    ExecuteSummary,
-                    SessionPhase.Execute,
-                    ApprovalState.NotRequired,
-                    [CreateArtifact(request.SessionId, ExecuteArtifact, ArtifactKind.Snapshot)])),
-            AgentExecutionMode.Review => Result<AgentTurnResult>.Succeed(
-                new AgentTurnResult(
-                    ReviewSummary,
-                    SessionPhase.Review,
-                    ApprovalState.Approved,
-                    [CreateArtifact(request.SessionId, ReviewArtifact, ArtifactKind.Report)])),
-            _ => Result<AgentTurnResult>.Fail(RuntimeCommunicationProblems.OrchestrationUnavailable()),
-        });
+        return ValueTask.FromResult(_engine.Execute(request));
     }
 
-    private static bool RequiresApproval(string prompt)
+    public ValueTask<Result<AgentTurnResult>> ResumeAsync(AgentTurnResumeRequest request, CancellationToken cancellationToken)
     {
-        return prompt.Contains(ApprovalKeyword, StringComparison.OrdinalIgnoreCase);
+        cancellationToken.ThrowIfCancellationRequested();
+        _ = request;
+        return ValueTask.FromResult(Result<AgentTurnResult>.Fail(DotPilot.Core.Features.RuntimeCommunication.RuntimeCommunicationProblems.OrchestrationUnavailable()));
     }
 
-    private static ArtifactDescriptor CreateArtifact(SessionId sessionId, string artifactName, ArtifactKind artifactKind)
+    public ValueTask<Result<RuntimeSessionArchive>> GetSessionArchiveAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
-        return new ArtifactDescriptor
-        {
-            Id = ArtifactId.New(),
-            SessionId = sessionId,
-            Name = artifactName,
-            Kind = artifactKind,
-            RelativePath = artifactName,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(Result<RuntimeSessionArchive>.Fail(DotPilot.Core.Features.RuntimeCommunication.RuntimeCommunicationProblems.SessionArchiveMissing(sessionId)));
     }
 }

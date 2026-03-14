@@ -17,12 +17,14 @@ public class RuntimeFoundationCatalogTests
         var snapshot = catalog.GetSnapshot();
 
         snapshot.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
-        snapshot.Slices.Should().HaveCount(4);
+        snapshot.Slices.Should().HaveCount(6);
         snapshot.Slices.Select(slice => slice.IssueNumber).Should().ContainInOrder(
             RuntimeFoundationIssues.DomainModel,
             RuntimeFoundationIssues.CommunicationContracts,
             RuntimeFoundationIssues.EmbeddedOrleansHost,
-            RuntimeFoundationIssues.AgentFrameworkRuntime);
+            RuntimeFoundationIssues.AgentFrameworkRuntime,
+            RuntimeFoundationIssues.GrainTrafficPolicy,
+            RuntimeFoundationIssues.SessionPersistence);
     }
 
     [Test]
@@ -146,6 +148,31 @@ public class RuntimeFoundationCatalogTests
         result.HasProblem.Should().BeTrue();
         problem.HasErrorCode(RuntimeCommunicationProblemCode.ProviderUnavailable).Should().BeTrue();
         problem.StatusCode.Should().Be((int)System.Net.HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Test]
+    public async Task DeterministicClientReturnsOrchestrationUnavailableForResume()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+
+        var result = await client.ResumeAsync(
+            new AgentTurnResumeRequest(SessionId.New(), ApprovalState.Approved, "Approved."),
+            CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.OrchestrationUnavailable).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task DeterministicClientReturnsMissingArchiveProblemForArchiveQueries()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var sessionId = SessionId.New();
+
+        var result = await client.GetSessionArchiveAsync(sessionId, CancellationToken.None);
+
+        result.IsFailed.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.SessionArchiveMissing).Should().BeTrue();
     }
 
     [TestCase(CodexCommandName)]

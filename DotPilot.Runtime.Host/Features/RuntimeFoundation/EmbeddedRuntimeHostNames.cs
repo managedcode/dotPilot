@@ -7,6 +7,8 @@ internal static class EmbeddedRuntimeHostNames
     public const int DefaultSiloPort = 11_111;
     public const int DefaultGatewayPort = 30_000;
     public const string GrainStorageProviderName = "runtime-foundation-memory";
+    public const string ClientSourceName = "Client";
+    public const string ClientSourceMethodName = "Invoke";
     public const string SessionStateName = "session";
     public const string WorkspaceStateName = "workspace";
     public const string FleetStateName = "fleet";

@@ -7,7 +7,7 @@ namespace DotPilot.Runtime.Features.RuntimeFoundation;
 public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
 {
     private const string EpicSummary =
-        "Issue #12 is staged into isolated contracts, communication, host, and orchestration slices so the Uno workbench can stay presentation-only.";
+        "The embedded runtime stays local-first by isolating contracts, host wiring, orchestration, policy, and durable session archives away from the Uno presentation layer.";
     private const string DeterministicProbePrompt =
         "Summarize the runtime foundation readiness for a local-first session that may require approval.";
     private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
@@ -22,7 +22,13 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         "The Orleans host integration point is sequenced behind dedicated runtime contracts instead of being baked into page code.";
     private const string OrchestrationName = "Orchestration runtime";
     private const string OrchestrationSummary =
-        "Agent Framework integration is prepared as a separate slice that can plug into the embedded host without reshaping the UI layer.";
+        "Agent Framework orchestrates local runs, approvals, and checkpoints without moving execution logic into the Uno app.";
+    private const string TrafficPolicyName = "Traffic policy";
+    private const string TrafficPolicySummary =
+        "Allowed grain transitions are explicit, testable, and visualized through Orleans.Graph instead of hidden conventions.";
+    private const string SessionPersistenceName = "Session persistence";
+    private const string SessionPersistenceSummary =
+        "Checkpoint, replay, and resume data survive host restarts in local session archives without changing the Orleans storage topology.";
 
     public RuntimeFoundationSnapshot GetSnapshot()
     {
@@ -62,6 +68,18 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
                 RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.AgentFrameworkRuntime),
                 OrchestrationName,
                 OrchestrationSummary,
+                RuntimeSliceState.Sequenced),
+            new(
+                RuntimeFoundationIssues.GrainTrafficPolicy,
+                RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.GrainTrafficPolicy),
+                TrafficPolicyName,
+                TrafficPolicySummary,
+                RuntimeSliceState.Sequenced),
+            new(
+                RuntimeFoundationIssues.SessionPersistence,
+                RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.SessionPersistence),
+                SessionPersistenceName,
+                SessionPersistenceSummary,
                 RuntimeSliceState.Sequenced),
         ];
     }

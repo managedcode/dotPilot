@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using DotPilot.Runtime.Features.RuntimeFoundation;
 #if !__WASM__
 using DotPilot.Runtime.Host.Features.RuntimeFoundation;
 #endif
@@ -110,14 +111,11 @@ public partial class App : Application
                             .AddSingleton<
                                 DotPilot.Core.Features.Workbench.IWorkbenchCatalog,
                                 DotPilot.Runtime.Features.Workbench.WorkbenchCatalog>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.RuntimeFoundation.IAgentRuntimeClient,
-                                DotPilot.Runtime.Features.RuntimeFoundation.DeterministicAgentRuntimeClient>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.RuntimeFoundation.IRuntimeFoundationCatalog,
-                                DotPilot.Runtime.Features.RuntimeFoundation.RuntimeFoundationCatalog>(services);
+#if !__WASM__
+                        services.AddDesktopRuntimeFoundation();
+#else
+                        services.AddBrowserRuntimeFoundation();
+#endif
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                             .AddSingleton<
                                 DotPilot.Core.Features.ToolchainCenter.IToolchainCenterCatalog,
