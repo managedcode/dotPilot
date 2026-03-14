@@ -43,6 +43,16 @@ public static class EmbeddedRuntimeHostBuilderExtensions
             cluster.ClusterId = options.ClusterId;
             cluster.ServiceId = options.ServiceId;
         });
+        siloBuilder.AddStartupTask(
+            static (serviceProvider, _) =>
+            {
+                serviceProvider
+                    .GetRequiredService<EmbeddedRuntimeHostCatalog>()
+                    .SetState(EmbeddedRuntimeHostState.Running);
+
+                return Task.CompletedTask;
+            },
+            ServiceLifecycleStage.Active);
         siloBuilder.AddMemoryGrainStorage(EmbeddedRuntimeHostNames.GrainStorageProviderName);
         siloBuilder.UseInMemoryReminderService();
     }
