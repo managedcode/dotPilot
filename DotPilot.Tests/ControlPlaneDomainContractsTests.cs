@@ -97,8 +97,8 @@ public class ControlPlaneDomainContractsTests
         {
             Id = WorkspaceId.New(),
             Name = "dotPilot",
-            RootPath = "/Users/ksemenenko/Developer/dotPilot",
-            BranchName = "codex/issue-22-domain-model",
+            RootPath = "/repo/dotPilot",
+            BranchName = "codex/epic-11-foundation-contracts",
         };
 
         var codingAgent = new AgentProfileDescriptor

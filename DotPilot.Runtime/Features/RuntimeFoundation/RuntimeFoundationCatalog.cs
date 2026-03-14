@@ -7,7 +7,7 @@ namespace DotPilot.Runtime.Features.RuntimeFoundation;
 public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
 {
     private const string EpicSummary =
-        "Issue #12 is staged into isolated contracts, communication, host, and orchestration slices so the Uno workbench can stay presentation-only.";
+        "Issue #12 builds on the #11 foundation contracts and stages host and orchestration work behind isolated runtime slices so the Uno app stays presentation-only.";
     private const string DeterministicProbePrompt =
         "Summarize the runtime foundation readiness for a local-first session that may require approval.";
     private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";

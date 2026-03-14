@@ -32,7 +32,7 @@ We will use these architectural defaults for implementation work going forward:
    - `DotPilot.Core` for contracts, typed identifiers, and public slice interfaces
    - `DotPilot.Runtime` for provider-independent runtime implementations and future host integration seams
 3. Feature code must be organized as vertical slices under `Features/<FeatureName>/...`, not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
-4. Epic `#12` starts with a `RuntimeFoundation` slice that sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface before live Orleans or provider integration.
+4. Epic `#11` establishes the shared `ControlPlaneDomain` and `RuntimeCommunication` slices, and epic `#12` builds on that foundation for runtime-host and orchestration work.
 5. CI-safe agent-flow verification must use a deterministic in-repo runtime client as a first-class implementation of the same public contracts, not a mock or hand-wired test double.
 6. Tests that require real `Codex`, `Claude Code`, or `GitHub Copilot` toolchains may run only when the corresponding toolchain is available; their absence must not weaken the provider-independent baseline.
 
@@ -81,7 +81,7 @@ CI does not guarantee those toolchains, so the repo would lose an honest agent-f
 
 - The Uno app gets cleaner and stays focused on operator-facing concerns.
 - Future slices can land without merging unrelated feature logic into shared buckets.
-- Contracts for `#12` become reusable across UI, runtime, and tests.
+- Contracts from epic `#11` become reusable across UI, runtime, and tests before epic `#12` begins live runtime integration.
 - CI keeps a real provider-independent verification path through the deterministic runtime client.
 
 ### Negative

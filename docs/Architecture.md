@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, the workbench foundation for epic `#13`, the Toolchain Center for epic `#14`, and the vertical-slice runtime foundation that starts epic `#12`.
+Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, the foundation contracts from epic `#11`, the workbench foundation for epic `#13`, the Toolchain Center for epic `#14`, and the runtime-host backlog that builds on those contracts in epic `#12`.
 
 This file is the required start-here architecture map for non-trivial tasks.
 
@@ -10,15 +10,14 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
 - **Workbench boundary:** epic [#13](https://github.com/managedcode/dotPilot/issues/13) is landing as a `Workbench` slice that will provide repository navigation, file inspection, artifact and log inspection, and a unified settings shell without moving that behavior into page code-behind.
 - **Toolchain Center boundary:** epic [#14](https://github.com/managedcode/dotPilot/issues/14) now lives as a `ToolchainCenter` slice. [../DotPilot.Core/Features/ToolchainCenter](../DotPilot.Core/Features/ToolchainCenter) defines the readiness, diagnostics, configuration, action, and polling contracts; [../DotPilot.Runtime/Features/ToolchainCenter](../DotPilot.Runtime/Features/ToolchainCenter) probes local provider CLIs for `Codex`, `Claude Code`, and `GitHub Copilot`; the Uno app surfaces the slice through the settings shell.
+- **Foundation contract boundary:** epic [#11](https://github.com/managedcode/dotPilot/issues/11) is represented through [../DotPilot.Core/Features/ControlPlaneDomain](../DotPilot.Core/Features/ControlPlaneDomain) and [../DotPilot.Core/Features/RuntimeCommunication](../DotPilot.Core/Features/RuntimeCommunication). These slices define the shared agent/session/tool model and the `ManagedCode.Communication` result/problem language that later runtime work reuses.
 - **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, and public slice interfaces; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic test client, toolchain probing, and future embedded-host integration points.
-- **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
-- **Communication slice boundary:** issue [#23](https://github.com/managedcode/dotPilot/issues/23) lives in `DotPilot.Core/Features/RuntimeCommunication`, which defines the shared `ManagedCode.Communication` result/problem language for runtime public boundaries.
-- **First implementation slice:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) is represented locally through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, and `#25` behind a stable contract surface instead of mixing runtime work into the Uno app.
+- **Embedded runtime backlog boundary:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) now builds on the epic `#11` foundation contracts through the `RuntimeFoundation` slice instead of treating issues `#22` and `#23` as runtime-host work.
 - **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow, Toolchain Center, and runtime-foundation UI surface. Provider-independent flows must pass in CI through deterministic or environment-agnostic checks, while provider-specific checks can run only when the matching toolchain is available.
 
 ## Scoping
 
-- **In scope for the current repository state:** the Uno workbench shell, the new `DotPilot.Core` and `DotPilot.Runtime` libraries, the runtime-foundation slice, and the automated validation boundaries around them.
+- **In scope for the current repository state:** the Uno workbench shell, the `DotPilot.Core` and `DotPilot.Runtime` libraries, the epic `#11` foundation-contract slices, the runtime-foundation planning surface for epic `#12`, and the automated validation boundaries around them.
 - **In scope for future implementation:** embedded Orleans hosting, `Microsoft Agent Framework`, provider adapters, persistence, telemetry, evaluation, Git tooling, and local runtimes.
 - **Out of scope in the current slice:** full Orleans hosting, live provider execution, remote workers, and cloud-only control-plane services.
 
@@ -35,7 +34,7 @@ flowchart LR
   Adr3["ADR-0003 vertical slices + UI-only app"]
   Feature["agent-control-plane-experience.md"]
   Toolchains["toolchain-center.md"]
-  Plan["vertical-slice-runtime-foundation.plan.md"]
+  Plan["epic-11-foundation-contracts.plan.md"]
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core contracts"]
   Runtime["DotPilot.Runtime services"]
@@ -123,31 +122,60 @@ flowchart TD
   RuntimeSlice --> UiSlice
 ```
 
-### Runtime foundation slice for epic #12
+### Foundation contract slices for epic #11
+
+```mermaid
+flowchart TD
+  Epic["#11 Desktop control-plane foundation"]
+  Domain["#22 Domain contracts"]
+  Comm["#23 Communication contracts"]
+  DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
+  CommunicationSlice["DotPilot.Core/Features/RuntimeCommunication"]
+  RuntimeContracts["DotPilot.Core/Features/RuntimeFoundation"]
+  DeterministicClient["DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient"]
+  Tests["DotPilot.Tests contract coverage"]
+
+  Epic --> Domain
+  Epic --> Comm
+  Domain --> DomainSlice
+  Comm --> CommunicationSlice
+  DomainSlice --> RuntimeContracts
+  CommunicationSlice --> RuntimeContracts
+  CommunicationSlice --> DeterministicClient
+  DomainSlice --> DeterministicClient
+  DeterministicClient --> Tests
+  RuntimeContracts --> Tests
+```
+
+### Runtime-host backlog slices for epic #12
 
 ```mermaid
 flowchart TD
   Epic["#12 Embedded agent runtime host"]
-  Domain["#22 Domain contracts"]
-  Comm["#23 Communication contracts"]
   Host["#24 Embedded Orleans host"]
   MAF["#25 Agent Framework runtime"]
+  Policy["#26 Grain traffic policy"]
+  Sessions["#27 Session persistence and resume"]
+  Foundation["#11 Foundation contracts"]
   DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
   CommunicationSlice["DotPilot.Core/Features/RuntimeCommunication"]
   CoreSlice["DotPilot.Core/Features/RuntimeFoundation"]
   RuntimeSlice["DotPilot.Runtime/Features/RuntimeFoundation"]
   UiSlice["DotPilot runtime panel + banner"]
 
-  Epic --> Domain
-  Epic --> Comm
+  Foundation --> DomainSlice
+  Foundation --> CommunicationSlice
   Epic --> Host
   Epic --> MAF
-  Domain --> DomainSlice
+  Epic --> Policy
+  Epic --> Sessions
   DomainSlice --> CommunicationSlice
   CommunicationSlice --> CoreSlice
-  Comm --> CommunicationSlice
   Host --> RuntimeSlice
   MAF --> RuntimeSlice
+  Policy --> CoreSlice
+  Sessions --> CoreSlice
+  Sessions --> RuntimeSlice
   CoreSlice --> UiSlice
   RuntimeSlice --> UiSlice
 ```
@@ -185,7 +213,7 @@ flowchart LR
 ### Planning and decision docs
 
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
-- `Task plan` — [../vertical-slice-runtime-foundation.plan.md](../vertical-slice-runtime-foundation.plan.md)
+- `Task plan` — [../epic-11-foundation-contracts.plan.md](../epic-11-foundation-contracts.plan.md)
 - `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
@@ -237,7 +265,8 @@ flowchart LR
 
 - The Uno app must remain a presentation-only host instead of becoming a dump for runtime logic.
 - Feature work should land as vertical slices with isolated contracts and implementations, not as shared horizontal folders.
-- Epic `#12` starts with contracts, sequencing, deterministic runtime coverage, and UI exposure before live Orleans or provider integration.
+- Epic `#11` establishes the reusable contract and communication foundation before epic `#12` begins embedded runtime-host work.
+- Epic `#12` builds on that foundation instead of re-owning issues `#22` and `#23`.
 - Epic `#14` makes external-provider toolchain readiness explicit before session creation, so install, auth, diagnostics, and configuration state stays visible instead of being inferred later.
 - CI must stay meaningful without external provider CLIs by using the in-repo deterministic runtime client.
 - Real provider checks may run only when the corresponding toolchain is present and discoverable.

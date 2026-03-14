@@ -48,6 +48,7 @@ flowchart LR
 
 ## Verification
 
+- `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~RuntimeCommunication`
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
 - `dotnet test DotPilot.slnx`
 
