@@ -4,7 +4,7 @@ namespace DotPilot.Core.Features.ToolchainCenter;
 
 public sealed record ToolchainCenterWorkstreamDescriptor(
     int IssueNumber,
-    string IssueLabel,
+    string SectionLabel,
     string Name,
     string Summary);
 
@@ -37,7 +37,7 @@ public sealed record ToolchainPollingDescriptor(
 
 public sealed record ToolchainProviderSnapshot(
     int IssueNumber,
-    string IssueLabel,
+    string SectionLabel,
     ProviderDescriptor Provider,
     string ExecutablePath,
     string InstalledVersion,

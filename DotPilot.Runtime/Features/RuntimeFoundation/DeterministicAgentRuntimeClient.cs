@@ -8,7 +8,6 @@ namespace DotPilot.Runtime.Features.RuntimeFoundation;
 public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
 {
     private const string ApprovalKeyword = "approval";
-    private const string DeterministicProviderDisplayName = "Deterministic Runtime Client";
     private const string PlanSummary =
         "Planned the runtime foundation flow with contracts first, then communication, host lifecycle, and orchestration.";
     private const string ExecuteSummary =
@@ -35,7 +34,7 @@ public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
                 Result<AgentTurnResult>.Fail(
                     RuntimeCommunicationProblems.ProviderUnavailable(
                         request.ProviderStatus,
-                        DeterministicProviderDisplayName)));
+                        ProviderToolchainNames.DeterministicClientDisplayName)));
         }
 
         return ValueTask.FromResult(request.Mode switch
@@ -77,12 +76,12 @@ public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
     {
         return new ArtifactDescriptor
         {
-            Id = ArtifactId.New(),
+            Id = RuntimeFoundationDeterministicIdentity.CreateArtifactId(sessionId, artifactName),
             SessionId = sessionId,
             Name = artifactName,
             Kind = artifactKind,
             RelativePath = artifactName,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = RuntimeFoundationDeterministicIdentity.ArtifactCreatedAt,
         };
     }
 }

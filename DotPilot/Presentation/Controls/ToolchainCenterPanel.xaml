@@ -19,7 +19,7 @@
                      FontSize="11"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{x:Bind Workstream.IssueLabel}" />
+                     Text="{x:Bind Workstream.SectionLabel}" />
           <TextBlock FontSize="13"
                      FontWeight="SemiBold"
                      Text="{x:Bind Workstream.Name}" />
@@ -44,7 +44,7 @@
                      FontSize="11"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{x:Bind IssueLabel}" />
+                     Text="{x:Bind SectionLabel}" />
           <TextBlock FontSize="13"
                      FontWeight="SemiBold"
                      AutomationProperties.AutomationId="{x:Bind AutomationId}"
@@ -256,7 +256,7 @@
                          FontSize="11"
                          FontWeight="Medium"
                          Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="{Binding SelectedToolchainProviderSnapshot.IssueLabel}" />
+                         Text="{Binding SelectedToolchainProviderSnapshot.SectionLabel}" />
               <TextBlock AutomationProperties.AutomationId="SelectedToolchainProviderTitle"
                          FontSize="20"
                          FontWeight="SemiBold"

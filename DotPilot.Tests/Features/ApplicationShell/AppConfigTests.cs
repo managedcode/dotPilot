@@ -1,6 +1,6 @@
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.ApplicationShell;
 
-public class AppInfoTests
+public class AppConfigTests
 {
     [SetUp]
     public void Setup()

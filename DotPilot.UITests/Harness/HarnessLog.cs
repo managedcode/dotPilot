@@ -1,4 +1,4 @@
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 internal static class HarnessLog
 {

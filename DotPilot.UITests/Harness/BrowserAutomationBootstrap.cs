@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 internal static partial class BrowserAutomationBootstrap
 {

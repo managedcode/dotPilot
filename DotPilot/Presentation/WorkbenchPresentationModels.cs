@@ -26,7 +26,7 @@ public sealed record ToolchainProviderItem(
 {
     public string DisplayName => Snapshot.Provider.DisplayName;
 
-    public string IssueLabel => Snapshot.IssueLabel;
+    public string SectionLabel => Snapshot.SectionLabel;
 
     public string ReadinessLabel => Snapshot.ReadinessState.ToString();
 

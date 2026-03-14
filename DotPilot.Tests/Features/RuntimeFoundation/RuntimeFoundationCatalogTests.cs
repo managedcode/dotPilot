@@ -1,13 +1,12 @@
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.RuntimeFoundation;
 
 public class RuntimeFoundationCatalogTests
 {
     private const string ApprovalPrompt = "Please continue, but stop for approval before changing files.";
     private const string BlankPrompt = " ";
-    private const string CodexCommandName = "codex";
-    private const string ClaudeCommandName = "claude";
-    private const string GitHubCommandName = "gh";
     private const string DeterministicClientStatusSummary = "Always available for in-repo and CI validation.";
+    private const string RuntimeEpicLabel = "LOCAL RUNTIME READINESS";
+    private static readonly DateTimeOffset DeterministicArtifactCreatedAt = new(2026, 3, 13, 0, 0, 0, TimeSpan.Zero);
 
     [Test]
     public void CatalogGroupsEpicTwelveIntoFourSequencedSlices()
@@ -16,8 +15,9 @@ public class RuntimeFoundationCatalogTests
 
         var snapshot = catalog.GetSnapshot();
 
-        snapshot.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
+        snapshot.EpicLabel.Should().Be(RuntimeEpicLabel);
         snapshot.Slices.Should().HaveCount(4);
+        snapshot.Slices.Select(slice => slice.IssueLabel).Should().ContainInOrder("DOMAIN", "CONTRACTS", "HOST", "ORCHESTRATION");
         snapshot.Slices.Select(slice => slice.IssueNumber).Should().ContainInOrder(
             RuntimeFoundationIssues.DomainModel,
             RuntimeFoundationIssues.CommunicationContracts,
@@ -69,6 +69,24 @@ public class RuntimeFoundationCatalogTests
         outcome.ProducedArtifacts.Should().ContainSingle(artifact =>
             artifact.Name == "runtime-foundation.plan.md" &&
             artifact.Kind == ArtifactKind.Plan);
+    }
+
+    [Test]
+    public async Task DeterministicClientProducesStableArtifactsForIdenticalRequests()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var request = CreateRequest("Run the provider-independent runtime flow.", AgentExecutionMode.Execute);
+
+        var firstResult = await client.ExecuteAsync(request, CancellationToken.None);
+        var secondResult = await client.ExecuteAsync(request, CancellationToken.None);
+        var firstArtifact = firstResult.Value!.ProducedArtifacts.Should().ContainSingle().Subject;
+        var secondArtifact = secondResult.Value!.ProducedArtifacts.Should().ContainSingle().Subject;
+
+        firstResult.IsSuccess.Should().BeTrue();
+        secondResult.IsSuccess.Should().BeTrue();
+        firstArtifact.Id.Should().Be(secondArtifact.Id);
+        firstArtifact.CreatedAt.Should().Be(DeterministicArtifactCreatedAt);
+        secondArtifact.CreatedAt.Should().Be(DeterministicArtifactCreatedAt);
     }
 
     [Test]
@@ -133,6 +151,7 @@ public class RuntimeFoundationCatalogTests
     public async Task DeterministicClientReturnsProviderUnavailableProblemWhenProviderIsNotReady()
     {
         var client = new DeterministicAgentRuntimeClient();
+        var snapshot = CreateCatalog().GetSnapshot();
 
         var result = await client.ExecuteAsync(
             CreateRequest(
@@ -146,23 +165,36 @@ public class RuntimeFoundationCatalogTests
         result.HasProblem.Should().BeTrue();
         problem.HasErrorCode(RuntimeCommunicationProblemCode.ProviderUnavailable).Should().BeTrue();
         problem.StatusCode.Should().Be((int)System.Net.HttpStatusCode.ServiceUnavailable);
+        problem.Detail.Should().Contain(snapshot.DeterministicClientName);
     }
 
-    [TestCase(CodexCommandName)]
-    [TestCase(ClaudeCommandName)]
-    [TestCase(GitHubCommandName)]
-    public void ExternalToolchainVerificationRunsOnlyWhenTheCommandIsAvailable(string commandName)
+    [Test]
+    public void DeterministicClientRejectsUnexpectedExecutionModes()
+    {
+        var client = new DeterministicAgentRuntimeClient();
+        var invalidRequest = CreateRequest("Plan the runtime foundation rollout.", (AgentExecutionMode)int.MaxValue);
+
+        var result = client.ExecuteAsync(invalidRequest, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+
+        result.IsFailed.Should().BeTrue();
+        result.HasProblem.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.OrchestrationUnavailable).Should().BeTrue();
+    }
+
+    [Test]
+    public void CatalogPreservesProviderIdentityAcrossSnapshotRefreshes()
     {
         var catalog = CreateCatalog();
-        var provider = catalog.GetSnapshot().Providers.Single(item => item.CommandName == commandName);
 
-        Assume.That(
-            provider.Status,
-            Is.EqualTo(ProviderConnectionStatus.Available),
-            $"The '{commandName}' toolchain is not available in this environment.");
+        var firstSnapshot = catalog.GetSnapshot();
+        var secondSnapshot = catalog.GetSnapshot();
 
-        provider.RequiresExternalToolchain.Should().BeTrue();
-        provider.StatusSummary.Should().Contain("available");
+        firstSnapshot.Providers.Should().HaveSameCount(secondSnapshot.Providers);
+        foreach (var firstProvider in firstSnapshot.Providers)
+        {
+            var secondProvider = secondSnapshot.Providers.Single(provider => provider.CommandName == firstProvider.CommandName);
+            firstProvider.Id.Should().Be(secondProvider.Id);
+        }
     }
 
     [Test]
@@ -183,15 +215,15 @@ public class RuntimeFoundationCatalogTests
     }
 
     [Test]
-    [NonParallelizable]
-    public void ExternalProvidersBecomeUnavailableWhenPathIsCleared()
+    public void CatalogCachesProviderListAcrossSnapshotReads()
     {
-        using var scope = new EnvironmentVariableScope("PATH", string.Empty);
         var catalog = CreateCatalog();
 
-        var externalProviders = catalog.GetSnapshot().Providers.Where(provider => provider.RequiresExternalToolchain);
+        var firstSnapshot = catalog.GetSnapshot();
+        var secondSnapshot = catalog.GetSnapshot();
 
-        externalProviders.Should().OnlyContain(provider => provider.Status == ProviderConnectionStatus.Unavailable);
+        ReferenceEquals(firstSnapshot.Providers, secondSnapshot.Providers).Should().BeTrue();
+        firstSnapshot.Providers.Should().NotBeAssignableTo<ProviderDescriptor[]>();
     }
 
     private static RuntimeFoundationCatalog CreateCatalog()
@@ -205,23 +237,5 @@ public class RuntimeFoundationCatalogTests
         ProviderConnectionStatus providerStatus = ProviderConnectionStatus.Available)
     {
         return new AgentTurnRequest(SessionId.New(), AgentProfileId.New(), prompt, mode, providerStatus);
-    }
-
-    private sealed class EnvironmentVariableScope : IDisposable
-    {
-        private readonly string _variableName;
-        private readonly string? _originalValue;
-
-        public EnvironmentVariableScope(string variableName, string? value)
-        {
-            _variableName = variableName;
-            _originalValue = Environment.GetEnvironmentVariable(variableName);
-            Environment.SetEnvironmentVariable(variableName, value);
-        }
-
-        public void Dispose()
-        {
-            Environment.SetEnvironmentVariable(_variableName, _originalValue);
-        }
     }
 }

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 internal static class BrowserTestEnvironment
 {

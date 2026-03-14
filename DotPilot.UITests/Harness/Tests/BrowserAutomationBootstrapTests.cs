@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 [TestFixture]
 public sealed class BrowserAutomationBootstrapTests

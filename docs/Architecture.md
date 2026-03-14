@@ -35,7 +35,6 @@ flowchart LR
   Adr3["ADR-0003 vertical slices + UI-only app"]
   Feature["agent-control-plane-experience.md"]
   Toolchains["toolchain-center.md"]
-  Plan["vertical-slice-runtime-foundation.plan.md"]
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core contracts"]
   Runtime["DotPilot.Runtime services"]
@@ -48,7 +47,6 @@ flowchart LR
   Root --> Adr3
   Root --> Feature
   Root --> Toolchains
-  Root --> Plan
   Root --> Ui
   Root --> Core
   Root --> Runtime
@@ -162,7 +160,6 @@ flowchart LR
   Catalog["RuntimeFoundationCatalog"]
   Toolchains["ToolchainCenterCatalog"]
   TestClient["DeterministicAgentRuntimeClient"]
-  Probe["ProviderToolchainProbe"]
   ToolchainProbe["ToolchainCommandProbe + provider profiles"]
   Contracts["Typed IDs + contracts"]
   Future["Future Orleans + Agent Framework integrations"]
@@ -172,7 +169,6 @@ flowchart LR
   ViewModels --> Catalog
   ViewModels --> Toolchains
   Catalog --> TestClient
-  Catalog --> Probe
   Catalog --> Contracts
   Toolchains --> ToolchainProbe
   Toolchains --> Contracts
@@ -185,7 +181,6 @@ flowchart LR
 ### Planning and decision docs
 
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
-- `Task plan` — [../vertical-slice-runtime-foundation.plan.md](../vertical-slice-runtime-foundation.plan.md)
 - `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
 - `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
 - `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
