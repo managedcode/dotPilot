@@ -23,6 +23,7 @@ This file defines how AI agents work in this solution.
   - `DotPilot`
   - `DotPilot.Core`
   - `DotPilot.Runtime`
+  - `DotPilot.Runtime.Host`
   - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
@@ -152,7 +153,9 @@ For this app:
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
 - structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
+- the first embedded Orleans host cut must use `UseLocalhostClustering` plus in-memory grain storage and reminders; do not introduce remote clustering or external durable stores until a later backlog item explicitly requires them
 - GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
+- never claim an epic is complete until its current GitHub scope is verified against the live issue graph; check which issues are real children versus issues that merely depend on the epic or belong to a different parent epic
 - Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
 - Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
@@ -366,6 +369,7 @@ Ask first:
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
+- Creating auxiliary `git worktree` directories for normal PR follow-up when straightforward branch switching in the main checkout is enough.
 - Running build, test, or verification commands for file-only structural reorganizations when the user explicitly asked for folder cleanup without behavior changes.
 - Adding fallback paths or alternate harnesses that only make failures disappear in tests while the primary product path remains broken.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.

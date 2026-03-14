@@ -20,6 +20,7 @@ Stack: `.NET 10`, class library, provider-independent runtime services and diagn
 - Implement feature slices against `DotPilot.Core` contracts instead of reaching back into the app project.
 - Prefer deterministic runtime behavior and environment probing here so tests can exercise real flows without mocks.
 - Keep external-provider assumptions soft: absence of Codex, Claude Code, or GitHub Copilot in CI must not break the provider-independent baseline.
+- For the first embedded Orleans host implementation, stay local-first with `UseLocalhostClustering` and in-memory storage/reminders so the desktop runtime remains self-contained.
 
 ## Local Commands
 

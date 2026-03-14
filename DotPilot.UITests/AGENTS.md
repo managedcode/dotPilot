@@ -13,7 +13,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - `DotPilot.UITests.csproj`
 - `Harness/Constants.cs`
 - `Harness/TestBase.cs`
-- `Features/ApplicationShell/Given_MainPage.cs` (`GivenWorkbenchShell` in `DotPilot.UITests.Features.Workbench`)
+- `Features/Workbench/GivenWorkbenchShell.cs`
 
 ## Boundaries
 
