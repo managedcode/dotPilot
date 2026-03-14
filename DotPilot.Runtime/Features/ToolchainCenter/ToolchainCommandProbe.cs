@@ -5,6 +5,7 @@ namespace DotPilot.Runtime.Features.ToolchainCenter;
 internal static class ToolchainCommandProbe
 {
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan RedirectDrainTimeout = TimeSpan.FromSeconds(1);
     private const string VersionSeparator = "version";
     private const string EmptyOutput = "";
 
@@ -87,14 +88,19 @@ internal static class ToolchainCommandProbe
 
         using (process)
         {
-            var standardOutputTask = process.StandardOutput.ReadToEndAsync();
-            var standardErrorTask = process.StandardError.ReadToEndAsync();
+            var standardOutputTask = ObserveRedirectedStream(process.StandardOutput.ReadToEndAsync());
+            var standardErrorTask = ObserveRedirectedStream(process.StandardError.ReadToEndAsync());
 
             if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
             {
                 TryTerminate(process);
-                ObserveRedirectedStreamFaults(standardOutputTask, standardErrorTask);
-                return new(true, false, EmptyOutput, EmptyOutput);
+                WaitForTermination(process);
+
+                return new(
+                    true,
+                    false,
+                    AwaitStreamRead(standardOutputTask),
+                    AwaitStreamRead(standardErrorTask));
             }
 
             return new(
@@ -105,22 +111,32 @@ internal static class ToolchainCommandProbe
         }
     }
 
+    private static Task<string> ObserveRedirectedStream(Task<string> readTask)
+    {
+        _ = readTask.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return readTask;
+    }
+
     private static string AwaitStreamRead(Task<string> readTask)
     {
         try
         {
+            if (!readTask.Wait(RedirectDrainTimeout))
+            {
+                return EmptyOutput;
+            }
+
             return readTask.GetAwaiter().GetResult();
         }
         catch
         {
             return EmptyOutput;
         }
-    }
-
-    private static void ObserveRedirectedStreamFaults(Task<string> standardOutputTask, Task<string> standardErrorTask)
-    {
-        _ = standardOutputTask.Exception;
-        _ = standardErrorTask.Exception;
     }
 
     private static void TryTerminate(Process process)
@@ -130,6 +146,21 @@ internal static class ToolchainCommandProbe
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup only.
+        }
+    }
+
+    private static void WaitForTermination(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.WaitForExit((int)RedirectDrainTimeout.TotalMilliseconds);
             }
         }
         catch

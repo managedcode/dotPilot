@@ -4,7 +4,7 @@ namespace DotPilot.Runtime.Features.ToolchainCenter;
 
 public sealed class ToolchainCenterCatalog : IToolchainCenterCatalog, IDisposable
 {
-    private const string EpicLabelValue = "PRESESSION READINESS";
+    private const string EpicLabelValue = "PRE-SESSION READINESS";
     private const string EpicSummary =
         "Provider installation, launch checks, authentication, configuration, and refresh state stay visible before the first live session.";
     private const string UiWorkstreamLabel = "SURFACE";

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Core.Features.RuntimeCommunication;
 using DotPilot.Core.Features.RuntimeFoundation;
@@ -64,7 +63,7 @@ public sealed class DeterministicAgentRuntimeClient : IAgentRuntimeClient
                     SessionPhase.Review,
                     ApprovalState.Approved,
                     [CreateArtifact(request.SessionId, ReviewArtifact, ArtifactKind.Report)])),
-            _ => throw new UnreachableException(),
+            _ => Result<AgentTurnResult>.Fail(RuntimeCommunicationProblems.OrchestrationUnavailable()),
         });
     }
 

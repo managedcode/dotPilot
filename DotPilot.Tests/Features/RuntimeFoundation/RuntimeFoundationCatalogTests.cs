@@ -174,9 +174,11 @@ public class RuntimeFoundationCatalogTests
         var client = new DeterministicAgentRuntimeClient();
         var invalidRequest = CreateRequest("Plan the runtime foundation rollout.", (AgentExecutionMode)int.MaxValue);
 
-        var action = () => client.ExecuteAsync(invalidRequest, CancellationToken.None);
+        var result = client.ExecuteAsync(invalidRequest, CancellationToken.None).AsTask().GetAwaiter().GetResult();
 
-        action.Should().Throw<System.Diagnostics.UnreachableException>();
+        result.IsFailed.Should().BeTrue();
+        result.HasProblem.Should().BeTrue();
+        result.Problem!.HasErrorCode(RuntimeCommunicationProblemCode.OrchestrationUnavailable).Should().BeTrue();
     }
 
     [Test]
@@ -221,6 +223,7 @@ public class RuntimeFoundationCatalogTests
         var secondSnapshot = catalog.GetSnapshot();
 
         ReferenceEquals(firstSnapshot.Providers, secondSnapshot.Providers).Should().BeTrue();
+        firstSnapshot.Providers.Should().NotBeAssignableTo<ProviderDescriptor[]>();
     }
 
     private static RuntimeFoundationCatalog CreateCatalog()
