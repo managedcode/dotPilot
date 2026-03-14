@@ -1,4 +1,3 @@
-
 namespace DotPilot.UITests.Harness;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(

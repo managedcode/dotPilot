@@ -12,25 +12,17 @@ internal sealed class AgentSessionService(
     TimeProvider timeProvider)
     : IAgentSessionService, IDisposable
 {
-    private const string BrowserStatusSummary = "Desktop CLI probing is unavailable in the browser automation head.";
-    private const string DisabledStatusSummary = "Provider is disabled for local agent creation.";
-    private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
-    private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
-    private const string ReadySummaryFormat = "{0} CLI is available on PATH.";
     private const string NotYetImplementedFormat = "{0} live CLI execution is not wired yet in this slice.";
     private const string SessionReadyText = "Session created. Send the first message to start the workflow.";
     private const string UserAuthor = "You";
     private const string ToolAuthor = "Tool";
     private const string StatusAuthor = "System";
+    private const string DisabledProviderSendText = "The provider for this agent is disabled. Re-enable it in settings before sending.";
     private const string DebugToolStartText = "Preparing local debug workflow.";
     private const string DebugToolDoneText = "Debug workflow finished.";
     private const string ToolAccentLabel = "tool";
     private const string StatusAccentLabel = "status";
     private const string ErrorAccentLabel = "error";
-    private static readonly System.Text.CompositeFormat MissingCliSummaryCompositeFormat =
-        System.Text.CompositeFormat.Parse(MissingCliSummaryFormat);
-    private static readonly System.Text.CompositeFormat ReadySummaryCompositeFormat =
-        System.Text.CompositeFormat.Parse(ReadySummaryFormat);
     private static readonly System.Text.CompositeFormat NotYetImplementedCompositeFormat =
         System.Text.CompositeFormat.Parse(NotYetImplementedFormat);
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
@@ -61,7 +53,7 @@ internal sealed class AgentSessionService(
         return new AgentWorkspaceSnapshot(
             sessionItems,
             agents.Select(MapAgentSummary).ToArray(),
-            await BuildProviderStatusesAsync(dbContext, cancellationToken),
+            await AgentProviderStatusSnapshotReader.BuildAsync(dbContext, cancellationToken),
             sessionItems.Length > 0 ? sessionItems[0].Id : null);
     }
 
@@ -101,7 +93,7 @@ internal sealed class AgentSessionService(
         await EnsureInitializedAsync(cancellationToken);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var providers = await BuildProviderStatusesAsync(dbContext, cancellationToken);
+        var providers = await AgentProviderStatusSnapshotReader.BuildAsync(dbContext, cancellationToken);
         var provider = providers.First(status => status.Kind == command.ProviderKind);
         if (!provider.CanCreateAgents)
         {
@@ -182,7 +174,7 @@ internal sealed class AgentSessionService(
         record.UpdatedAt = timeProvider.GetUtcNow();
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return (await BuildProviderStatusesAsync(dbContext, cancellationToken))
+        return (await AgentProviderStatusSnapshotReader.BuildAsync(dbContext, cancellationToken))
             .First(status => status.Kind == command.ProviderKind);
     }
 
@@ -199,8 +191,6 @@ internal sealed class AgentSessionService(
         var agent = await dbContext.AgentProfiles
             .FirstAsync(record => record.Id == session.PrimaryAgentProfileId, cancellationToken);
         var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
-        var providerStatuses = await BuildProviderStatusesAsync(dbContext, cancellationToken);
-        var providerStatus = providerStatuses.First(status => status.Kind == providerProfile.Kind);
         var runtimeConversation = await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
 
@@ -220,7 +210,24 @@ internal sealed class AgentSessionService(
             accentLabel: StatusAccentLabel);
         yield return MapEntry(statusEntry);
 
-        if (!providerStatus.CanCreateAgents || providerProfile.Kind is not AgentProviderKind.Debug)
+        if (!await AgentProviderStatusSnapshotReader.IsEnabledAsync(dbContext, providerProfile.Kind, cancellationToken))
+        {
+            var disabledEntry = CreateEntryRecord(
+                command.SessionId,
+                SessionStreamEntryKind.Error,
+                StatusAuthor,
+                DisabledProviderSendText,
+                timeProvider.GetUtcNow(),
+                accentLabel: ErrorAccentLabel);
+            dbContext.SessionEntries.Add(disabledEntry);
+            session.UpdatedAt = disabledEntry.Timestamp;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            yield return MapEntry(disabledEntry);
+            yield break;
+        }
+
+        if (providerProfile.Kind is not AgentProviderKind.Debug)
         {
             var notImplementedEntry = CreateEntryRecord(
                 command.SessionId,
@@ -332,94 +339,6 @@ internal sealed class AgentSessionService(
         {
             _initializationGate.Release();
         }
-    }
-
-    private static async Task<IReadOnlyList<ProviderStatusDescriptor>> BuildProviderStatusesAsync(
-        LocalAgentSessionDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var preferences = await dbContext.ProviderPreferences
-            .ToDictionaryAsync(
-                preference => (AgentProviderKind)preference.ProviderKind,
-                cancellationToken);
-
-        return AgentSessionProviderCatalog.All
-            .Select(profile => BuildProviderStatus(profile, GetProviderPreference(profile.Kind, preferences)))
-            .ToArray();
-    }
-
-    private static ProviderPreferenceRecord GetProviderPreference(
-        AgentProviderKind kind,
-        Dictionary<AgentProviderKind, ProviderPreferenceRecord> preferences)
-    {
-        return preferences.TryGetValue(kind, out var preference)
-            ? preference
-            : new ProviderPreferenceRecord
-            {
-                ProviderKind = (int)kind,
-                IsEnabled = false,
-                UpdatedAt = DateTimeOffset.MinValue,
-            };
-    }
-
-    private static ProviderStatusDescriptor BuildProviderStatus(
-        AgentSessionProviderProfile profile,
-        ProviderPreferenceRecord preference)
-    {
-        var providerId = AgentSessionDeterministicIdentity.CreateProviderId(profile.CommandName);
-        var actions = new List<ProviderActionDescriptor>();
-        string? installedVersion = null;
-        var status = AgentProviderStatus.Ready;
-        var statusSummary = BuiltInStatusSummary;
-        var canCreateAgents = true;
-
-        if (OperatingSystem.IsBrowser() && !profile.IsBuiltIn)
-        {
-            actions.Add(new ProviderActionDescriptor("Install", "Run this on desktop.", profile.InstallCommand));
-            status = AgentProviderStatus.Unsupported;
-            statusSummary = BrowserStatusSummary;
-            canCreateAgents = false;
-        }
-        else if (profile.IsBuiltIn)
-        {
-            installedVersion = profile.DefaultModelName;
-        }
-        else
-        {
-            var executablePath = AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName);
-            if (string.IsNullOrWhiteSpace(executablePath))
-            {
-                actions.Add(new ProviderActionDescriptor("Install", "Install the CLI, then refresh settings.", profile.InstallCommand));
-                status = AgentProviderStatus.RequiresSetup;
-                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, MissingCliSummaryCompositeFormat, profile.DisplayName);
-                canCreateAgents = false;
-            }
-            else
-            {
-                installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
-                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
-                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadySummaryCompositeFormat, profile.DisplayName);
-            }
-        }
-
-        if (!preference.IsEnabled)
-        {
-            status = AgentProviderStatus.Disabled;
-            statusSummary = $"{DisabledStatusSummary} {statusSummary}";
-            canCreateAgents = false;
-        }
-
-        return new ProviderStatusDescriptor(
-            providerId,
-            profile.Kind,
-            profile.DisplayName,
-            profile.CommandName,
-            status,
-            statusSummary,
-            installedVersion,
-            preference.IsEnabled,
-            canCreateAgents,
-            actions);
     }
 
     private static SessionEntryRecord CreateEntryRecord(

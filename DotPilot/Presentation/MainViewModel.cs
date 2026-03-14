@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 
 namespace DotPilot.Presentation;
 
@@ -178,8 +179,7 @@ public sealed class MainViewModel : ObservableObject
         var session = await _agentSessionService.CreateSessionAsync(
             new CreateSessionCommand($"Session with {agent.Name}", agent.Id),
             CancellationToken.None);
-        await LoadWorkspaceAsync();
-        SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == session.Session.Id);
+        InsertOrUpdateRecentChat(session.Session, selectSession: true);
     }
 
     private async Task SendMessageAsync()
@@ -192,6 +192,7 @@ public sealed class MainViewModel : ObservableObject
 
         ComposerText = string.Empty;
         FeedbackMessage = SendInProgressMessage;
+        var latestPreview = message;
 
         try
         {
@@ -208,11 +209,15 @@ public sealed class MainViewModel : ObservableObject
                                new SendSessionMessageCommand(SelectedChat.Id, message),
                                CancellationToken.None))
             {
+                if (entry.Kind is SessionStreamEntryKind.AssistantMessage && !string.IsNullOrWhiteSpace(entry.Text))
+                {
+                    latestPreview = entry.Text;
+                }
+
                 ApplyTimelineEntry(entry);
             }
 
-            await LoadWorkspaceAsync();
-            SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == SelectedChat?.Id);
+            UpdateRecentChatPreview(SelectedChat.Id, latestPreview ?? message);
             FeedbackMessage = string.Empty;
         }
         catch (Exception exception)
@@ -238,6 +243,38 @@ public sealed class MainViewModel : ObservableObject
         {
             RecentChats.Add(new SessionSidebarItem(session.Id, session.Title, session.Preview));
         }
+    }
+
+    private void InsertOrUpdateRecentChat(SessionListItem session, bool selectSession)
+    {
+        var existingIndex = RecentChats
+            .Select((item, index) => new { item, index })
+            .FirstOrDefault(pair => pair.item.Id == session.Id)
+            ?.index;
+        var sidebarItem = new SessionSidebarItem(session.Id, session.Title, session.Preview);
+
+        if (existingIndex is int index)
+        {
+            RecentChats.RemoveAt(index);
+        }
+
+        RecentChats.Insert(0, sidebarItem);
+
+        if (selectSession)
+        {
+            SelectedChat = sidebarItem;
+        }
+    }
+
+    private void UpdateRecentChatPreview(SessionId sessionId, string preview)
+    {
+        var existingItem = RecentChats.FirstOrDefault(item => item.Id == sessionId);
+        if (existingItem is null)
+        {
+            return;
+        }
+
+        existingItem.Preview = preview;
     }
 
     private void RebuildTimeline(IReadOnlyList<SessionStreamEntry> entries)

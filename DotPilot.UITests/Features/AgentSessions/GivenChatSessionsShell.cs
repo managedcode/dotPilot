@@ -25,6 +25,7 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string AgentCreateStatusMessageAutomationId = "AgentCreateStatusMessage";
     private const string CreateAgentButtonAutomationId = "CreateAgentButton";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
+    private const string ChatComposerHintAutomationId = "ChatComposerHint";
     private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
     private const string ChatStartNewButtonAutomationId = "ChatStartNewButton";
     private const string ChatTitleTextAutomationId = "ChatTitleText";
@@ -46,6 +47,7 @@ public sealed class GivenChatSessionsShell : TestBase
         EnsureOnChatScreen();
         WaitForElement(ChatTitleTextAutomationId);
         WaitForElement(ChatComposerInputAutomationId);
+        WaitForTextContains(ChatComposerHintAutomationId, "Enter sends.", ScreenTransitionTimeout);
         WaitForElement(ChatStartNewButtonAutomationId);
 
         TakeScreenshot("chat_shell_visible");

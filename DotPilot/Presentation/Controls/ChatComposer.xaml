@@ -12,62 +12,83 @@
             BorderBrush="{StaticResource AppOutlineBrush}"
             BorderThickness="1"
             CornerRadius="28"
-            Padding="8">
+            Padding="12">
       <Grid AutomationProperties.AutomationId="ChatComposerBar"
-            ColumnSpacing="8">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
+            RowSpacing="12">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <TextBox Grid.Column="0"
+        <TextBox x:Name="ComposerInput"
+                 Grid.Row="0"
                  AutomationProperties.AutomationId="ChatComposerInput"
+                 AcceptsReturn="True"
                  Background="Transparent"
                  BorderBrush="Transparent"
                  BorderThickness="0"
                  FontSize="14"
                  Foreground="{StaticResource AppPrimaryTextBrush}"
+                 KeyDown="OnComposerInputKeyDown"
+                 MaxHeight="180"
+                 MinHeight="96"
                  PlaceholderText="{Binding ComposerPlaceholder}"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                  SelectionHighlightColor="{StaticResource AppAccentBrush}"
                  Text="{Binding ComposerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 VerticalAlignment="Center"
-                 VerticalContentAlignment="Center"
-                 TextWrapping="Wrap" />
+                 TextWrapping="Wrap"
+                 VerticalAlignment="Stretch"
+                 VerticalContentAlignment="Top" />
 
-        <Button Grid.Column="1"
-                AutomationProperties.AutomationId="ChatStartSessionButton"
-                Background="{StaticResource AppSoftSurfaceBrush}"
-                BorderBrush="{StaticResource AppOutlineBrush}"
-                BorderThickness="1"
-                Command="{Binding StartNewSessionCommand}"
-                CornerRadius="20"
-                Padding="14,12">
-          <TextBlock FontSize="12"
-                     FontWeight="SemiBold"
-                     Text="New session" />
-        </Button>
+        <Grid Grid.Row="1"
+              ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
 
-        <Button Grid.Column="2"
-                AutomationProperties.AutomationId="ChatComposerSendButton"
-                Background="{StaticResource AppAccentBrush}"
-                BorderBrush="Transparent"
-                BorderThickness="0"
-                Command="{Binding SendMessageCommand}"
-                CornerRadius="20"
-                Padding="16,12">
-          <StackPanel Orientation="Horizontal"
-                      Spacing="6">
-            <TextBlock FontSize="14"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource AppPrimaryTextBrush}"
-                       Text=">" />
+          <TextBlock AutomationProperties.AutomationId="ChatComposerHint"
+                     VerticalAlignment="Center"
+                     FontSize="12"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="Enter sends. Shift/Alt+Enter adds a new line."
+                     TextWrapping="WrapWholeWords" />
+
+          <Button Grid.Column="1"
+                  AutomationProperties.AutomationId="ChatStartSessionButton"
+                  Background="{StaticResource AppSoftSurfaceBrush}"
+                  BorderBrush="{StaticResource AppOutlineBrush}"
+                  BorderThickness="1"
+                  Command="{Binding StartNewSessionCommand}"
+                  CornerRadius="20"
+                  Padding="14,12">
             <TextBlock FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource AppPrimaryTextBrush}"
-                       Text="Send" />
-          </StackPanel>
-        </Button>
+                       Text="New session" />
+          </Button>
+
+          <Button Grid.Column="2"
+                  AutomationProperties.AutomationId="ChatComposerSendButton"
+                  Background="{StaticResource AppAccentBrush}"
+                  BorderBrush="Transparent"
+                  BorderThickness="0"
+                  Command="{Binding SendMessageCommand}"
+                  CornerRadius="20"
+                  Padding="16,12">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="6">
+              <TextBlock FontSize="14"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource AppPrimaryTextBrush}"
+                         Text=">" />
+              <TextBlock FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource AppPrimaryTextBrush}"
+                         Text="Send" />
+            </StackPanel>
+          </Button>
+        </Grid>
       </Grid>
     </Border>
   </StackPanel>

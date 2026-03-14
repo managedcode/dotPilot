@@ -3,10 +3,20 @@ using DotPilot.Core.Features.ControlPlaneDomain;
 
 namespace DotPilot.Presentation;
 
-public sealed partial record SessionSidebarItem(
-    SessionId Id,
-    string Title,
-    string Preview);
+public sealed class SessionSidebarItem(SessionId id, string title, string preview) : ObservableObject
+{
+    private string _preview = preview;
+
+    public SessionId Id { get; } = id;
+
+    public string Title { get; } = title;
+
+    public string Preview
+    {
+        get => _preview;
+        set => SetProperty(ref _preview, value);
+    }
+}
 
 public sealed partial record ChatTimelineItem(
     string Id,
