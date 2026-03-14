@@ -9,10 +9,14 @@ public static class AgentSessionServiceCollectionExtensions
         this IServiceCollection services,
         AgentSessionStorageOptions? storageOptions = null)
     {
+        services.AddLogging();
         services.AddSingleton(storageOptions ?? new AgentSessionStorageOptions());
         services.AddDbContextFactory<LocalAgentSessionDbContext>(ConfigureDbContext);
         services.AddSingleton<LocalAgentSessionStateStore>();
         services.AddSingleton<LocalAgentChatHistoryStore>();
+        services.AddSingleton<AgentProviderStatusCache>();
+        services.AddSingleton<IAgentProviderStatusCache>(serviceProvider =>
+            serviceProvider.GetRequiredService<AgentProviderStatusCache>());
         services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<DotPilot.Core.Features.AgentSessions.IAgentSessionService, AgentSessionService>();
         return services;

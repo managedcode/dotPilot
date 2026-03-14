@@ -1,8 +1,10 @@
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
+using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
+[Bindable]
 public sealed partial record AgentProviderOption(
     AgentProviderKind Kind,
     string DisplayName,
@@ -11,6 +13,7 @@ public sealed partial record AgentProviderOption(
     string? InstalledVersion,
     bool CanCreateAgents);
 
+[Bindable]
 public sealed class CapabilityOption(
     string name,
     string description,
@@ -29,6 +32,7 @@ public sealed class CapabilityOption(
     }
 }
 
+[Bindable]
 public sealed class RoleOption(
     string label,
     AgentRoleKind role,

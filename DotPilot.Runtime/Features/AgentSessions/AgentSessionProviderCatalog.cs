@@ -36,10 +36,10 @@ internal static class AgentSessionProviderCatalog
     {
         return
         [
-            new(AgentProviderKind.Debug, DebugDisplayName, DebugCommandName, DebugModelName, DebugInstallCommand, true),
-            new(AgentProviderKind.Codex, CodexDisplayName, CodexCommandName, CodexModelName, CodexInstallCommand, false),
-            new(AgentProviderKind.ClaudeCode, ClaudeDisplayName, ClaudeCommandName, ClaudeModelName, ClaudeInstallCommand, false),
-            new(AgentProviderKind.GitHubCopilot, CopilotDisplayName, CopilotCommandName, CopilotModelName, CopilotInstallCommand, false),
+            new(AgentProviderKind.Debug, DebugDisplayName, DebugCommandName, DebugModelName, DebugInstallCommand, true, true),
+            new(AgentProviderKind.Codex, CodexDisplayName, CodexCommandName, CodexModelName, CodexInstallCommand, false, false),
+            new(AgentProviderKind.ClaudeCode, ClaudeDisplayName, ClaudeCommandName, ClaudeModelName, ClaudeInstallCommand, false, false),
+            new(AgentProviderKind.GitHubCopilot, CopilotDisplayName, CopilotCommandName, CopilotModelName, CopilotInstallCommand, false, false),
         ];
     }
 }
@@ -50,5 +50,5 @@ internal sealed record AgentSessionProviderProfile(
     string CommandName,
     string DefaultModelName,
     string InstallCommand,
-    bool IsBuiltIn);
-
+    bool IsBuiltIn,
+    bool SupportsLiveExecution);

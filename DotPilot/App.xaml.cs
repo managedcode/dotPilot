@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using DotPilot.Runtime.Features.AgentSessions;
 #if !__WASM__
@@ -16,6 +17,7 @@ public partial class App : Application
     private const string BuilderCreatedMarker = "Uno host builder created.";
     private const string NavigateStartedMarker = "Navigating to shell.";
     private const string NavigateCompletedMarker = "Shell navigation completed.";
+    private const string DotPilotCategoryName = "DotPilot";
 #if !__WASM__
     private const string CenterMethodName = "Center";
     private const string WindowStartupLocationPropertyName = "WindowStartupLocation";
@@ -67,6 +69,7 @@ public partial class App : Application
                                 context.HostingEnvironment.IsDevelopment() ?
                                     LogLevel.Information :
                                     LogLevel.Warning)
+                            .AddFilter(DotPilotCategoryName, LogLevel.Information)
 
                             // Default filters for core Uno Platform namespaces
                             .CoreLogLevel(LogLevel.Warning);
@@ -133,6 +136,10 @@ public partial class App : Application
             WriteStartupMarker(NavigateStartedMarker);
             Host = await builder.NavigateAsync<Shell>();
             WriteStartupMarker(NavigateCompletedMarker);
+            var appLogger = Host.Services.GetRequiredService<ILogger<App>>();
+            AppLog.StartupMarker(
+                appLogger,
+                NavigateCompletedMarker);
 #if !__WASM__
             CenterDesktopWindow(MainWindow);
 #endif

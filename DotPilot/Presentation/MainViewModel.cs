@@ -2,9 +2,14 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
+using DotPilot.Runtime.Features.AgentSessions;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
+[Bindable]
 public sealed class MainViewModel : ObservableObject
 {
     private const string EmptyTitleValue = "No active session";
@@ -14,6 +19,9 @@ public sealed class MainViewModel : ObservableObject
     private const string LocalMemberName = "Local operator";
     private const string LocalMemberSummary = "This desktop instance";
     private readonly IAgentSessionService _agentSessionService;
+    private readonly IAgentProviderStatusCache _providerStatusCache;
+    private readonly ILogger<MainViewModel> _logger;
+    private readonly DispatcherQueue _dispatcherQueue;
     private readonly AsyncCommand _sendMessageCommand;
     private readonly AsyncCommand _startNewSessionCommand;
     private readonly AsyncCommand _refreshCommand;
@@ -25,9 +33,16 @@ public sealed class MainViewModel : ObservableObject
     private string _composerText = string.Empty;
     private string _feedbackMessage = string.Empty;
 
-    public MainViewModel(IAgentSessionService agentSessionService)
+    public MainViewModel(
+        IAgentSessionService agentSessionService,
+        IAgentProviderStatusCache providerStatusCache,
+        ILogger<MainViewModel> logger)
     {
         _agentSessionService = agentSessionService;
+        _providerStatusCache = providerStatusCache;
+        _logger = logger;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
+            throw new InvalidOperationException("MainViewModel requires a UI dispatcher queue.");
         RecentChats = [];
         Messages = [];
         Members = [new ParticipantItem(LocalMemberName, LocalMemberSummary, "L", DesignBrushPalette.UserAvatarBrush)];
@@ -35,7 +50,7 @@ public sealed class MainViewModel : ObservableObject
 
         _sendMessageCommand = new AsyncCommand(SendMessageAsync, CanSendMessage);
         _startNewSessionCommand = new AsyncCommand(StartNewSessionAsync, CanStartNewSession);
-        _refreshCommand = new AsyncCommand(LoadWorkspaceAsync);
+        _refreshCommand = new AsyncCommand(RefreshWorkspaceAsync);
 
         _ = LoadWorkspaceAsync();
     }
@@ -111,33 +126,40 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
+            MainViewModelLog.LoadingWorkspace(_logger);
             var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
-            _agents = workspace.Agents;
-            RebuildRecentChats(workspace.Sessions);
-            _startNewSessionCommand.RaiseCanExecuteChanged();
-            _sendMessageCommand.RaiseCanExecuteChanged();
+            await RunOnUiThreadAsync(() =>
+            {
+                _agents = workspace.Agents;
+                RebuildRecentChats(workspace.Sessions);
+                _startNewSessionCommand.RaiseCanExecuteChanged();
+                _sendMessageCommand.RaiseCanExecuteChanged();
 
-            if (workspace.SelectedSessionId is { } selectedSessionId)
-            {
-                SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == selectedSessionId);
-            }
-            else if (RecentChats.Count > 0)
-            {
-                SelectedChat = RecentChats[0];
-            }
-            else
-            {
-                ClearTimeline();
-                RebuildAgentPanel([]);
-                Title = EmptyTitleValue;
-                StatusSummary = HasAgents
-                    ? "Start a new session from the sidebar or send the first message."
-                    : EmptyStatusValue;
-            }
+                if (workspace.SelectedSessionId is { } selectedSessionId)
+                {
+                    SelectedChat = RecentChats.FirstOrDefault(chat => chat.Id == selectedSessionId);
+                }
+                else if (RecentChats.Count > 0)
+                {
+                    SelectedChat = RecentChats[0];
+                }
+                else
+                {
+                    ClearTimeline();
+                    RebuildAgentPanel([]);
+                    Title = EmptyTitleValue;
+                    StatusSummary = HasAgents
+                        ? "Start a new session from the sidebar or send the first message."
+                        : EmptyStatusValue;
+                }
+            });
+
+            MainViewModelLog.WorkspaceLoaded(_logger, workspace.Sessions.Count, workspace.Agents.Count);
         }
         catch (Exception exception)
         {
-            FeedbackMessage = exception.Message;
+            MainViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => FeedbackMessage = exception.Message);
         }
     }
 
@@ -145,26 +167,40 @@ public sealed class MainViewModel : ObservableObject
     {
         if (_selectedChat is null)
         {
-            ClearTimeline();
-            RebuildAgentPanel([]);
-            Title = EmptyTitleValue;
-            StatusSummary = HasAgents
-                ? "Start a new session from the sidebar or send the first message."
-                : EmptyStatusValue;
-            _sendMessageCommand.RaiseCanExecuteChanged();
+            await RunOnUiThreadAsync(() =>
+            {
+                ClearTimeline();
+                RebuildAgentPanel([]);
+                Title = EmptyTitleValue;
+                StatusSummary = HasAgents
+                    ? "Start a new session from the sidebar or send the first message."
+                    : EmptyStatusValue;
+                _sendMessageCommand.RaiseCanExecuteChanged();
+            });
             return;
         }
 
-        var snapshot = await _agentSessionService.GetSessionAsync(_selectedChat.Id, CancellationToken.None);
+        var selectedChatId = _selectedChat.Id;
+        var snapshot = await _agentSessionService.GetSessionAsync(selectedChatId, CancellationToken.None);
         if (snapshot is null)
         {
             return;
         }
 
-        Title = snapshot.Session.Title;
-        StatusSummary = $"{snapshot.Session.PrimaryAgentName} · {snapshot.Session.ProviderDisplayName}";
-        RebuildTimeline(snapshot.Entries);
-        RebuildAgentPanel(snapshot.Participants);
+        await RunOnUiThreadAsync(() =>
+        {
+            Title = snapshot.Session.Title;
+            StatusSummary = $"{snapshot.Session.PrimaryAgentName} · {snapshot.Session.ProviderDisplayName}";
+            RebuildTimeline(snapshot.Entries);
+            RebuildAgentPanel(snapshot.Participants);
+        });
+    }
+
+    private async Task RefreshWorkspaceAsync()
+    {
+        MainViewModelLog.RefreshRequested(_logger);
+        await _providerStatusCache.RefreshAsync(CancellationToken.None);
+        await LoadWorkspaceAsync();
     }
 
     private async Task StartNewSessionAsync()
@@ -175,11 +211,12 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        MainViewModelLog.StartingSession(_logger);
         var agent = _agents[0];
         var session = await _agentSessionService.CreateSessionAsync(
             new CreateSessionCommand($"Session with {agent.Name}", agent.Id),
             CancellationToken.None);
-        InsertOrUpdateRecentChat(session.Session, selectSession: true);
+        await RunOnUiThreadAsync(() => InsertOrUpdateRecentChat(session.Session, selectSession: true));
     }
 
     private async Task SendMessageAsync()
@@ -205,8 +242,9 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
+            var selectedChatId = SelectedChat.Id;
             await foreach (var entry in _agentSessionService.SendMessageAsync(
-                               new SendSessionMessageCommand(SelectedChat.Id, message),
+                               new SendSessionMessageCommand(selectedChatId, message),
                                CancellationToken.None))
             {
                 if (entry.Kind is SessionStreamEntryKind.AssistantMessage && !string.IsNullOrWhiteSpace(entry.Text))
@@ -214,15 +252,19 @@ public sealed class MainViewModel : ObservableObject
                     latestPreview = entry.Text;
                 }
 
-                ApplyTimelineEntry(entry);
+                await RunOnUiThreadAsync(() => ApplyTimelineEntry(entry));
             }
 
-            UpdateRecentChatPreview(SelectedChat.Id, latestPreview ?? message);
-            FeedbackMessage = string.Empty;
+            await RunOnUiThreadAsync(() =>
+            {
+                UpdateRecentChatPreview(selectedChatId, latestPreview ?? message);
+                FeedbackMessage = string.Empty;
+            });
         }
         catch (Exception exception)
         {
-            FeedbackMessage = exception.Message;
+            MainViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => FeedbackMessage = exception.Message);
         }
     }
 
@@ -371,5 +413,35 @@ public sealed class MainViewModel : ObservableObject
             AgentProviderKind.GitHubCopilot => DesignBrushPalette.AvatarVariantDanishBrush,
             _ => DesignBrushPalette.CodeAvatarBrush,
         };
+    }
+
+    private Task RunOnUiThreadAsync(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_dispatcherQueue.HasThreadAccess)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_dispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    action();
+                    completionSource.SetResult();
+                }
+                catch (Exception exception)
+                {
+                    completionSource.SetException(exception);
+                }
+            }))
+        {
+            completionSource.SetException(new InvalidOperationException("Unable to enqueue work to the UI dispatcher."));
+        }
+
+        return completionSource.Task;
     }
 }

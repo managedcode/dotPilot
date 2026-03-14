@@ -1,8 +1,10 @@
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
+using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
+[Bindable]
 public sealed class SessionSidebarItem(SessionId id, string title, string preview) : ObservableObject
 {
     private string _preview = preview;
@@ -18,6 +20,7 @@ public sealed class SessionSidebarItem(SessionId id, string title, string previe
     }
 }
 
+[Bindable]
 public sealed partial record ChatTimelineItem(
     string Id,
     SessionStreamEntryKind Kind,
@@ -29,6 +32,7 @@ public sealed partial record ChatTimelineItem(
     bool IsCurrentUser,
     string? AccentLabel = null);
 
+[Bindable]
 public sealed partial record ParticipantItem(
     string Name,
     string SecondaryText,
@@ -37,6 +41,7 @@ public sealed partial record ParticipantItem(
     string? BadgeText = null,
     Brush? BadgeBrush = null);
 
+[Bindable]
 public sealed partial record ProviderStatusItem(
     AgentProviderKind Kind,
     string DisplayName,
@@ -48,6 +53,7 @@ public sealed partial record ProviderStatusItem(
     string InstallCommand,
     IReadOnlyList<ProviderActionItem> Actions);
 
+[Bindable]
 public sealed partial record ProviderActionItem(
     string Label,
     string Summary,

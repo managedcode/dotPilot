@@ -10,12 +10,16 @@ internal static class AgentProviderStatusSnapshotReader
     private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
     private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
     private const string ReadySummaryFormat = "{0} CLI is available on PATH.";
+    private const string LiveExecutionUnavailableSummaryFormat =
+        "{0} CLI is detected, but live session execution is not wired yet in this app slice.";
     private static readonly System.Text.CompositeFormat MissingCliSummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(MissingCliSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadySummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(ReadySummaryFormat);
+    private static readonly System.Text.CompositeFormat LiveExecutionUnavailableCompositeFormat =
+        System.Text.CompositeFormat.Parse(LiveExecutionUnavailableSummaryFormat);
 
-    public static async Task<IReadOnlyList<ProviderStatusDescriptor>> BuildAsync(
+    public static async Task<IReadOnlyList<ProviderStatusProbeResult>> BuildAsync(
         LocalAgentSessionDbContext dbContext,
         CancellationToken cancellationToken)
     {
@@ -33,21 +37,6 @@ internal static class AgentProviderStatusSnapshotReader
             cancellationToken);
     }
 
-    public static async Task<bool> IsEnabledAsync(
-        LocalAgentSessionDbContext dbContext,
-        AgentProviderKind providerKind,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(dbContext);
-
-        var record = await dbContext.ProviderPreferences
-            .FirstOrDefaultAsync(
-                preference => preference.ProviderKind == (int)providerKind,
-                cancellationToken);
-
-        return record?.IsEnabled == true;
-    }
-
     private static ProviderPreferenceRecord GetProviderPreference(
         AgentProviderKind kind,
         Dictionary<AgentProviderKind, ProviderPreferenceRecord> preferences)
@@ -62,13 +51,14 @@ internal static class AgentProviderStatusSnapshotReader
             };
     }
 
-    private static ProviderStatusDescriptor BuildProviderStatus(
+    private static ProviderStatusProbeResult BuildProviderStatus(
         AgentSessionProviderProfile profile,
         ProviderPreferenceRecord preference)
     {
         var providerId = AgentSessionDeterministicIdentity.CreateProviderId(profile.CommandName);
         var actions = new List<ProviderActionDescriptor>();
         string? installedVersion = null;
+        string? executablePath = null;
         var status = AgentProviderStatus.Ready;
         var statusSummary = BuiltInStatusSummary;
         var canCreateAgents = true;
@@ -86,7 +76,7 @@ internal static class AgentProviderStatusSnapshotReader
         }
         else
         {
-            var executablePath = AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName);
+            executablePath = AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName);
             if (string.IsNullOrWhiteSpace(executablePath))
             {
                 actions.Add(new ProviderActionDescriptor("Install", "Install the CLI, then refresh settings.", profile.InstallCommand));
@@ -98,7 +88,19 @@ internal static class AgentProviderStatusSnapshotReader
             {
                 installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
                 actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
-                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadySummaryCompositeFormat, profile.DisplayName);
+                if (profile.SupportsLiveExecution)
+                {
+                    statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadySummaryCompositeFormat, profile.DisplayName);
+                }
+                else
+                {
+                    status = AgentProviderStatus.Error;
+                    statusSummary = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        LiveExecutionUnavailableCompositeFormat,
+                        profile.DisplayName);
+                    canCreateAgents = false;
+                }
             }
         }
 
@@ -109,16 +111,22 @@ internal static class AgentProviderStatusSnapshotReader
             canCreateAgents = false;
         }
 
-        return new ProviderStatusDescriptor(
-            providerId,
-            profile.Kind,
-            profile.DisplayName,
-            profile.CommandName,
-            status,
-            statusSummary,
-            installedVersion,
-            preference.IsEnabled,
-            canCreateAgents,
-            actions);
+        return new ProviderStatusProbeResult(
+            new ProviderStatusDescriptor(
+                providerId,
+                profile.Kind,
+                profile.DisplayName,
+                profile.CommandName,
+                status,
+                statusSummary,
+                installedVersion,
+                preference.IsEnabled,
+                canCreateAgents,
+                actions),
+            executablePath);
     }
 }
+
+internal sealed record ProviderStatusProbeResult(
+    ProviderStatusDescriptor Descriptor,
+    string? ExecutablePath);

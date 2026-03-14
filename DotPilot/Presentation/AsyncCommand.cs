@@ -1,3 +1,5 @@
+using Microsoft.UI.Dispatching;
+
 namespace DotPilot.Presentation;
 
 public sealed class AsyncCommand(
@@ -5,6 +7,7 @@ public sealed class AsyncCommand(
     Func<object?, bool>? canExecute = null) : ICommand
 {
     private bool _isExecuting;
+    private readonly DispatcherQueue? _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
     public AsyncCommand(Func<Task> executeAsync, Func<bool>? canExecute = null)
         : this(
@@ -43,6 +46,12 @@ public sealed class AsyncCommand(
 
     public void RaiseCanExecuteChanged()
     {
-        CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
     }
 }

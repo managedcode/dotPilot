@@ -1,14 +1,20 @@
 using System.Collections.ObjectModel;
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
+[Bindable]
 public sealed class SecondViewModel : ObservableObject
 {
     private const string AgentValidationMessage = "Enter an agent name and model before creating the profile.";
     private const string AgentCreationProgressMessage = "Creating agent profile...";
     private readonly IAgentSessionService _agentSessionService;
+    private readonly ILogger<SecondViewModel> _logger;
+    private readonly DispatcherQueue _dispatcherQueue;
     private readonly AsyncCommand _createAgentCommand;
     private readonly ObservableCollection<RoleOption> _roleOptions;
     private readonly ObservableCollection<CapabilityOption> _capabilityOptions;
@@ -20,9 +26,14 @@ public sealed class SecondViewModel : ObservableObject
     private string _statusMessage = "Loading provider readiness...";
     private AgentProviderOption? _selectedProvider;
 
-    public SecondViewModel(IAgentSessionService agentSessionService)
+    public SecondViewModel(
+        IAgentSessionService agentSessionService,
+        ILogger<SecondViewModel> logger)
     {
         _agentSessionService = agentSessionService;
+        _logger = logger;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
+            throw new InvalidOperationException("SecondViewModel requires a UI dispatcher queue.");
         _providerOptions = [];
         _roleOptions =
         [
@@ -122,23 +133,37 @@ public sealed class SecondViewModel : ObservableObject
 
     private async Task LoadProvidersAsync()
     {
-        var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
-        _providerOptions.Clear();
-
-        foreach (var provider in workspace.Providers)
+        try
         {
-            _providerOptions.Add(
-                new AgentProviderOption(
-                    provider.Kind,
-                    provider.DisplayName,
-                    provider.CommandName,
-                    provider.StatusSummary,
-                    provider.InstalledVersion,
-                    provider.CanCreateAgents));
-        }
+            SecondViewModelLog.LoadingProviders(_logger);
+            var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
+            await RunOnUiThreadAsync(() =>
+            {
+                _providerOptions.Clear();
 
-        SelectedProvider = _providerOptions.FirstOrDefault(option => option.CanCreateAgents) ??
-            _providerOptions.FirstOrDefault();
+                foreach (var provider in workspace.Providers)
+                {
+                    _providerOptions.Add(
+                        new AgentProviderOption(
+                            provider.Kind,
+                            provider.DisplayName,
+                            provider.CommandName,
+                            provider.StatusSummary,
+                            provider.InstalledVersion,
+                            provider.CanCreateAgents));
+                }
+
+                SelectedProvider = _providerOptions.FirstOrDefault(option => option.CanCreateAgents) ??
+                    _providerOptions.FirstOrDefault();
+            });
+
+            SecondViewModelLog.ProvidersLoaded(_logger, workspace.Providers.Count);
+        }
+        catch (Exception exception)
+        {
+            SecondViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
+        }
     }
 
     private async Task CreateAgentAsync()
@@ -178,12 +203,16 @@ public sealed class SecondViewModel : ObservableObject
                         .ToArray()),
                 CancellationToken.None);
 
-            StatusMessage = $"Created {created.Name} using {created.ProviderDisplayName}.";
-            AgentName = $"{created.Name} Copy";
+            await RunOnUiThreadAsync(() =>
+            {
+                StatusMessage = $"Created {created.Name} using {created.ProviderDisplayName}.";
+                AgentName = $"{created.Name} Copy";
+            });
         }
         catch (Exception exception)
         {
-            StatusMessage = exception.Message;
+            SecondViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
         }
     }
 
@@ -201,5 +230,35 @@ public sealed class SecondViewModel : ObservableObject
             AgentProviderKind.GitHubCopilot => "gpt-5",
             _ => "debug-echo",
         };
+    }
+
+    private Task RunOnUiThreadAsync(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_dispatcherQueue.HasThreadAccess)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_dispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    action();
+                    completionSource.SetResult();
+                }
+                catch (Exception exception)
+                {
+                    completionSource.SetException(exception);
+                }
+            }))
+        {
+            completionSource.SetException(new InvalidOperationException("Unable to enqueue work to the UI dispatcher."));
+        }
+
+        return completionSource.Task;
     }
 }

@@ -25,12 +25,13 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 
 - Keep this project focused on app composition, presentation, routing, and platform startup concerns.
 - Keep feature/domain/runtime code out of this project; reference it through slice-owned contracts and application services from separate DLLs.
+- Keep the Uno UI as a thin representation layer: background orchestration, long-running commands, and durable session updates should come from Orleans/runtime services instead of page-owned workflows.
 - Build the visible product around a desktop chat shell: session list, active transcript, terminal-like activity pane, agent/profile controls, and provider settings are the primary surfaces.
 - Do not use workbench, issue-center, domain-browser, or other backlog-driven IA labels as the product shell.
 - Do not preserve legacy prototype pages or controls once the replacement chat/session surface is underway; remove obsolete UI paths instead of carrying both shells.
 - Prefer declarative `Uno.Extensions.Navigation` in XAML via `uen:Navigation.Request` over page code-behind navigation calls.
 - Keep business logic, persistence, networking workflows, and non-UI orchestration out of page code-behind.
-- Build presentation with `MVVM`-friendly view models and separate reusable XAML components instead of large monolithic pages.
+- Build presentation with projection-only `MVVM`/`MVUX`-friendly models and separate reusable XAML components instead of large monolithic pages; runtime coordination, provider probes, session-loading pipelines, and other orchestration must stay outside the UI layer.
 - Organize non-UI work by feature-aligned vertical slices so each slice can evolve and ship without creating a shared dump of cross-cutting services in the app project.
 - Replace scaffold sample data with real runtime-backed state as product features arrive; the shell should converge on the real chat/session workflow instead of preserving prototype-only concepts.
 - Reuse shared resources and small XAML components instead of duplicating large visual sections across pages.
@@ -65,5 +66,6 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - `App.xaml` and `Styles/*` are shared styling roots; careless edits can regress the whole app.
 - `Presentation/*Page.xaml` files can grow quickly; split repeated sections before they violate maintainability limits.
 - This project is currently the visible product surface, so every visual change should preserve desktop responsiveness and accessibility-minded structure.
+- Screen switches, tab changes, and menu navigation in this project must reuse already-available in-memory projections; avoid view-model constructors or activation hooks that trigger cold runtime work during ordinary navigation.
 - `DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so Roslyn `IDE0005` stays active in CI across desktop, core, and browserwasm targets; do not remove that exception unless full XML documentation becomes part of the enforced quality bar.
 - Product wording and navigation here set the real user expectation; avoid leaking architecture slice names, issue numbers, or backlog jargon into the visible shell.

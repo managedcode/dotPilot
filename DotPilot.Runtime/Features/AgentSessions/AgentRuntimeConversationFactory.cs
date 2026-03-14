@@ -11,7 +11,8 @@ namespace DotPilot.Runtime.Features.AgentSessions;
 internal sealed class AgentRuntimeConversationFactory(
     LocalAgentSessionStateStore sessionStateStore,
     IServiceProvider serviceProvider,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<AgentRuntimeConversationFactory> logger)
 {
     private const string NotYetImplementedFormat = "{0} live CLI execution is not wired yet in this slice.";
     private static readonly System.Text.CompositeFormat NotYetImplementedCompositeFormat =
@@ -22,8 +23,17 @@ internal sealed class AgentRuntimeConversationFactory(
         SessionId sessionId,
         CancellationToken cancellationToken)
     {
+        AgentRuntimeConversationFactoryLog.InitializeStarted(logger, sessionId, agentRecord.Id);
         var runtimeSession = await LoadOrCreateAsync(agentRecord, sessionId, cancellationToken);
         await sessionStateStore.SaveAsync(runtimeSession.Agent, runtimeSession.Session, sessionId, cancellationToken);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            var agentRuntimeId = agentRecord.Id.ToString("N", CultureInfo.InvariantCulture);
+            AgentRuntimeConversationFactoryLog.SessionSaved(
+                logger,
+                sessionId,
+                agentRuntimeId);
+        }
     }
 
     public async ValueTask<RuntimeConversationContext> LoadOrCreateAsync(
@@ -41,6 +51,11 @@ internal sealed class AgentRuntimeConversationFactory(
         {
             session = await CreateNewSessionAsync(agent, sessionId, cancellationToken);
             await sessionStateStore.SaveAsync(agent, session, sessionId, cancellationToken);
+            AgentRuntimeConversationFactoryLog.SessionCreated(logger, sessionId, agentRecord.Id);
+        }
+        else
+        {
+            AgentRuntimeConversationFactoryLog.SessionLoaded(logger, sessionId, agentRecord.Id);
         }
 
         FolderChatHistoryProvider.BindToSession(session, sessionId);
@@ -53,6 +68,7 @@ internal sealed class AgentRuntimeConversationFactory(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtimeContext);
+        AgentRuntimeConversationFactoryLog.SessionSaved(logger, sessionId, runtimeContext.Agent.Id);
         return sessionStateStore.SaveAsync(runtimeContext.Agent, runtimeContext.Session, sessionId, cancellationToken);
     }
 
@@ -85,6 +101,12 @@ internal sealed class AgentRuntimeConversationFactory(
                 ModelId = agentRecord.ModelName,
             },
         };
+
+        AgentRuntimeConversationFactoryLog.AgentRuntimeCreated(
+            logger,
+            agentRecord.Id,
+            agentRecord.Name,
+            providerProfile.Kind);
 
         return CreateChatClient(providerProfile, agentRecord.Name)
             .AsAIAgent(options, loggerFactory, serviceProvider);

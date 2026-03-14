@@ -1,12 +1,21 @@
 using System.Collections.ObjectModel;
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Runtime.Features.AgentSessions;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Data;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace DotPilot.Presentation;
 
+[Bindable]
 public sealed class SettingsViewModel : ObservableObject
 {
+    private const string RefreshCompletedMessage = "Provider readiness refreshed.";
     private readonly IAgentSessionService _agentSessionService;
+    private readonly IAgentProviderStatusCache _providerStatusCache;
+    private readonly ILogger<SettingsViewModel> _logger;
+    private readonly DispatcherQueue _dispatcherQueue;
     private readonly AsyncCommand _refreshCommand;
     private readonly AsyncCommand _toggleProviderCommand;
     private readonly AsyncCommand _providerActionCommand;
@@ -14,11 +23,18 @@ public sealed class SettingsViewModel : ObservableObject
     private ProviderStatusItem? _selectedProvider;
     private string _statusMessage = string.Empty;
 
-    public SettingsViewModel(IAgentSessionService agentSessionService)
+    public SettingsViewModel(
+        IAgentSessionService agentSessionService,
+        IAgentProviderStatusCache providerStatusCache,
+        ILogger<SettingsViewModel> logger)
     {
         _agentSessionService = agentSessionService;
+        _providerStatusCache = providerStatusCache;
+        _logger = logger;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
+            throw new InvalidOperationException("SettingsViewModel requires a UI dispatcher queue.");
         _providers = [];
-        _refreshCommand = new AsyncCommand(LoadProvidersAsync);
+        _refreshCommand = new AsyncCommand(RefreshProvidersAsync);
         _toggleProviderCommand = new AsyncCommand(ToggleSelectedProviderAsync, CanToggleSelectedProvider);
         _providerActionCommand = new AsyncCommand(ExecuteProviderActionAsync, CanExecuteProviderAction);
         _ = LoadProvidersAsync();
@@ -77,28 +93,60 @@ public sealed class SettingsViewModel : ObservableObject
 
     private async Task LoadProvidersAsync()
     {
-        var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
-        _providers.Clear();
-
-        foreach (var provider in workspace.Providers)
+        try
         {
-            _providers.Add(
-                new ProviderStatusItem(
-                    provider.Kind,
-                    provider.DisplayName,
-                    provider.CommandName,
-                    provider.StatusSummary,
-                    provider.InstalledVersion,
-                    provider.IsEnabled,
-                    provider.CanCreateAgents,
-                    provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
-                    provider.Actions
-                        .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
-                        .ToArray()));
-        }
+            SettingsViewModelLog.LoadingProviders(_logger);
+            var previouslySelectedKind = SelectedProvider?.Kind;
+            var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
+            await RunOnUiThreadAsync(() =>
+            {
+                _providers.Clear();
 
-        SelectedProvider = _providers.FirstOrDefault(provider => provider.IsEnabled) ??
-            _providers.FirstOrDefault();
+                foreach (var provider in workspace.Providers)
+                {
+                    _providers.Add(
+                        new ProviderStatusItem(
+                            provider.Kind,
+                            provider.DisplayName,
+                            provider.CommandName,
+                            provider.StatusSummary,
+                            provider.InstalledVersion,
+                            provider.IsEnabled,
+                            provider.CanCreateAgents,
+                            provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
+                            provider.Actions
+                                .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
+                                .ToArray()));
+                }
+
+                SelectedProvider = _providers.FirstOrDefault(provider => provider.Kind == previouslySelectedKind) ??
+                    _providers.FirstOrDefault(provider => provider.IsEnabled) ??
+                    _providers.FirstOrDefault();
+            });
+
+            SettingsViewModelLog.ProvidersLoaded(_logger, workspace.Providers.Count);
+        }
+        catch (Exception exception)
+        {
+            SettingsViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
+        }
+    }
+
+    private async Task RefreshProvidersAsync()
+    {
+        try
+        {
+            SettingsViewModelLog.RefreshRequested(_logger);
+            await _providerStatusCache.RefreshAsync(CancellationToken.None);
+            await LoadProvidersAsync();
+            await RunOnUiThreadAsync(() => StatusMessage = RefreshCompletedMessage);
+        }
+        catch (Exception exception)
+        {
+            SettingsViewModelLog.Failure(_logger, exception);
+            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
+        }
     }
 
     private async Task ToggleSelectedProviderAsync()
@@ -112,7 +160,7 @@ public sealed class SettingsViewModel : ObservableObject
             new UpdateProviderPreferenceCommand(SelectedProvider.Kind, !SelectedProvider.IsEnabled),
             CancellationToken.None);
         await LoadProvidersAsync();
-        StatusMessage = $"{SelectedProviderTitle} updated.";
+        await RunOnUiThreadAsync(() => StatusMessage = $"{SelectedProviderTitle} updated.");
     }
 
     private bool CanToggleSelectedProvider()
@@ -152,5 +200,35 @@ public sealed class SettingsViewModel : ObservableObject
     private static bool CanExecuteProviderAction(object? parameter)
     {
         return parameter is ProviderActionItem;
+    }
+
+    private Task RunOnUiThreadAsync(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_dispatcherQueue.HasThreadAccess)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_dispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    action();
+                    completionSource.SetResult();
+                }
+                catch (Exception exception)
+                {
+                    completionSource.SetException(exception);
+                }
+            }))
+        {
+            completionSource.SetException(new InvalidOperationException("Unable to enqueue work to the UI dispatcher."));
+        }
+
+        return completionSource.Task;
     }
 }
