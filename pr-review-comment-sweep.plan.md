@@ -47,11 +47,11 @@ Out of scope:
 - [x] Collect actionable review comments and threads for PRs `#79`, `#80`, `#81`, and `#82`.
 - [x] Audit each comment for current validity and group them by PR and affected slice.
 - [x] Apply the valid fixes for PR `#79` and run focused verification.
-- [ ] Apply the valid fixes for PR `#80` and run focused verification.
-- [ ] Apply the valid fixes for PR `#81` and run focused verification.
-- [ ] Apply the valid fixes for PR `#82` and run focused verification.
-- [ ] Run the full repo validation sequence.
-- [ ] Commit the sweep and push the branch updates needed for the affected PR heads.
+- [x] Apply the valid fixes for PR `#80` and run focused verification.
+- [x] Apply the valid fixes for PR `#81` and run focused verification.
+- [x] Apply the valid fixes for PR `#82` and run focused verification.
+- [x] Run the full repo validation sequence.
+- [x] Commit the sweep and push the branch updates needed for the affected PR heads.
 
 ## Full-Test Baseline
 
@@ -61,10 +61,27 @@ Out of scope:
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter "FullyQualifiedName~ToolchainCenter|FullyQualifiedName~RuntimeFoundation"`
   - `dotnet test DotPilot.UITests/DotPilot.UITests.csproj --filter "FullyQualifiedName~WhenNavigatingToSettingsThenCategoriesAndEntriesAreVisible|FullyQualifiedName~WhenNavigatingToSettingsThenToolchainCenterProviderDetailsAreVisible|FullyQualifiedName~WhenSwitchingToolchainProvidersThenProviderSpecificDetailsAreVisible"`
   - `dotnet format DotPilot.slnx --verify-no-changes`
+- [x] PR `#80` focused verification passed:
+  - `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
+  - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter "FullyQualifiedName~EmbeddedRuntimeHost|FullyQualifiedName~ToolchainCommandProbe"`
+  - `dotnet format DotPilot.slnx --verify-no-changes`
+- [x] PR `#81` focused verification passed:
+  - `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
+  - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter "FullyQualifiedName~AgentFrameworkRuntimeClient|FullyQualifiedName~EmbeddedRuntimeTrafficPolicy|FullyQualifiedName~RuntimeFoundationCatalog"`
+  - `dotnet format DotPilot.slnx --verify-no-changes`
+- [x] PR `#82` focused verification passed:
+  - `dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false`
+  - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter "FullyQualifiedName~ControlPlaneDomain"`
+  - `dotnet format DotPilot.slnx --verify-no-changes`
+- [x] Full repo validation passed on every updated PR head:
+  - PR `#79` (`codex/consolidated-13-15-76`): `60` unit tests, `22` UI tests, coverage collector green.
+  - PR `#80` (`codex/issue-24-embedded-orleans-host`): `68` unit tests, `22` UI tests, coverage collector green.
+  - PR `#81` (`codex/epic-12-embedded-runtime`): `75` unit tests, `22` UI tests, coverage collector green.
+  - PR `#82` (`codex/epic-11-foundation-contracts`): `61` unit tests, `22` UI tests, coverage collector green.
 
 ## Tracked Failing Tests
 
-- [ ] No failing tests tracked yet. Add each failure here if comment-driven fixes expose regressions.
+- [x] No failing tests remained after the PR sweep.
 
 ## Done Criteria
 
