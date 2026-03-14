@@ -1,7 +1,9 @@
-namespace DotPilot.UITests;
+using DotPilot.UITests.Harness;
+
+namespace DotPilot.UITests.Features.Workbench;
 
 [NonParallelizable]
-public class GivenMainPage : TestBase
+public class GivenWorkbenchShell : TestBase
 {
     private static readonly TimeSpan InitialScreenProbeTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ScreenTransitionTimeout = TimeSpan.FromSeconds(60);

@@ -144,6 +144,7 @@ For this app:
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
 - do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
+- do not commit user-specific local paths, usernames, or machine-specific identifiers in tests, docs, snapshots, or fixtures; use neutral synthetic values so the repo stays portable and does not leak personal machine details
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
@@ -157,6 +158,7 @@ For this app:
 - structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
 - the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; do not introduce remote clustering or external durable stores until a later backlog item explicitly requires them, and keep durable resume/replay outside Orleans storage until the cluster topology is intentionally upgraded
 - GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
+- never claim an epic is complete until its current GitHub scope is verified against the live issue graph; check which issues are real children versus issues that merely depend on the epic or belong to a different parent epic
 - Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
 - Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
@@ -311,6 +313,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Hardcoded values are forbidden.
 - String literals are forbidden in implementation code. Declare them once as named constants, enums, configuration entries, or dedicated value objects, then reuse those symbols.
 - Avoid magic literals. Extract shared values into constants, enums, configuration, or dedicated types.
+- Backlog metadata does not belong in product code: issue numbers, PR numbers, review language, and planning terminology must never appear in production runtime models, diagnostics, or user-facing text unless the feature explicitly exposes source-control metadata.
 - Design boundaries so real behaviour can be tested through public interfaces.
 - For `.NET`, the repo-root `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity.
 - Use nested `.editorconfig` files when they serve a clear subtree-specific purpose. Do not let IDE defaults, pipeline flags, and repo config disagree.
@@ -369,6 +372,8 @@ Ask first:
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
+- Creating auxiliary `git worktree` directories for normal PR follow-up when straightforward branch switching in the main checkout is enough.
+- Running build, test, or verification commands for file-only structural reorganizations when the user explicitly asked for folder cleanup without behavior changes.
 - Adding fallback paths or alternate harnesses that only make failures disappear in tests while the primary product path remains broken.
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.

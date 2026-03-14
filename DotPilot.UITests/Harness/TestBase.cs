@@ -1,5 +1,5 @@
 
-namespace DotPilot.UITests;
+namespace DotPilot.UITests.Harness;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
     "Performance",

@@ -20,10 +20,12 @@ internal static class ToolchainProviderSnapshotFactory
     private const string AuthMissingSummary = "No non-interactive authentication signal was detected.";
     private const string AuthConnectedSummary = "A non-interactive authentication signal is configured.";
     private const string ReadinessMissingSummaryFormat = "{0} is not installed on PATH.";
+    private const string ReadinessLaunchFailedSummaryFormat = "{0} is on PATH, but dotPilot could not launch the CLI automatically.";
     private const string ReadinessAuthRequiredSummaryFormat = "{0} is installed, but authentication still needs operator attention.";
     private const string ReadinessLimitedSummaryFormat = "{0} is installed, but one or more readiness prerequisites still need attention.";
     private const string ReadinessReadySummaryFormat = "{0} is ready for pre-session operator checks.";
     private const string HealthBlockedMissingSummaryFormat = "{0} launch is blocked until the CLI is installed.";
+    private const string HealthBlockedLaunchSummaryFormat = "{0} launch is blocked until dotPilot can start the CLI successfully.";
     private const string HealthBlockedAuthSummaryFormat = "{0} launch is blocked until authentication is configured.";
     private const string HealthWarningSummaryFormat = "{0} is installed, but diagnostics still show warnings.";
     private const string HealthReadySummaryFormat = "{0} passed the available pre-session readiness checks.";
@@ -34,6 +36,7 @@ internal static class ToolchainProviderSnapshotFactory
     private const string ResumeDiagnosticName = "Resume test";
     private const string LaunchPassedSummary = "The executable is installed and launchable from PATH.";
     private const string LaunchFailedSummary = "The executable is not available on PATH.";
+    private const string LaunchUnavailableSummary = "The executable was detected, but dotPilot could not launch it automatically.";
     private const string VersionFailedSummary = "The version could not be resolved automatically.";
     private const string ConnectionReadySummary = "The provider is ready for a live connection test from the Toolchain Center.";
     private const string ConnectionBlockedSummary = "Fix installation and authentication before running a live connection test.";
@@ -50,10 +53,12 @@ internal static class ToolchainProviderSnapshotFactory
     private static readonly System.Text.CompositeFormat DocsActionTitleCompositeFormat = System.Text.CompositeFormat.Parse(DocsActionTitleFormat);
     private static readonly System.Text.CompositeFormat VersionSummaryCompositeFormat = System.Text.CompositeFormat.Parse(VersionSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadinessMissingSummaryCompositeFormat = System.Text.CompositeFormat.Parse(ReadinessMissingSummaryFormat);
+    private static readonly System.Text.CompositeFormat ReadinessLaunchFailedSummaryCompositeFormat = System.Text.CompositeFormat.Parse(ReadinessLaunchFailedSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadinessAuthRequiredSummaryCompositeFormat = System.Text.CompositeFormat.Parse(ReadinessAuthRequiredSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadinessLimitedSummaryCompositeFormat = System.Text.CompositeFormat.Parse(ReadinessLimitedSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadinessReadySummaryCompositeFormat = System.Text.CompositeFormat.Parse(ReadinessReadySummaryFormat);
     private static readonly System.Text.CompositeFormat HealthBlockedMissingSummaryCompositeFormat = System.Text.CompositeFormat.Parse(HealthBlockedMissingSummaryFormat);
+    private static readonly System.Text.CompositeFormat HealthBlockedLaunchSummaryCompositeFormat = System.Text.CompositeFormat.Parse(HealthBlockedLaunchSummaryFormat);
     private static readonly System.Text.CompositeFormat HealthBlockedAuthSummaryCompositeFormat = System.Text.CompositeFormat.Parse(HealthBlockedAuthSummaryFormat);
     private static readonly System.Text.CompositeFormat HealthWarningSummaryCompositeFormat = System.Text.CompositeFormat.Parse(HealthWarningSummaryFormat);
     private static readonly System.Text.CompositeFormat HealthReadySummaryCompositeFormat = System.Text.CompositeFormat.Parse(HealthReadySummaryFormat);
@@ -91,54 +96,56 @@ internal static class ToolchainProviderSnapshotFactory
     {
         var executablePath = ToolchainCommandProbe.ResolveExecutablePath(profile.CommandName);
         var isInstalled = !string.IsNullOrWhiteSpace(executablePath);
-        var installedVersion = isInstalled
-            ? ToolchainCommandProbe.ReadVersion(executablePath!, profile.VersionArguments)
-            : string.Empty;
+        var versionProbe = isInstalled
+            ? ToolchainCommandProbe.ProbeVersion(executablePath!, profile.VersionArguments)
+            : ToolchainCommandProbe.ToolchainVersionProbeResult.Missing;
+        var launchAvailable = isInstalled && versionProbe.Launched;
+        var installedVersion = launchAvailable ? versionProbe.Version : string.Empty;
         var authConfigured = profile.AuthenticationEnvironmentVariables
             .Select(Environment.GetEnvironmentVariable)
             .Any(static value => !string.IsNullOrWhiteSpace(value));
-        var toolAccessAvailable = isInstalled && (
+        var toolAccessAvailable = launchAvailable && (
             profile.ToolAccessArguments.Count == 0 ||
             ToolchainCommandProbe.CanExecute(executablePath!, profile.ToolAccessArguments));
 
-        var providerStatus = ResolveProviderStatus(isInstalled, authConfigured, toolAccessAvailable);
-        var readinessState = ResolveReadinessState(isInstalled, authConfigured, toolAccessAvailable, installedVersion);
+        var providerStatus = ResolveProviderStatus(isInstalled, launchAvailable, authConfigured, toolAccessAvailable);
+        var readinessState = ResolveReadinessState(isInstalled, launchAvailable, authConfigured, toolAccessAvailable, installedVersion);
         var versionStatus = ResolveVersionStatus(isInstalled, installedVersion);
         var authStatus = authConfigured ? ToolchainAuthStatus.Connected : ToolchainAuthStatus.Missing;
-        var healthStatus = ResolveHealthStatus(isInstalled, authConfigured, toolAccessAvailable, installedVersion);
+        var healthStatus = ResolveHealthStatus(isInstalled, launchAvailable, authConfigured, toolAccessAvailable, installedVersion);
         var polling = CreateProviderPolling(evaluatedAt, readinessState);
 
         return new(
             profile.IssueNumber,
-            ToolchainCenterIssues.FormatIssueLabel(profile.IssueNumber),
+            profile.SectionLabel,
             new ProviderDescriptor
             {
                 Id = ToolchainDeterministicIdentity.CreateProviderId(profile.CommandName),
                 DisplayName = profile.DisplayName,
                 CommandName = profile.CommandName,
                 Status = providerStatus,
-                StatusSummary = ResolveReadinessSummary(profile.DisplayName, readinessState),
+                StatusSummary = ResolveReadinessSummary(profile.DisplayName, isInstalled, launchAvailable, readinessState),
                 RequiresExternalToolchain = true,
             },
             executablePath ?? MissingExecutablePath,
             string.IsNullOrWhiteSpace(installedVersion) ? MissingVersion : installedVersion,
             readinessState,
-            ResolveReadinessSummary(profile.DisplayName, readinessState),
+            ResolveReadinessSummary(profile.DisplayName, isInstalled, launchAvailable, readinessState),
             versionStatus,
             ResolveVersionSummary(versionStatus, installedVersion),
             authStatus,
             authConfigured ? AuthConnectedSummary : AuthMissingSummary,
             healthStatus,
-            ResolveHealthSummary(profile.DisplayName, healthStatus, authConfigured),
+            ResolveHealthSummary(profile.DisplayName, healthStatus, isInstalled, launchAvailable, authConfigured),
             CreateActions(profile, readinessState),
-            CreateDiagnostics(profile, isInstalled, authConfigured, installedVersion, toolAccessAvailable),
+            CreateDiagnostics(profile, isInstalled, launchAvailable, authConfigured, installedVersion, toolAccessAvailable),
             CreateConfiguration(profile),
             polling);
     }
 
-    private static ProviderConnectionStatus ResolveProviderStatus(bool isInstalled, bool authConfigured, bool toolAccessAvailable)
+    private static ProviderConnectionStatus ResolveProviderStatus(bool isInstalled, bool launchAvailable, bool authConfigured, bool toolAccessAvailable)
     {
-        if (!isInstalled)
+        if (!isInstalled || !launchAvailable)
         {
             return ProviderConnectionStatus.Unavailable;
         }
@@ -155,11 +162,12 @@ internal static class ToolchainProviderSnapshotFactory
 
     private static ToolchainReadinessState ResolveReadinessState(
         bool isInstalled,
+        bool launchAvailable,
         bool authConfigured,
         bool toolAccessAvailable,
         string installedVersion)
     {
-        if (!isInstalled)
+        if (!isInstalled || !launchAvailable)
         {
             return ToolchainReadinessState.Missing;
         }
@@ -191,11 +199,12 @@ internal static class ToolchainProviderSnapshotFactory
 
     private static ToolchainHealthStatus ResolveHealthStatus(
         bool isInstalled,
+        bool launchAvailable,
         bool authConfigured,
         bool toolAccessAvailable,
         string installedVersion)
     {
-        if (!isInstalled || !authConfigured)
+        if (!isInstalled || !launchAvailable || !authConfigured)
         {
             return ToolchainHealthStatus.Blocked;
         }
@@ -205,9 +214,14 @@ internal static class ToolchainProviderSnapshotFactory
             : ToolchainHealthStatus.Warning;
     }
 
-    private static string ResolveReadinessSummary(string displayName, ToolchainReadinessState readinessState) =>
+    private static string ResolveReadinessSummary(
+        string displayName,
+        bool isInstalled,
+        bool launchAvailable,
+        ToolchainReadinessState readinessState) =>
         readinessState switch
         {
+            ToolchainReadinessState.Missing when isInstalled && !launchAvailable => string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadinessLaunchFailedSummaryCompositeFormat, displayName),
             ToolchainReadinessState.Missing => string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadinessMissingSummaryCompositeFormat, displayName),
             ToolchainReadinessState.ActionRequired => string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadinessAuthRequiredSummaryCompositeFormat, displayName),
             ToolchainReadinessState.Limited => string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadinessLimitedSummaryCompositeFormat, displayName),
@@ -222,11 +236,17 @@ internal static class ToolchainProviderSnapshotFactory
             _ => string.Format(System.Globalization.CultureInfo.InvariantCulture, VersionSummaryCompositeFormat, installedVersion),
         };
 
-    private static string ResolveHealthSummary(string displayName, ToolchainHealthStatus healthStatus, bool authConfigured) =>
+    private static string ResolveHealthSummary(
+        string displayName,
+        ToolchainHealthStatus healthStatus,
+        bool isInstalled,
+        bool launchAvailable,
+        bool authConfigured) =>
         healthStatus switch
         {
-            ToolchainHealthStatus.Blocked when authConfigured => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthBlockedMissingSummaryCompositeFormat, displayName),
-            ToolchainHealthStatus.Blocked => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthBlockedAuthSummaryCompositeFormat, displayName),
+            ToolchainHealthStatus.Blocked when !isInstalled => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthBlockedMissingSummaryCompositeFormat, displayName),
+            ToolchainHealthStatus.Blocked when !launchAvailable => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthBlockedLaunchSummaryCompositeFormat, displayName),
+            ToolchainHealthStatus.Blocked when !authConfigured => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthBlockedAuthSummaryCompositeFormat, displayName),
             ToolchainHealthStatus.Warning => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthWarningSummaryCompositeFormat, displayName),
             _ => string.Format(System.Globalization.CultureInfo.InvariantCulture, HealthReadySummaryCompositeFormat, displayName),
         };
@@ -283,18 +303,19 @@ internal static class ToolchainProviderSnapshotFactory
     private static ToolchainDiagnosticDescriptor[] CreateDiagnostics(
         ToolchainProviderProfile profile,
         bool isInstalled,
+        bool launchAvailable,
         bool authConfigured,
         string installedVersion,
         bool toolAccessAvailable)
     {
-        var launchPassed = isInstalled;
+        var launchPassed = launchAvailable;
         var versionPassed = !string.IsNullOrWhiteSpace(installedVersion);
         var connectionReady = launchPassed && authConfigured;
         var resumeReady = connectionReady;
 
         return
         [
-            new(LaunchDiagnosticName, launchPassed ? ToolchainDiagnosticStatus.Passed : ToolchainDiagnosticStatus.Failed, launchPassed ? LaunchPassedSummary : LaunchFailedSummary),
+            new(LaunchDiagnosticName, launchPassed ? ToolchainDiagnosticStatus.Passed : ToolchainDiagnosticStatus.Failed, launchPassed ? LaunchPassedSummary : (isInstalled ? LaunchUnavailableSummary : LaunchFailedSummary)),
             new(VersionDiagnosticName, launchPassed ? (versionPassed ? ToolchainDiagnosticStatus.Passed : ToolchainDiagnosticStatus.Warning) : ToolchainDiagnosticStatus.Blocked, versionPassed ? ResolveVersionSummary(ToolchainVersionStatus.Detected, installedVersion) : VersionFailedSummary),
             new(AuthDiagnosticName, launchPassed ? (authConfigured ? ToolchainDiagnosticStatus.Passed : ToolchainDiagnosticStatus.Warning) : ToolchainDiagnosticStatus.Blocked, authConfigured ? AuthConnectedSummary : AuthMissingSummary),
             new(profile.ToolAccessDiagnosticName, launchPassed ? (toolAccessAvailable ? ToolchainDiagnosticStatus.Passed : ToolchainDiagnosticStatus.Warning) : ToolchainDiagnosticStatus.Blocked, toolAccessAvailable ? profile.ToolAccessReadySummary : profile.ToolAccessBlockedSummary),

@@ -1,9 +1,10 @@
 using System.Text.Json;
 
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.ControlPlaneDomain;
 
 public class ControlPlaneDomainContractsTests
 {
+    private const string SyntheticWorkspaceRootPath = "/repo/dotPilot";
     private static readonly DateTimeOffset CreatedAt = new(2026, 3, 13, 10, 15, 30, TimeSpan.Zero);
     private static readonly DateTimeOffset UpdatedAt = new(2026, 3, 13, 10, 45, 30, TimeSpan.Zero);
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -99,7 +100,7 @@ public class ControlPlaneDomainContractsTests
         {
             Id = WorkspaceId.New(),
             Name = "dotPilot",
-            RootPath = "/Users/ksemenenko/Developer/dotPilot",
+            RootPath = SyntheticWorkspaceRootPath,
             BranchName = "codex/issue-22-domain-model",
         };
 

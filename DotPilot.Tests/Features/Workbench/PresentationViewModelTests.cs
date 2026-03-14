@@ -1,7 +1,7 @@
 using DotPilot.Presentation;
 using DotPilot.Runtime.Features.Workbench;
 
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.Workbench;
 
 public class PresentationViewModelTests
 {
@@ -26,7 +26,7 @@ public class PresentationViewModelTests
         viewModel.IsPreviewMode.Should().BeFalse();
         viewModel.IsLogConsoleVisible = true;
         viewModel.IsArtifactsVisible.Should().BeFalse();
-        viewModel.RuntimeFoundation.EpicLabel.Should().Be(RuntimeFoundationIssues.FormatIssueLabel(RuntimeFoundationIssues.EmbeddedAgentRuntimeHostEpic));
+        viewModel.RuntimeFoundation.EpicLabel.Should().Be("LOCAL RUNTIME READINESS");
         viewModel.RuntimeFoundation.Providers.Should().Contain(provider => !provider.RequiresExternalToolchain);
     }
 
@@ -69,7 +69,7 @@ public class PresentationViewModelTests
         viewModel.Skills.Should().Contain(skill => skill.IsEnabled);
         viewModel.Skills.Should().Contain(skill => !skill.IsEnabled);
         viewModel.RuntimeFoundation.DeterministicClientName.Should().Be("In-Repo Test Client");
-        viewModel.RuntimeFoundation.Providers.Should().HaveCountGreaterOrEqualTo(4);
+        viewModel.RuntimeFoundation.Providers.Should().ContainSingle();
     }
 
     private static RuntimeFoundationCatalog CreateRuntimeFoundationCatalog()

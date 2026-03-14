@@ -2,6 +2,8 @@ namespace DotPilot.Tests.Features.ToolchainCenter;
 
 public class ToolchainCenterCatalogTests
 {
+    private const string ToolchainEpicLabel = "PRE-SESSION READINESS";
+
     [Test]
     public void CatalogIncludesEpicIssueCoverageAndAllExternalProviders()
     {
@@ -14,7 +16,9 @@ public class ToolchainCenterCatalogTests
             .Order()
             .ToArray();
 
-        snapshot.EpicLabel.Should().Be(ToolchainCenterIssues.FormatIssueLabel(ToolchainCenterIssues.ToolchainCenterEpic));
+        snapshot.EpicLabel.Should().Be(ToolchainEpicLabel);
+        snapshot.Summary.Should().NotContain("Issue #");
+        snapshot.Workstreams.Select(workstream => workstream.SectionLabel).Should().Equal("SURFACE", "DIAGNOSTICS", "CONFIGURATION", "POLLING");
         coveredIssues.Should().Equal(
             ToolchainCenterIssues.ToolchainCenterUi,
             ToolchainCenterIssues.CodexReadiness,
@@ -52,6 +56,16 @@ public class ToolchainCenterCatalogTests
 
         snapshot.BackgroundPolling.RefreshInterval.Should().Be(TimeSpan.FromMinutes(5));
         snapshot.Providers.Should().NotBeEmpty();
+    }
+
+    [Test]
+    public void CatalogDisposeIsIdempotentAfterBackgroundPollingStarts()
+    {
+        var catalog = new ToolchainCenterCatalog(TimeProvider.System, startBackgroundPolling: true);
+
+        catalog.Dispose();
+
+        catalog.Invoking(item => item.Dispose()).Should().NotThrow();
     }
 
     [Test]

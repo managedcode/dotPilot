@@ -35,7 +35,6 @@ flowchart LR
   Adr3["ADR-0003 vertical slices + UI-only app"]
   Feature["agent-control-plane-experience.md"]
   Toolchains["toolchain-center.md"]
-  Plan["vertical-slice-runtime-foundation.plan.md"]
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core contracts"]
   Runtime["DotPilot.Runtime services"]
@@ -49,7 +48,6 @@ flowchart LR
   Root --> Adr3
   Root --> Feature
   Root --> Toolchains
-  Root --> Plan
   Root --> Ui
   Root --> Core
   Root --> Runtime
@@ -182,7 +180,6 @@ flowchart LR
   DesktopClient["AgentFrameworkRuntimeClient"]
   Archive["RuntimeSessionArchiveStore"]
   Traffic["EmbeddedRuntimeTrafficPolicyCatalog"]
-  Probe["ProviderToolchainProbe"]
   ToolchainProbe["ToolchainCommandProbe + provider profiles"]
   EmbeddedHost["UseDotPilotEmbeddedRuntime + Orleans silo"]
   Contracts["Typed IDs + contracts"]
@@ -194,7 +191,6 @@ flowchart LR
   ViewModels --> Toolchains
   Catalog --> BrowserClient
   Catalog --> DesktopClient
-  Catalog --> Probe
   Catalog --> Contracts
   Toolchains --> ToolchainProbe
   Toolchains --> Contracts

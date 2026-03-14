@@ -1,4 +1,4 @@
-namespace DotPilot.Tests;
+namespace DotPilot.Tests.Features.Workbench;
 
 internal sealed class TemporaryWorkbenchDirectory : IDisposable
 {

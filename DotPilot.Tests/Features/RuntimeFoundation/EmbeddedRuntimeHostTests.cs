@@ -61,6 +61,25 @@ public class EmbeddedRuntimeHostTests
     }
 
     [Test]
+    public async Task LifecycleServiceDoesNotMarkTheCatalogRunningBeforeTheSiloStartupTaskRuns()
+    {
+        var options = CreateOptions();
+        using var host = CreateHost(options);
+        var lifecycleService = host.Services
+            .GetServices<IHostedService>()
+            .Single(service => service.GetType().Name == "EmbeddedRuntimeHostLifecycleService");
+
+        await lifecycleService.StartAsync(CancellationToken.None);
+
+        host.Services
+            .GetRequiredService<IEmbeddedRuntimeHostCatalog>()
+            .GetSnapshot()
+            .State
+            .Should()
+            .Be(EmbeddedRuntimeHostState.Stopped);
+    }
+
+    [Test]
     public async Task InitialGrainsReturnNullBeforeTheirFirstWrite()
     {
         var options = CreateOptions();
