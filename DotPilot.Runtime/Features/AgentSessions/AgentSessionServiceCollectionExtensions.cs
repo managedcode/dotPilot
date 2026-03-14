@@ -1,3 +1,4 @@
+using DotPilot.Core.Features.AgentSessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,7 @@ public static class AgentSessionServiceCollectionExtensions
             serviceProvider.GetRequiredService<AgentProviderStatusCache>());
         services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<DotPilot.Core.Features.AgentSessions.IAgentSessionService, AgentSessionService>();
+        services.AddSingleton<IAgentWorkspaceState, AgentWorkspaceState>();
         return services;
     }
 

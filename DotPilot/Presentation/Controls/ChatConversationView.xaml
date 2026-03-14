@@ -135,7 +135,7 @@
                    FontSize="16"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource AppPrimaryTextBrush}"
-                   Text="{Binding Title}" />
+                   Text="{Binding ActiveSession.Title}" />
         <StackPanel Orientation="Horizontal"
                     Spacing="6">
           <Ellipse Width="7"
@@ -144,7 +144,7 @@
           <TextBlock AutomationProperties.AutomationId="ChatStatusText"
                      FontSize="12"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{Binding StatusSummary}" />
+                     Text="{Binding ActiveSession.StatusSummary}" />
         </StackPanel>
       </StackPanel>
 
@@ -153,7 +153,7 @@
               Background="{StaticResource AppSoftSurfaceBrush}"
               BorderBrush="{StaticResource AppOutlineBrush}"
               BorderThickness="1"
-              Command="{Binding RefreshCommand}"
+              Command="{Binding Refresh}"
               CornerRadius="20"
               Padding="14,10">
         <StackPanel Orientation="Horizontal"
@@ -187,14 +187,14 @@
             <TextBlock HorizontalAlignment="Center"
                        FontSize="13"
                        Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="{Binding StatusSummary}"
+                       Text="{Binding ActiveSession.StatusSummary}"
                        TextWrapping="WrapWholeWords" />
           </StackPanel>
         </Border>
 
         <ItemsControl AutomationProperties.AutomationId="ChatMessagesList"
                       ItemTemplateSelector="{StaticResource ChatMessageTemplateSelector}"
-                      ItemsSource="{Binding Messages}" />
+                      ItemsSource="{Binding ActiveSession.Messages}" />
       </StackPanel>
     </ScrollViewer>
   </Grid>

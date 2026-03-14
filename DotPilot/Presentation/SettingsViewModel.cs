@@ -1,184 +1,127 @@
-using System.Collections.ObjectModel;
+using System.Collections.Immutable;
 using DotPilot.Core.Features.AgentSessions;
-using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.Logging;
-using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Data;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace DotPilot.Presentation;
 
 [Bindable]
-public sealed class SettingsViewModel : ObservableObject
+public partial record SettingsModel
 {
     private const string RefreshCompletedMessage = "Provider readiness refreshed.";
-    private readonly IAgentSessionService _agentSessionService;
-    private readonly IAgentProviderStatusCache _providerStatusCache;
-    private readonly ILogger<SettingsViewModel> _logger;
-    private readonly DispatcherQueue _dispatcherQueue;
-    private readonly AsyncCommand _refreshCommand;
-    private readonly AsyncCommand _toggleProviderCommand;
-    private readonly AsyncCommand _providerActionCommand;
-    private readonly ObservableCollection<ProviderStatusItem> _providers;
-    private ProviderStatusItem? _selectedProvider;
-    private string _statusMessage = string.Empty;
+    private const string SelectProviderTitleValue = "Select a provider";
+    private const string SelectProviderSummaryValue = "Choose a provider to inspect readiness and install guidance.";
+    private const string EnableProviderLabel = "Enable provider";
+    private const string DisableProviderLabel = "Disable provider";
+    private static readonly ProviderStatusItem EmptySelectedProvider = new(
+        AgentProviderKind.Debug,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        null,
+        false,
+        false,
+        string.Empty,
+        []);
 
-    public SettingsViewModel(
-        IAgentSessionService agentSessionService,
-        IAgentProviderStatusCache providerStatusCache,
-        ILogger<SettingsViewModel> logger)
+    private readonly IAgentWorkspaceState workspaceState;
+    private readonly ILogger<SettingsModel> logger;
+    private readonly Signal _workspaceRefresh = new();
+
+    public SettingsModel(
+        IAgentWorkspaceState workspaceState,
+        ILogger<SettingsModel> logger)
     {
-        _agentSessionService = agentSessionService;
-        _providerStatusCache = providerStatusCache;
-        _logger = logger;
-        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
-            throw new InvalidOperationException("SettingsViewModel requires a UI dispatcher queue.");
-        _providers = [];
-        _refreshCommand = new AsyncCommand(RefreshProvidersAsync);
-        _toggleProviderCommand = new AsyncCommand(ToggleSelectedProviderAsync, CanToggleSelectedProvider);
-        _providerActionCommand = new AsyncCommand(ExecuteProviderActionAsync, CanExecuteProviderAction);
-        _ = LoadProvidersAsync();
+        this.workspaceState = workspaceState;
+        this.logger = logger;
+        SelectedProvider.ForEach(SynchronizeSelectedProviderProjectionAsync);
     }
-
-    public ObservableCollection<ProviderStatusItem> Providers => _providers;
-
-    public ICommand RefreshCommand => _refreshCommand;
-
-    public ICommand ToggleProviderCommand => _toggleProviderCommand;
-
-    public ICommand ProviderActionCommand => _providerActionCommand;
 
     public string PageTitle => "Providers";
 
     public string PageSubtitle => "Enable the built-in debug client or connect local CLI providers before creating agents.";
 
-    public ProviderStatusItem? SelectedProvider
-    {
-        get => _selectedProvider;
-        set
-        {
-            if (!SetProperty(ref _selectedProvider, value))
-            {
-                return;
-            }
+    public IListState<ProviderStatusItem> Providers => ListState.Async(this, LoadProvidersAsync, _workspaceRefresh);
 
-            RaisePropertyChanged(nameof(SelectedProviderTitle));
-            RaisePropertyChanged(nameof(SelectedProviderSummary));
-            RaisePropertyChanged(nameof(SelectedProviderInstallCommand));
-            RaisePropertyChanged(nameof(SelectedProviderActions));
-            RaisePropertyChanged(nameof(HasSelectedProviderActions));
-            RaisePropertyChanged(nameof(ToggleActionLabel));
-            _toggleProviderCommand.RaiseCanExecuteChanged();
-            _providerActionCommand.RaiseCanExecuteChanged();
-        }
-    }
+    public IState<ProviderStatusItem> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
-    public string SelectedProviderTitle => SelectedProvider?.DisplayName ?? "Select a provider";
+    public IState<string> SelectedProviderTitle => State.Value(this, static () => SelectProviderTitleValue);
 
-    public string SelectedProviderSummary => SelectedProvider?.StatusSummary ?? "Choose a provider to inspect readiness and install guidance.";
+    public IState<string> SelectedProviderSummary => State.Value(this, static () => SelectProviderSummaryValue);
 
-    public string SelectedProviderInstallCommand => SelectedProvider?.InstallCommand ?? string.Empty;
+    public IState<string> SelectedProviderInstallCommand => State.Value(this, static () => string.Empty);
 
-    public IReadOnlyList<ProviderActionItem> SelectedProviderActions => SelectedProvider?.Actions ?? [];
+    public IState<ImmutableArray<ProviderActionItem>> SelectedProviderActions => State.Value(this, static () => ImmutableArray<ProviderActionItem>.Empty);
 
-    public bool HasSelectedProviderActions => SelectedProviderActions.Count > 0;
+    public IState<bool> HasSelectedProviderActions => State.Value(this, static () => false);
 
-    public string ToggleActionLabel => SelectedProvider?.IsEnabled == true ? "Disable provider" : "Enable provider";
+    public IState<string> ToggleActionLabel => State.Value(this, static () => EnableProviderLabel);
 
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
-    }
+    public IState<string> StatusMessage => State.Value(this, static () => string.Empty);
 
-    private async Task LoadProvidersAsync()
+    public IState<bool> CanToggleSelectedProvider => State.Value(this, static () => false);
+
+    public async ValueTask Refresh(CancellationToken cancellationToken)
     {
         try
         {
-            SettingsViewModelLog.LoadingProviders(_logger);
-            var previouslySelectedKind = SelectedProvider?.Kind;
-            var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
-            await RunOnUiThreadAsync(() =>
-            {
-                _providers.Clear();
-
-                foreach (var provider in workspace.Providers)
-                {
-                    _providers.Add(
-                        new ProviderStatusItem(
-                            provider.Kind,
-                            provider.DisplayName,
-                            provider.CommandName,
-                            provider.StatusSummary,
-                            provider.InstalledVersion,
-                            provider.IsEnabled,
-                            provider.CanCreateAgents,
-                            provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
-                            provider.Actions
-                                .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
-                                .ToArray()));
-                }
-
-                SelectedProvider = _providers.FirstOrDefault(provider => provider.Kind == previouslySelectedKind) ??
-                    _providers.FirstOrDefault(provider => provider.IsEnabled) ??
-                    _providers.FirstOrDefault();
-            });
-
-            SettingsViewModelLog.ProvidersLoaded(_logger, workspace.Providers.Count);
+            SettingsViewModelLog.RefreshRequested(logger);
+            var workspace = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
+            var providers = workspace.Providers
+                .Select(MapProviderStatusItem)
+                .ToImmutableArray();
+            await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            _workspaceRefresh.Raise();
+            await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
         }
         catch (Exception exception)
         {
-            SettingsViewModelLog.Failure(_logger, exception);
-            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
+            SettingsViewModelLog.Failure(logger, exception);
+            await StatusMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
 
-    private async Task RefreshProvidersAsync()
+    public async ValueTask ToggleSelectedProvider(CancellationToken cancellationToken)
     {
-        try
-        {
-            SettingsViewModelLog.RefreshRequested(_logger);
-            await _providerStatusCache.RefreshAsync(CancellationToken.None);
-            await LoadProvidersAsync();
-            await RunOnUiThreadAsync(() => StatusMessage = RefreshCompletedMessage);
-        }
-        catch (Exception exception)
-        {
-            SettingsViewModelLog.Failure(_logger, exception);
-            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
-        }
-    }
-
-    private async Task ToggleSelectedProviderAsync()
-    {
-        if (SelectedProvider is null)
+        var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        if (IsEmptySelectedProvider(selectedProvider))
         {
             return;
         }
 
-        await _agentSessionService.UpdateProviderAsync(
-            new UpdateProviderPreferenceCommand(SelectedProvider.Kind, !SelectedProvider.IsEnabled),
-            CancellationToken.None);
-        await LoadProvidersAsync();
-        await RunOnUiThreadAsync(() => StatusMessage = $"{SelectedProviderTitle} updated.");
-    }
-
-    private bool CanToggleSelectedProvider()
-    {
-        return SelectedProvider is not null;
-    }
-
-    private Task ExecuteProviderActionAsync(object? parameter)
-    {
-        if (parameter is not ProviderActionItem action)
+        try
         {
-            return Task.CompletedTask;
+            var currentSelectedProvider = await SelectedProvider ?? EmptySelectedProvider;
+            var updated = await workspaceState.UpdateProviderAsync(
+                new UpdateProviderPreferenceCommand(currentSelectedProvider.Kind, !currentSelectedProvider.IsEnabled),
+                cancellationToken);
+            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            var providers = workspace.Providers
+                .Select(MapProviderStatusItem)
+                .ToImmutableArray();
+            await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            _workspaceRefresh.Raise();
+            await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            SettingsViewModelLog.Failure(logger, exception);
+            await StatusMessage.SetAsync(exception.Message, cancellationToken);
+        }
+    }
+
+    public async ValueTask ExecuteProviderAction(ProviderActionItem? action, CancellationToken cancellationToken)
+    {
+        if (action is null)
+        {
+            return;
         }
 
         if (string.IsNullOrWhiteSpace(action.Command))
         {
-            StatusMessage = action.Summary;
-            return Task.CompletedTask;
+            await StatusMessage.SetAsync(action.Summary, cancellationToken);
+            return;
         }
 
         try
@@ -187,48 +130,137 @@ public sealed class SettingsViewModel : ObservableObject
             dataPackage.SetText(action.Command);
             Clipboard.SetContent(dataPackage);
             Clipboard.Flush();
-            StatusMessage = $"Copied command: {action.Command}";
+            await StatusMessage.SetAsync($"Copied command: {action.Command}", cancellationToken);
         }
         catch (Exception)
         {
-            StatusMessage = $"Run this command in your terminal: {action.Command}";
+            await StatusMessage.SetAsync($"Run this command in your terminal: {action.Command}", cancellationToken);
         }
-
-        return Task.CompletedTask;
     }
 
-    private static bool CanExecuteProviderAction(object? parameter)
+    private async ValueTask<IImmutableList<ProviderStatusItem>> LoadProvidersAsync(CancellationToken cancellationToken)
     {
-        return parameter is ProviderActionItem;
-    }
-
-    private Task RunOnUiThreadAsync(Action action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        if (_dispatcherQueue.HasThreadAccess)
+        try
         {
-            action();
-            return Task.CompletedTask;
+            SettingsViewModelLog.LoadingProviders(logger);
+            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            SettingsViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
+            var providers = workspace.Providers
+                .Select(MapProviderStatusItem)
+                .ToImmutableArray();
+            await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            return providers;
         }
+        catch (Exception exception)
+        {
+            SettingsViewModelLog.Failure(logger, exception);
+            await StatusMessage.SetAsync(exception.Message, cancellationToken);
+            return ImmutableArray<ProviderStatusItem>.Empty;
+        }
+    }
 
-        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_dispatcherQueue.TryEnqueue(() =>
+    private async ValueTask EnsureSelectedProviderAsync(
+        AgentWorkspaceSnapshot workspace,
+        IImmutableList<ProviderStatusItem> providers,
+        CancellationToken cancellationToken)
+    {
+        var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        var resolvedProvider = FindProviderByKind(providers, selectedProvider.Kind);
+
+        if (IsEmptySelectedProvider(resolvedProvider))
+        {
+            var enabledProviderKind = FindEnabledProviderKind(workspace.Providers);
+            if (enabledProviderKind is { } providerKind)
             {
-                try
-                {
-                    action();
-                    completionSource.SetResult();
-                }
-                catch (Exception exception)
-                {
-                    completionSource.SetException(exception);
-                }
-            }))
-        {
-            completionSource.SetException(new InvalidOperationException("Unable to enqueue work to the UI dispatcher."));
+                resolvedProvider = FindProviderByKind(providers, providerKind);
+            }
         }
 
-        return completionSource.Task;
+        if (IsEmptySelectedProvider(resolvedProvider) && providers.Count > 0)
+        {
+            resolvedProvider = providers[0];
+        }
+
+        if (!Equals(selectedProvider, resolvedProvider))
+        {
+            await SelectedProvider.UpdateAsync(_ => resolvedProvider, cancellationToken);
+        }
+
+        await SynchronizeSelectedProviderProjectionAsync(resolvedProvider, cancellationToken);
+    }
+
+    private async ValueTask SynchronizeSelectedProviderProjectionAsync(
+        ProviderStatusItem? selectedProvider,
+        CancellationToken cancellationToken)
+    {
+        selectedProvider ??= EmptySelectedProvider;
+        var actions = IsEmptySelectedProvider(selectedProvider)
+            ? ImmutableArray<ProviderActionItem>.Empty
+            : selectedProvider.Actions.ToImmutableArray();
+
+        await SelectedProviderTitle.SetAsync(
+            IsEmptySelectedProvider(selectedProvider) ? SelectProviderTitleValue : selectedProvider.DisplayName,
+            cancellationToken);
+        await SelectedProviderSummary.SetAsync(
+            IsEmptySelectedProvider(selectedProvider) ? SelectProviderSummaryValue : selectedProvider.StatusSummary,
+            cancellationToken);
+        await SelectedProviderInstallCommand.SetAsync(
+            IsEmptySelectedProvider(selectedProvider) ? string.Empty : selectedProvider.InstallCommand,
+            cancellationToken);
+        await SelectedProviderActions.UpdateAsync(_ => actions, cancellationToken);
+        await HasSelectedProviderActions.UpdateAsync(_ => actions.Length > 0, cancellationToken);
+        await ToggleActionLabel.SetAsync(
+            !IsEmptySelectedProvider(selectedProvider) && selectedProvider.IsEnabled
+                ? DisableProviderLabel
+                : EnableProviderLabel,
+            cancellationToken);
+        await CanToggleSelectedProvider.UpdateAsync(_ => !IsEmptySelectedProvider(selectedProvider), cancellationToken);
+    }
+
+    private static AgentProviderKind? FindEnabledProviderKind(IReadOnlyList<ProviderStatusDescriptor> providers)
+    {
+        for (var index = 0; index < providers.Count; index++)
+        {
+            if (providers[index].IsEnabled)
+            {
+                return providers[index].Kind;
+            }
+        }
+
+        return null;
+    }
+
+    private static ProviderStatusItem FindProviderByKind(IImmutableList<ProviderStatusItem> providers, AgentProviderKind kind)
+    {
+        for (var index = 0; index < providers.Count; index++)
+        {
+            if (providers[index].Kind == kind)
+            {
+                return providers[index];
+            }
+        }
+
+        return EmptySelectedProvider;
+    }
+
+    private static bool IsEmptySelectedProvider(ProviderStatusItem provider)
+    {
+        return string.IsNullOrWhiteSpace(provider.DisplayName);
+    }
+
+    private static ProviderStatusItem MapProviderStatusItem(ProviderStatusDescriptor provider)
+    {
+        return new ProviderStatusItem(
+            provider.Kind,
+            provider.DisplayName,
+            provider.CommandName,
+            provider.StatusSummary,
+            provider.InstalledVersion,
+            provider.IsEnabled,
+            provider.CanCreateAgents,
+            provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
+            provider.Actions
+                .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
+                .ToArray());
     }
 }

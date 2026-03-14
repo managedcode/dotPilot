@@ -222,3 +222,42 @@ internal static partial class AgentSessionServiceLog
         Message = "Session send failed. SessionId={SessionId} AgentId={AgentId}.")]
     public static partial void SendFailed(ILogger logger, Exception exception, SessionId sessionId, Guid agentId);
 }
+
+internal static partial class AgentWorkspaceStateLog
+{
+    [LoggerMessage(
+        EventId = 1300,
+        Level = LogLevel.Information,
+        Message = "Returning cached workspace projection. Sessions={SessionCount} Agents={AgentCount} Providers={ProviderCount}.")]
+    public static partial void WorkspaceCacheHit(ILogger logger, int sessionCount, int agentCount, int providerCount);
+
+    [LoggerMessage(
+        EventId = 1301,
+        Level = LogLevel.Information,
+        Message = "Workspace projection refreshed. Sessions={SessionCount} Agents={AgentCount} Providers={ProviderCount}.")]
+    public static partial void WorkspaceRefreshed(ILogger logger, int sessionCount, int agentCount, int providerCount);
+
+    [LoggerMessage(
+        EventId = 1302,
+        Level = LogLevel.Information,
+        Message = "Returning cached session projection. SessionId={SessionId} Entries={EntryCount}.")]
+    public static partial void SessionCacheHit(ILogger logger, SessionId sessionId, int entryCount);
+
+    [LoggerMessage(
+        EventId = 1303,
+        Level = LogLevel.Information,
+        Message = "Cached workspace updated after agent creation. AgentId={AgentId} Provider={ProviderKind}.")]
+    public static partial void AgentCached(ILogger logger, AgentProfileId agentId, AgentProviderKind providerKind);
+
+    [LoggerMessage(
+        EventId = 1304,
+        Level = LogLevel.Information,
+        Message = "Cached workspace updated after session creation. SessionId={SessionId} AgentId={AgentId}.")]
+    public static partial void SessionCached(ILogger logger, SessionId sessionId, AgentProfileId agentId);
+
+    [LoggerMessage(
+        EventId = 1305,
+        Level = LogLevel.Information,
+        Message = "Cached workspace updated after provider preference change. Provider={ProviderKind} Enabled={IsEnabled}.")]
+    public static partial void ProviderCached(ILogger logger, AgentProviderKind providerKind, bool isEnabled);
+}

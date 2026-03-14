@@ -33,20 +33,6 @@ public sealed class CapabilityOption(
 }
 
 [Bindable]
-public sealed class RoleOption(
-    string label,
-    AgentRoleKind role,
-    bool isSelected) : ObservableObject
-{
-    private bool _isSelected = isSelected;
-
-    public string Label { get; } = label;
-
-    public AgentRoleKind Role { get; } = role;
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set => SetProperty(ref _isSelected, value);
-    }
-}
+public sealed partial record RoleOption(
+    string Label,
+    AgentRoleKind Role);

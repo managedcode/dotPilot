@@ -60,7 +60,8 @@
                   Background="{StaticResource AppSoftSurfaceBrush}"
                   BorderBrush="{StaticResource AppOutlineBrush}"
                   BorderThickness="1"
-                  Command="{Binding StartNewSessionCommand}"
+                  Command="{Binding StartNewSession}"
+                  IsEnabled="{Binding HasAgents}"
                   CornerRadius="20"
                   Padding="14,12">
             <TextBlock FontSize="12"
@@ -68,12 +69,14 @@
                        Text="New session" />
           </Button>
 
-          <Button Grid.Column="2"
+          <Button x:Name="SendButton"
+                  Grid.Column="2"
                   AutomationProperties.AutomationId="ChatComposerSendButton"
                   Background="{StaticResource AppAccentBrush}"
                   BorderBrush="Transparent"
                   BorderThickness="0"
-                  Command="{Binding SendMessageCommand}"
+                  Command="{Binding SendMessage}"
+                  IsEnabled="{Binding CanSend}"
                   CornerRadius="20"
                   Padding="16,12">
             <StackPanel Orientation="Horizontal"

@@ -29,6 +29,7 @@
             Toolkit;
             Logging;
             Mvvm;
+            MVUX;
             Configuration;
             Http;
             Serialization;

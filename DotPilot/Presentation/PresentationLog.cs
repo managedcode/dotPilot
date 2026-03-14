@@ -1,3 +1,4 @@
+using DotPilot.Core.Features.AgentSessions;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Presentation;
@@ -19,7 +20,19 @@ internal static partial class MainViewModelLog
     [LoggerMessage(EventId = 2004, Level = LogLevel.Information, Message = "Starting new chat session from the chat shell.")]
     public static partial void StartingSession(ILogger logger);
 
-    [LoggerMessage(EventId = 2006, Level = LogLevel.Error, Message = "Chat shell operation failed.")]
+    [LoggerMessage(
+        EventId = 2005,
+        Level = LogLevel.Information,
+        Message = "Sending chat message from the shell. SessionId={SessionId} CharacterCount={CharacterCount}.")]
+    public static partial void SendRequested(ILogger logger, string sessionId, int characterCount);
+
+    [LoggerMessage(
+        EventId = 2006,
+        Level = LogLevel.Information,
+        Message = "Chat shell send completed. SessionId={SessionId}.")]
+    public static partial void SendCompleted(ILogger logger, string sessionId);
+
+    [LoggerMessage(EventId = 2007, Level = LogLevel.Error, Message = "Chat shell operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
 
@@ -34,7 +47,28 @@ internal static partial class SecondViewModelLog
         Message = "Loaded provider list for agent creation. Providers={ProviderCount}.")]
     public static partial void ProvidersLoaded(ILogger logger, int providerCount);
 
-    [LoggerMessage(EventId = 2102, Level = LogLevel.Error, Message = "Agent builder operation failed.")]
+    [LoggerMessage(
+        EventId = 2102,
+        Level = LogLevel.Information,
+        Message = "Creating local agent profile. Name={AgentName} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void AgentCreationRequested(
+        ILogger logger,
+        string agentName,
+        AgentProviderKind providerKind,
+        string modelName);
+
+    [LoggerMessage(
+        EventId = 2103,
+        Level = LogLevel.Information,
+        Message = "Created local agent profile. AgentId={AgentId} Name={AgentName} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void AgentCreated(
+        ILogger logger,
+        Guid agentId,
+        string agentName,
+        AgentProviderKind providerKind,
+        string modelName);
+
+    [LoggerMessage(EventId = 2104, Level = LogLevel.Error, Message = "Agent builder operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
 

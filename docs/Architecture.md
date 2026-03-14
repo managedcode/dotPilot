@@ -7,7 +7,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 ## Summary
 
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
-- **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, and visible operator flows such as session list, transcript, agent creation, and provider settings.
+- **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Contracts boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns the durable non-UI contracts for provider readiness, agent profiles, session lists, transcript entries, commands, and Orleans grain interfaces.
 - **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, `EF Core` + `SQLite` projection persistence, local folder-backed `AgentSession` storage, local folder-backed chat-history persistence through `ChatHistoryProvider`, and the `IAgentSessionService` implementation.
 - **Embedded host boundary:** [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host and the grains that represent session and agent-profile state. The product stays local-first with `UseLocalhostClustering`, in-memory reminders, and local folder-backed Orleans grain storage through `ManagedCode.Storage`.
@@ -81,7 +81,7 @@ flowchart LR
 ```mermaid
 flowchart TD
   Ui["Uno shell"]
-  ViewModels["Session / agent / settings view models"]
+  ViewModels["MVUX screen models + generated view-model proxies"]
   Service["IAgentSessionService"]
   ProjectionStore["EF Core + SQLite projections"]
   SessionStore["Folder AgentSession + chat history"]
@@ -176,6 +176,7 @@ sequenceDiagram
 - Keep the product framed as a chat-first local-agent client, not as a backlog-shaped workbench.
 - Replace seed-data assumptions with real provider, agent, session, transcript, and durable runtime state.
 - Keep repo/git operations as optional tools inside a session, not as the app's primary information architecture.
+- Keep presentation models long-lived and projection-only so desktop navigation stays memory-hot instead of rehydrating each screen from scratch.
 - Prefer provider SDKs and `IChatClient`-style abstractions over custom parallel request/result wrappers unless a concrete gap forces an adapter layer.
 - Keep the persistence split explicit:
   - `SQLite` for operator-facing projections and settings

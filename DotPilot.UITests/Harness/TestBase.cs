@@ -1,3 +1,6 @@
+using OpenQA.Selenium;
+using UITestPlatform = Uno.UITest.Helpers.Queries.Platform;
+
 namespace DotPilot.UITests.Harness;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -16,7 +19,7 @@ public class TestBase
     private static readonly TimeSpan AppCleanupTimeout = TimeSpan.FromSeconds(15);
 
     private static readonly BrowserAutomationSettings? _browserAutomation =
-        Constants.CurrentPlatform == Platform.Browser
+        Constants.CurrentPlatform == UITestPlatform.Browser
             ? BrowserAutomationBootstrap.Resolve()
             : null;
     private static readonly bool _browserHeadless = ResolveBrowserHeadless();
@@ -24,7 +27,7 @@ public class TestBase
 
     static TestBase()
     {
-        if (Constants.CurrentPlatform == Platform.Browser)
+        if (Constants.CurrentPlatform == UITestPlatform.Browser)
         {
             HarnessLog.Write($"Browser test target URI is '{Constants.WebAssemblyDefaultUri}'.");
             HarnessLog.Write($"Browser binary path is '{_browserAutomation!.BrowserBinaryPath}'.");
@@ -42,7 +45,7 @@ public class TestBase
         AppInitializer.TestEnvironment.CurrentPlatform = Constants.CurrentPlatform;
         AppInitializer.TestEnvironment.WebAssemblyBrowser = Constants.WebAssemblyBrowser;
 
-        if (Constants.CurrentPlatform != Platform.Browser)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser)
         {
             // Start the app only once, so the tests runs don't restart it
             // and gain some time for the tests.
@@ -64,7 +67,7 @@ public class TestBase
     public void SetUpTest()
     {
         HarnessLog.Write($"Starting setup for '{TestContext.CurrentContext.Test.Name}'.");
-        App = Constants.CurrentPlatform == Platform.Browser
+        App = Constants.CurrentPlatform == UITestPlatform.Browser
             ? StartBrowserApp(_browserAutomation!)
             : AppInitializer.AttachToApp();
         HarnessLog.Write($"Setup completed for '{TestContext.CurrentContext.Test.Name}'.");
@@ -81,7 +84,7 @@ public class TestBase
             TakeScreenshot("teardown");
         }
 
-        if (Constants.CurrentPlatform == Platform.Browser && _app is not null)
+        if (Constants.CurrentPlatform == UITestPlatform.Browser && _app is not null)
         {
             TryCleanup(
                 () => _app.Dispose(),
@@ -116,7 +119,7 @@ public class TestBase
         {
             TryCleanup(
                 () => _app.Dispose(),
-                Constants.CurrentPlatform == Platform.Browser
+                Constants.CurrentPlatform == UITestPlatform.Browser
                     ? BrowserAppCleanupOperationName
                     : AttachedAppCleanupOperationName,
                 cleanupFailures);
@@ -124,7 +127,7 @@ public class TestBase
 
         _app = null;
 
-        if (Constants.CurrentPlatform == Platform.Browser)
+        if (Constants.CurrentPlatform == UITestPlatform.Browser)
         {
             TryCleanup(
                 BrowserTestHost.Stop,
@@ -182,7 +185,7 @@ public class TestBase
 
     protected void WriteBrowserSystemLogs(string context, int maxEntries = 50)
     {
-        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
             return;
         }
@@ -208,7 +211,7 @@ public class TestBase
 
     protected void WriteBrowserDomSnapshot(string context, string? automationId = null)
     {
-        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
             return;
         }
@@ -323,8 +326,23 @@ public class TestBase
                 HarnessLog.Write(
                     $"Tap target '{automationId}' enabled='{target.Enabled}' rect='{target.Rect}' text='{target.Text}' label='{target.Label}'.");
 
-                if (Constants.CurrentPlatform == Platform.Browser)
+                if (Constants.CurrentPlatform == UITestPlatform.Browser)
                 {
+                    try
+                    {
+                        App.Tap(automationId);
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        HarnessLog.Write($"Browser element tap failed for '{automationId}': {exception.Message}");
+                    }
+
+                    if (TryClickBrowserAutomationElement(automationId))
+                    {
+                        return;
+                    }
+
                     App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
                     return;
                 }
@@ -353,7 +371,7 @@ public class TestBase
                 HarnessLog.Write($"Tap selector diagnostics failed for '{automationId}': {diagnosticException.Message}");
             }
 
-            if (Constants.CurrentPlatform == Platform.Browser)
+            if (Constants.CurrentPlatform == UITestPlatform.Browser)
             {
                 var fallbackMatches = App.Query(automationId);
                 if (fallbackMatches.Length > 0)
@@ -377,6 +395,11 @@ public class TestBase
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
         ArgumentNullException.ThrowIfNull(text);
 
+        if (TryTypeBrowserInputValue(automationId, text))
+        {
+            return;
+        }
+
         if (TrySetBrowserInputValue(automationId, text))
         {
             return;
@@ -398,9 +421,21 @@ public class TestBase
         TapAutomationElement(automationId);
     }
 
+    protected void PressEnterAutomationElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (TryPressEnterBrowserInput(automationId))
+        {
+            return;
+        }
+
+        App.EnterText(automationId, Keys.Enter);
+    }
+
     private bool TryClickBrowserAutomationElement(string automationId)
     {
-        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
             return false;
         }
@@ -488,9 +523,154 @@ public class TestBase
         }
     }
 
+    private bool TryTypeBrowserInputValue(string automationId, string text)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver)
+            {
+                return false;
+            }
+
+            if (!TryFocusBrowserInput(driver, automationId))
+            {
+                return false;
+            }
+
+            var activeElement = driver.SwitchTo().ActiveElement();
+            if (activeElement is null)
+            {
+                return false;
+            }
+
+            ClearActiveBrowserInput(activeElement);
+            activeElement.SendKeys(text);
+
+            var value = activeElement.GetAttribute("value") ?? activeElement.Text ?? string.Empty;
+            HarnessLog.Write($"Browser input typing outcome for '{automationId}': '{value}'.");
+            return string.Equals(value, text, StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser input typing failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TryPressEnterBrowserInput(string automationId)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver ||
+                !TryFocusBrowserInput(driver, automationId))
+            {
+                return false;
+            }
+
+            driver.SwitchTo().ActiveElement().SendKeys(Keys.Enter);
+            HarnessLog.Write($"Browser input enter outcome for '{automationId}': pressed.");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser input enter failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private static void ClearActiveBrowserInput(IWebElement activeElement)
+    {
+        ArgumentNullException.ThrowIfNull(activeElement);
+
+        try
+        {
+            activeElement.Clear();
+        }
+        catch (InvalidElementStateException)
+        {
+        }
+
+        var currentValue = activeElement.GetAttribute("value") ?? activeElement.Text ?? string.Empty;
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            return;
+        }
+
+        var selectAllModifier = OperatingSystem.IsMacOS() ? Keys.Command : Keys.Control;
+        activeElement.SendKeys($"{selectAllModifier}a");
+        activeElement.SendKeys(Keys.Backspace);
+    }
+
+    private static bool TryFocusBrowserInput(IWebDriver driver, string automationId)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return false;
+        }
+
+        var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+        var outcome = javaScriptExecutor.ExecuteScript(
+            string.Concat(
+                """
+                return (() => {
+                    const automationId = '
+                """,
+                escapedAutomationId,
+                """
+                ';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const host = document.querySelector(selector);
+                    if (!host) {
+                        return 'missing';
+                    }
+
+                    const element = host.matches('input, textarea, [contenteditable="true"]')
+                        ? host
+                        : host.querySelector('input, textarea, [contenteditable="true"]');
+                    if (!element) {
+                        return 'not-an-input';
+                    }
+
+                    element.scrollIntoView({ block: 'center', inline: 'center' });
+                    element.focus();
+
+                    if ('select' in element) {
+                        element.select();
+                    }
+
+                    return 'focused';
+                })();
+                """));
+
+        HarnessLog.Write($"Browser input focus outcome for '{automationId}': {outcome}");
+        return string.Equals(
+            Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+            "focused",
+            StringComparison.Ordinal);
+    }
+
     private bool TrySetBrowserInputValue(string automationId, string text)
     {
-        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
             return false;
         }
@@ -585,7 +765,7 @@ public class TestBase
 
     protected void WriteBrowserAutomationDiagnostics(string automationId)
     {
-        if (Constants.CurrentPlatform != Platform.Browser || _app is null)
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
             return;
         }
@@ -632,6 +812,13 @@ public class TestBase
                             xamlAutomationId: element.getAttribute('xamlautomationid') ?? '',
                             xamlType: element.getAttribute('xamltype') ?? '',
                             text: (element.innerText ?? '').trim(),
+                            value: 'value' in element ? element.value : '',
+                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"]')).map((child, childIndex) => ({
+                                childIndex,
+                                tag: child.tagName,
+                                className: child.className,
+                                value: 'value' in child ? child.value : child.textContent ?? ''
+                            })),
                             html: element.outerHTML.slice(0, 300)
                         }));
                     const byAria = Array.from(document.querySelectorAll(`[aria-label="${automationId}"]`))
@@ -643,6 +830,13 @@ public class TestBase
                             xamlAutomationId: element.getAttribute('xamlautomationid') ?? '',
                             xamlType: element.getAttribute('xamltype') ?? '',
                             text: (element.innerText ?? '').trim(),
+                            value: 'value' in element ? element.value : '',
+                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"]')).map((child, childIndex) => ({
+                                childIndex,
+                                tag: child.tagName,
+                                className: child.className,
+                                value: 'value' in child ? child.value : child.textContent ?? ''
+                            })),
                             html: element.outerHTML.slice(0, 300)
                         }));
                     return JSON.stringify({ byAutomation, byAria });

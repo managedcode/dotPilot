@@ -20,13 +20,18 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ProviderListAutomationId = "ProviderList";
     private const string SelectedProviderTitleAutomationId = "SelectedProviderTitle";
     private const string ToggleProviderButtonAutomationId = "ToggleProviderButton";
+    private const string AgentBasicInfoSectionAutomationId = "AgentBasicInfoSection";
     private const string AgentNameInputAutomationId = "AgentNameInput";
     private const string AgentModelInputAutomationId = "AgentModelInput";
+    private const string AgentRoleComboAutomationId = "AgentRoleCombo";
+    private const string AgentPromptSectionAutomationId = "AgentPromptSection";
+    private const string AgentSkillsSectionAutomationId = "AgentSkillsSection";
+    private const string AgentSuggestedModelTextAutomationId = "AgentSuggestedModelText";
+    private const string AgentCreateHelperMessageAutomationId = "AgentCreateHelperMessage";
     private const string AgentCreateStatusMessageAutomationId = "AgentCreateStatusMessage";
     private const string CreateAgentButtonAutomationId = "CreateAgentButton";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
-    private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
     private const string ChatStartNewButtonAutomationId = "ChatStartNewButton";
     private const string ChatTitleTextAutomationId = "ChatTitleText";
     private const string ChatMessageTextAutomationId = "ChatMessageText";
@@ -54,6 +59,54 @@ public sealed class GivenChatSessionsShell : TestBase
     }
 
     [Test]
+    public async Task WhenEnablingDebugAndOpeningAgentCreationThenBuilderSectionsAreVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
+        TapAutomationElement(ToggleProviderButtonAutomationId);
+        WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
+
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+        WaitForElement(AgentNameInputAutomationId);
+        WaitForElement(AgentRoleComboAutomationId);
+        WaitForElement(AgentModelInputAutomationId);
+        WaitForElement(AgentPromptSectionAutomationId);
+        WaitForElement(AgentSkillsSectionAutomationId);
+        WaitForTextContains(AgentSuggestedModelTextAutomationId, "debug-echo", ScreenTransitionTimeout);
+        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
+
+        TakeScreenshot("agent_builder_sections_visible");
+    }
+
+    [Test]
+    public async Task WhenEnablingDebugAndCreatingAgentThenBuilderShowsCreatedStatus()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
+        TapAutomationElement(ToggleProviderButtonAutomationId);
+        WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
+
+        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
+        ReplaceTextAutomationElement(AgentNameInputAutomationId, CreatedAgentName);
+        TapAutomationElement(CreateAgentButtonAutomationId);
+        WaitForTextContains(AgentCreateStatusMessageAutomationId, "Created Debug Agent UI using Debug Provider.", ScreenTransitionTimeout);
+
+        TakeScreenshot("agent_builder_created_status");
+    }
+
+    [Test]
     public async Task WhenEnablingDebugCreatingAgentAndSendingMessageThenStreamedTranscriptIsVisible()
     {
         await Task.CompletedTask;
@@ -70,7 +123,7 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AgentBuilderScreenAutomationId);
         WaitForElement(AgentNameInputAutomationId);
         WaitForElement(AgentModelInputAutomationId);
-        WaitForTextContains(AgentCreateStatusMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
+        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
         ReplaceTextAutomationElement(AgentNameInputAutomationId, CreatedAgentName);
         TapAutomationElement(CreateAgentButtonAutomationId);
         WaitForTextContains(AgentCreateStatusMessageAutomationId, "Created Debug Agent UI using Debug Provider.", ScreenTransitionTimeout);
@@ -81,8 +134,9 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(ChatRecentChatItemAutomationId);
         WaitForTextContains(ChatTitleTextAutomationId, SessionTitle, ScreenTransitionTimeout);
 
-        App.EnterText(ChatComposerInputAutomationId, UserPrompt);
-        TapAutomationElement(ChatComposerSendButtonAutomationId);
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        WriteBrowserAutomationDiagnostics(ChatComposerInputAutomationId);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
         WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
 

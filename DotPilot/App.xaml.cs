@@ -74,6 +74,10 @@ public partial class App : Application
                             // Default filters for core Uno Platform namespaces
                             .CoreLogLevel(LogLevel.Warning);
 
+#if !__WASM__
+                        logBuilder.AddConsole();
+#endif
+
                         // Uno Platform namespace filter groups
                         // Uncomment individual methods to see more detailed logging
                         //// Generic Xaml events
@@ -113,14 +117,7 @@ public partial class App : Application
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                             .AddSingleton(services, TimeProvider.System);
                         services.AddAgentSessions();
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<ShellViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<MainViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<SecondViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<SettingsViewModel>(services);
+                        services.AddPresentationModels();
                     })
                     .UseNavigation(RegisterRoutes)
                 );

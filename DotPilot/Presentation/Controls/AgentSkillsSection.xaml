@@ -3,80 +3,44 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:presentation="using:DotPilot.Presentation"
              FontFamily="{StaticResource AppBodyFontFamily}">
-  <Border Style="{StaticResource SectionCardStyle}"
+  <Border Style="{StaticResource BuilderSectionStyle}"
           AutomationProperties.AutomationId="AgentSkillsSection">
-    <StackPanel Spacing="12">
-      <Grid ColumnSpacing="12">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Border Width="26"
-                Height="26"
-                CornerRadius="8"
-                Background="{StaticResource AppPrimaryTextBrush}">
-          <TextBlock HorizontalAlignment="Center"
-                     VerticalAlignment="Center"
-                     FontFamily="{StaticResource AppAccentFontFamily}"
-                     FontSize="11.5"
-                     FontWeight="Bold"
-                     Foreground="{StaticResource AppAccentBrush}"
-                     Text="3" />
-        </Border>
-        <TextBlock Grid.Column="1"
-                   VerticalAlignment="Center"
-                   FontSize="14"
+    <StackPanel Spacing="18">
+      <StackPanel Spacing="6">
+        <TextBlock FontSize="18"
                    FontWeight="SemiBold"
                    Text="Capabilities" />
-      </Grid>
-
-      <TextBlock FontSize="12"
-                 Foreground="{StaticResource AppMutedTextBrush}"
-                 Text="Capabilities define what the local workflow grain is expected to do inside each session."
-                 TextWrapping="WrapWholeWords" />
+        <TextBlock FontSize="12.5"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Choose what this agent is allowed to handle inside each local workflow session."
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
 
       <ItemsControl AutomationProperties.AutomationId="SkillsList"
                     ItemsSource="{Binding Capabilities}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="presentation:CapabilityOption">
-            <StackPanel Spacing="0">
-              <Grid Margin="0,0,0,12"
-                    ColumnSpacing="12">
+            <Border Style="{StaticResource BuilderSummaryCardStyle}"
+                    Margin="0,0,0,12">
+              <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Width="36"
-                        Height="36"
-                        CornerRadius="10"
-                        Background="{StaticResource AppSoftSurfaceBrush}"
-                        VerticalAlignment="Center">
-                  <TextBlock HorizontalAlignment="Center"
-                             VerticalAlignment="Center"
-                             FontSize="14"
-                             Text="*" />
-                </Border>
+                <CheckBox VerticalAlignment="Top"
+                          IsChecked="{x:Bind IsEnabled, Mode=TwoWay}" />
                 <StackPanel Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Spacing="2">
+                            Spacing="4">
                   <TextBlock FontSize="13"
                              FontWeight="SemiBold"
                              Text="{x:Bind Name}" />
                   <TextBlock FontSize="11.5"
                              Foreground="{StaticResource AppMutedTextBrush}"
                              Text="{x:Bind Description}"
-                             TextWrapping="Wrap" />
+                             TextWrapping="WrapWholeWords" />
                 </StackPanel>
-                <ToggleSwitch Grid.Column="2"
-                              HorizontalAlignment="Right"
-                              IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
-                              OnContent=""
-                              OffContent=""
-                              VerticalAlignment="Center" />
               </Grid>
-              <Rectangle Style="{StaticResource SectionDividerStyle}" />
-            </StackPanel>
+            </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

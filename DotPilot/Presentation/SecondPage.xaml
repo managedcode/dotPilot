@@ -22,24 +22,24 @@
                Opacity="0.14" />
     </Canvas>
 
-    <Grid Margin="12"
-          ColumnSpacing="20">
+    <Grid Margin="16"
+          ColumnSpacing="24">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="260" />
+        <ColumnDefinition Width="272" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
       <controls:AgentSidebar />
 
       <Grid Grid.Column="1"
-            RowSpacing="16">
+            RowSpacing="20">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Margin="0,28,0,8"
-                    Spacing="8">
+        <StackPanel Margin="0,20,0,4"
+                    Spacing="6">
           <TextBlock FontSize="22"
                      FontWeight="SemiBold"
                      Text="{Binding PageTitle}" />
@@ -51,14 +51,14 @@
         <ScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-          <StackPanel MaxWidth="1120"
+          <StackPanel MaxWidth="1100"
                       HorizontalAlignment="Stretch"
-                      Spacing="16">
+                      Spacing="20">
             <controls:AgentBasicInfoSection />
 
             <Grid ColumnSpacing="20">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="1.65*" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
 

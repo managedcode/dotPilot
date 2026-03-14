@@ -43,17 +43,14 @@ public sealed partial class ChatComposer : UserControl
 
     private void ExecuteSubmitCommand()
     {
-        if (DataContext is not MainViewModel viewModel)
+        var command = SendButton.Command;
+        var parameter = SendButton.CommandParameter;
+        if (command?.CanExecute(parameter) != true)
         {
             return;
         }
 
-        if (!viewModel.SendMessageCommand.CanExecute(parameter: null))
-        {
-            return;
-        }
-
-        viewModel.SendMessageCommand.Execute(parameter: null);
+        command.Execute(parameter);
     }
 
     private static bool IsKeyPressed(VirtualKey key)

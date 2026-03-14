@@ -150,7 +150,7 @@
                               Background="{StaticResource AppSoftSurfaceBrush}"
                               BorderBrush="{StaticResource AppOutlineBrush}"
                               BorderThickness="1"
-                              Command="{Binding DataContext.ProviderActionCommand, ElementName=Root}"
+                              Command="{Binding DataContext.ExecuteProviderAction, ElementName=Root}"
                               CommandParameter="{Binding}"
                               CornerRadius="16"
                               Padding="14,9"
@@ -176,7 +176,8 @@
                     Background="{StaticResource AppAccentBrush}"
                     BorderBrush="Transparent"
                     BorderThickness="0"
-                    Command="{Binding ToggleProviderCommand}"
+                    Command="{Binding ToggleSelectedProvider}"
+                    IsEnabled="{Binding CanToggleSelectedProvider}"
                     CornerRadius="18"
                     Padding="16,10">
               <TextBlock FontSize="12"
@@ -190,7 +191,7 @@
                     Background="{StaticResource AppSoftSurfaceBrush}"
                     BorderBrush="{StaticResource AppOutlineBrush}"
                     BorderThickness="1"
-                    Command="{Binding RefreshCommand}"
+                    Command="{Binding Refresh}"
                     CornerRadius="18"
                     Padding="16,10">
               <TextBlock FontSize="12"

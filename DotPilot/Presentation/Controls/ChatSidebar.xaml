@@ -99,7 +99,8 @@
                      Text="SESSIONS" />
 
           <Button AutomationProperties.AutomationId="ChatStartNewButton"
-                  Command="{Binding StartNewSessionCommand}"
+                  Command="{Binding StartNewSession}"
+                  IsEnabled="{Binding HasAgents}"
                   Style="{StaticResource SidebarButtonStyle}">
             <StackPanel Orientation="Horizontal"
                         Spacing="8">
@@ -110,7 +111,7 @@
           </Button>
 
           <Button AutomationProperties.AutomationId="ChatRefreshButton"
-                  Command="{Binding RefreshCommand}"
+                  Command="{Binding Refresh}"
                   Style="{StaticResource SidebarButtonStyle}">
             <StackPanel Orientation="Horizontal"
                         Spacing="8">

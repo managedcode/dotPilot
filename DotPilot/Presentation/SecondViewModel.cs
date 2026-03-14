@@ -1,224 +1,292 @@
-using System.Collections.ObjectModel;
+using System.Collections.Immutable;
 using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
-using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
 [Bindable]
-public sealed class SecondViewModel : ObservableObject
+public partial record SecondModel(
+    IAgentWorkspaceState workspaceState,
+    ILogger<SecondModel> logger)
 {
-    private const string AgentValidationMessage = "Enter an agent name and model before creating the profile.";
+    private const string AgentValidationMessage = "Enter an agent name before creating the profile.";
     private const string AgentCreationProgressMessage = "Creating agent profile...";
-    private readonly IAgentSessionService _agentSessionService;
-    private readonly ILogger<SecondViewModel> _logger;
-    private readonly DispatcherQueue _dispatcherQueue;
-    private readonly AsyncCommand _createAgentCommand;
-    private readonly ObservableCollection<RoleOption> _roleOptions;
-    private readonly ObservableCollection<CapabilityOption> _capabilityOptions;
-    private readonly ObservableCollection<AgentProviderOption> _providerOptions;
-    private string _agentName = "Debug Agent";
-    private string _modelName = "debug-echo";
-    private string _systemPrompt =
+    private const string DefaultAgentName = "Debug Agent";
+    private const string EmptyProviderDisplayName = "No provider selected";
+    private const string EmptyProviderStatusSummary = "Provider readiness is still loading.";
+    private const string EmptyProviderCommandName = "No command available";
+    private const string ReadyMessageFormat = "Ready to create an agent with {0}.";
+    private const string VersionPrefix = "Version ";
+    private static readonly System.Text.CompositeFormat ReadyMessageCompositeFormat =
+        System.Text.CompositeFormat.Parse(ReadyMessageFormat);
+    private const string DefaultSystemPrompt =
         "You are a helpful local desktop agent. Be explicit about what you are doing and stream visible progress.";
-    private string _statusMessage = "Loading provider readiness...";
-    private AgentProviderOption? _selectedProvider;
-
-    public SecondViewModel(
-        IAgentSessionService agentSessionService,
-        ILogger<SecondViewModel> logger)
-    {
-        _agentSessionService = agentSessionService;
-        _logger = logger;
-        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
-            throw new InvalidOperationException("SecondViewModel requires a UI dispatcher queue.");
-        _providerOptions = [];
-        _roleOptions =
-        [
-            new RoleOption("Assistant", AgentRoleKind.Operator, true),
-            new RoleOption("Coder", AgentRoleKind.Coding, false),
-            new RoleOption("Researcher", AgentRoleKind.Research, false),
-            new RoleOption("Reviewer", AgentRoleKind.Reviewer, false),
-        ];
-        _capabilityOptions =
-        [
-            new CapabilityOption("Web", "Web research and browsing workflows.", true),
-            new CapabilityOption("Shell", "Terminal-style command execution.", true),
-            new CapabilityOption("Git", "Repository status, diff, and branch operations.", true),
-            new CapabilityOption("Files", "Read and update local files.", true),
-        ];
-
-        _createAgentCommand = new AsyncCommand(CreateAgentAsync);
-        _ = LoadProvidersAsync();
-    }
-
-    public ObservableCollection<AgentProviderOption> Providers => _providerOptions;
-
-    public ObservableCollection<RoleOption> Roles => _roleOptions;
-
-    public ObservableCollection<CapabilityOption> Capabilities => _capabilityOptions;
-
-    public ICommand CreateAgentCommand => _createAgentCommand;
+    private static readonly AgentProviderOption EmptySelectedProvider =
+        new(AgentProviderKind.Debug, string.Empty, string.Empty, string.Empty, null, false);
+    private static readonly RoleOption DefaultRole = new("Assistant", AgentRoleKind.Operator);
+    private readonly Signal _workspaceRefresh = new();
 
     public string PageTitle => "Create agent";
 
-    public string PageSubtitle => "Choose a provider, role, model, and capabilities for a local agent profile.";
+    public string PageSubtitle => "Configure a reusable local agent profile for sessions and workflows.";
 
-    public string AgentName
-    {
-        get => _agentName;
-        set
-        {
-            if (!SetProperty(ref _agentName, value))
-            {
-                return;
-            }
+    public IState<string> AgentName => State.Value(this, static () => DefaultAgentName);
 
-            _createAgentCommand.RaiseCanExecuteChanged();
-        }
-    }
+    public IState<string> ModelName => State.Value(this, static () => string.Empty);
 
-    public string ModelName
-    {
-        get => _modelName;
-        set
-        {
-            if (!SetProperty(ref _modelName, value))
-            {
-                return;
-            }
+    public IState<string> SystemPrompt => State.Value(this, static () => DefaultSystemPrompt);
 
-            _createAgentCommand.RaiseCanExecuteChanged();
-        }
-    }
+    public IState<string> OperationMessage => State.Value(this, static () => string.Empty);
 
-    public string SystemPrompt
-    {
-        get => _systemPrompt;
-        set => SetProperty(ref _systemPrompt, value);
-    }
+    public IListState<AgentProviderOption> Providers => ListState.Async(this, LoadProvidersAsync, _workspaceRefresh);
 
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
-    }
+    public IState<AgentProviderOption> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
-    public AgentProviderOption? SelectedProvider
-    {
-        get => _selectedProvider;
-        set
-        {
-            if (!SetProperty(ref _selectedProvider, value))
-            {
-                return;
-            }
+    public IState<RoleOption> SelectedRole => State.Value(this, static () => DefaultRole);
 
-            if (value is not null)
-            {
-                ModelName = string.IsNullOrWhiteSpace(value.InstalledVersion)
-                    ? ResolveDefaultModel(value.Kind)
-                    : ModelName;
+    public IImmutableList<RoleOption> Roles { get; } =
+    [
+        DefaultRole,
+        new RoleOption("Coder", AgentRoleKind.Coding),
+        new RoleOption("Researcher", AgentRoleKind.Research),
+        new RoleOption("Reviewer", AgentRoleKind.Reviewer),
+    ];
 
-                StatusMessage = value.CanCreateAgents
-                    ? $"Ready to create an agent with {value.DisplayName}."
-                    : value.StatusSummary;
-            }
+    public IImmutableList<CapabilityOption> Capabilities { get; } =
+    [
+        new CapabilityOption("Web", "Web research and browsing workflows.", true),
+        new CapabilityOption("Shell", "Terminal-style command execution.", true),
+        new CapabilityOption("Git", "Repository status, diff, and branch operations.", true),
+        new CapabilityOption("Files", "Read and update local files.", true),
+    ];
 
-            _createAgentCommand.RaiseCanExecuteChanged();
-        }
-    }
+    public IState<bool> CanCreateAgent => State.Async(this, LoadCanCreateAgentAsync);
 
-    private async Task LoadProvidersAsync()
+    public IState<AgentBuilderView> Builder => State.Async(this, LoadBuilderAsync);
+
+    public async ValueTask CreateAgent(CancellationToken cancellationToken)
     {
         try
         {
-            SecondViewModelLog.LoadingProviders(_logger);
-            var workspace = await _agentSessionService.GetWorkspaceAsync(CancellationToken.None);
-            await RunOnUiThreadAsync(() =>
+            var selectedProvider = await ResolveSelectedProviderAsync();
+            if (IsEmptySelectedProvider(selectedProvider))
             {
-                _providerOptions.Clear();
+                await OperationMessage.SetAsync(EmptyProviderStatusSummary, cancellationToken);
+                return;
+            }
 
-                foreach (var provider in workspace.Providers)
-                {
-                    _providerOptions.Add(
-                        new AgentProviderOption(
-                            provider.Kind,
-                            provider.DisplayName,
-                            provider.CommandName,
-                            provider.StatusSummary,
-                            provider.InstalledVersion,
-                            provider.CanCreateAgents));
-                }
+            if (!selectedProvider.CanCreateAgents)
+            {
+                await OperationMessage.SetAsync(selectedProvider.StatusSummary, cancellationToken);
+                return;
+            }
 
-                SelectedProvider = _providerOptions.FirstOrDefault(option => option.CanCreateAgents) ??
-                    _providerOptions.FirstOrDefault();
-            });
+            var agentName = ((await AgentName) ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(agentName))
+            {
+                await OperationMessage.SetAsync(AgentValidationMessage, cancellationToken);
+                return;
+            }
 
-            SecondViewModelLog.ProvidersLoaded(_logger, workspace.Providers.Count);
-        }
-        catch (Exception exception)
-        {
-            SecondViewModelLog.Failure(_logger, exception);
-            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
-        }
-    }
+            var modelName = await ResolveEffectiveModelNameAsync();
+            await OperationMessage.SetAsync(AgentCreationProgressMessage, cancellationToken);
+            SecondViewModelLog.AgentCreationRequested(logger, agentName, selectedProvider.Kind, modelName);
+            BrowserConsoleDiagnostics.Info(
+                $"[DotPilot.AgentBuilder] Create requested. Name={agentName} Provider={selectedProvider.Kind} Model={modelName}");
 
-    private async Task CreateAgentAsync()
-    {
-        if (SelectedProvider is null)
-        {
-            StatusMessage = "Wait for provider readiness before creating an agent.";
-            return;
-        }
-
-        if (!SelectedProvider.CanCreateAgents)
-        {
-            StatusMessage = SelectedProvider.StatusSummary;
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(AgentName) || string.IsNullOrWhiteSpace(ModelName))
-        {
-            StatusMessage = AgentValidationMessage;
-            return;
-        }
-
-        StatusMessage = AgentCreationProgressMessage;
-
-        try
-        {
-            var created = await _agentSessionService.CreateAgentAsync(
+            var created = await workspaceState.CreateAgentAsync(
                 new CreateAgentProfileCommand(
-                    AgentName.Trim(),
-                    ResolveSelectedRole(),
-                    SelectedProvider.Kind,
-                    ModelName.Trim(),
-                    SystemPrompt.Trim(),
-                    _capabilityOptions
+                    agentName,
+                    ((await SelectedRole) ?? DefaultRole).Role,
+                    selectedProvider.Kind,
+                    modelName,
+                    ((await SystemPrompt) ?? string.Empty).Trim(),
+                    Capabilities
                         .Where(option => option.IsEnabled)
                         .Select(option => option.Name)
                         .ToArray()),
-                CancellationToken.None);
+                cancellationToken);
 
-            await RunOnUiThreadAsync(() =>
-            {
-                StatusMessage = $"Created {created.Name} using {created.ProviderDisplayName}.";
-                AgentName = $"{created.Name} Copy";
-            });
+            _workspaceRefresh.Raise();
+            SecondViewModelLog.AgentCreated(logger, created.Id.Value, created.Name, created.ProviderKind, created.ModelName);
+            await OperationMessage.SetAsync($"Created {created.Name} using {created.ProviderDisplayName}.", cancellationToken);
+            BrowserConsoleDiagnostics.Info(
+                $"[DotPilot.AgentBuilder] Create completed. AgentId={created.Id.Value:N} Name={created.Name} Provider={created.ProviderKind} Model={created.ModelName}");
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(_logger, exception);
-            await RunOnUiThreadAsync(() => StatusMessage = exception.Message);
+            SecondViewModelLog.Failure(logger, exception);
+            BrowserConsoleDiagnostics.Error($"[DotPilot.AgentBuilder] Create failed. {exception}");
+            await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
 
-    private AgentRoleKind ResolveSelectedRole()
+    private async ValueTask<IImmutableList<AgentProviderOption>> LoadProvidersAsync(CancellationToken cancellationToken)
     {
-        return _roleOptions.FirstOrDefault(option => option.IsSelected)?.Role ?? AgentRoleKind.Operator;
+        try
+        {
+            SecondViewModelLog.LoadingProviders(logger);
+            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            SecondViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
+
+            var providers = workspace.Providers
+                .Select(MapProviderOption)
+                .ToImmutableArray();
+
+            await EnsureSelectedProviderAsync(providers, cancellationToken);
+            return providers;
+        }
+        catch (Exception exception)
+        {
+            SecondViewModelLog.Failure(logger, exception);
+            await OperationMessage.SetAsync(exception.Message, cancellationToken);
+            return ImmutableArray<AgentProviderOption>.Empty;
+        }
+    }
+
+    private async ValueTask<bool> LoadCanCreateAgentAsync(CancellationToken cancellationToken)
+    {
+        var selectedProvider = await ResolveSelectedProviderAsync();
+        var agentName = (await AgentName) ?? string.Empty;
+        return !IsEmptySelectedProvider(selectedProvider) &&
+            selectedProvider.CanCreateAgents &&
+            !string.IsNullOrWhiteSpace(agentName);
+    }
+
+    private async ValueTask<AgentBuilderView> LoadBuilderAsync(CancellationToken cancellationToken)
+    {
+        var selectedProvider = await ResolveSelectedProviderAsync();
+        var suggestedModelName = ResolveSuggestedModelName(selectedProvider);
+        var providerVersionLabel = string.IsNullOrWhiteSpace(selectedProvider.InstalledVersion)
+            ? string.Empty
+            : VersionPrefix + selectedProvider.InstalledVersion;
+
+        return new AgentBuilderView(
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderDisplayName : selectedProvider.DisplayName,
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderStatusSummary : selectedProvider.StatusSummary,
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderCommandName : selectedProvider.CommandName,
+            providerVersionLabel,
+            !string.IsNullOrWhiteSpace(providerVersionLabel),
+            suggestedModelName,
+            ResolveStatusMessage(selectedProvider),
+            await CanCreateAgent);
+    }
+
+    private async ValueTask EnsureSelectedProviderAsync(
+        IImmutableList<AgentProviderOption> providers,
+        CancellationToken cancellationToken)
+    {
+        var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        var resolvedProvider = FindProviderByKind(providers, selectedProvider.Kind);
+        if (IsEmptySelectedProvider(resolvedProvider))
+        {
+            resolvedProvider = FindFirstCreatableProvider(providers);
+        }
+
+        if (IsEmptySelectedProvider(resolvedProvider) && providers.Count > 0)
+        {
+            resolvedProvider = providers[0];
+        }
+
+        if (!Equals(selectedProvider, resolvedProvider))
+        {
+            await SelectedProvider.UpdateAsync(_ => resolvedProvider, cancellationToken);
+        }
+    }
+
+    private static AgentProviderOption FindProviderByKind(IImmutableList<AgentProviderOption> providers, AgentProviderKind kind)
+    {
+        for (var index = 0; index < providers.Count; index++)
+        {
+            if (providers[index].Kind == kind)
+            {
+                return providers[index];
+            }
+        }
+
+        return EmptySelectedProvider;
+    }
+
+    private static AgentProviderOption FindFirstCreatableProvider(IImmutableList<AgentProviderOption> providers)
+    {
+        for (var index = 0; index < providers.Count; index++)
+        {
+            if (providers[index].CanCreateAgents)
+            {
+                return providers[index];
+            }
+        }
+
+        return EmptySelectedProvider;
+    }
+
+    private static bool IsEmptySelectedProvider(AgentProviderOption? provider)
+    {
+        return provider is null || string.IsNullOrWhiteSpace(provider.DisplayName);
+    }
+
+    private async ValueTask<AgentProviderOption> ResolveSelectedProviderAsync()
+    {
+        var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        if (!IsEmptySelectedProvider(selectedProvider))
+        {
+            return selectedProvider;
+        }
+
+        var providers = await Providers;
+        var resolvedProvider = FindFirstCreatableProvider(providers);
+        if (!IsEmptySelectedProvider(resolvedProvider))
+        {
+            return resolvedProvider;
+        }
+
+        return providers.Count > 0 ? providers[0] : EmptySelectedProvider;
+    }
+
+    private async ValueTask<string> ResolveEffectiveModelNameAsync()
+    {
+        var modelName = ((await ModelName) ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(modelName))
+        {
+            return modelName;
+        }
+
+        return ResolveSuggestedModelName(await ResolveSelectedProviderAsync());
+    }
+
+    private static AgentProviderOption MapProviderOption(ProviderStatusDescriptor provider)
+    {
+        return new AgentProviderOption(
+            provider.Kind,
+            provider.DisplayName,
+            provider.CommandName,
+            provider.StatusSummary,
+            provider.InstalledVersion,
+            provider.CanCreateAgents);
+    }
+
+    private static string ResolveStatusMessage(AgentProviderOption provider)
+    {
+        if (IsEmptySelectedProvider(provider))
+        {
+            return EmptyProviderStatusSummary;
+        }
+
+        return provider.CanCreateAgents
+            ? string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                ReadyMessageCompositeFormat,
+                provider.DisplayName)
+            : provider.StatusSummary;
+    }
+
+    private static string ResolveSuggestedModelName(AgentProviderOption provider)
+    {
+        return IsEmptySelectedProvider(provider)
+            ? ResolveDefaultModel(AgentProviderKind.Debug)
+            : ResolveDefaultModel(provider.Kind);
     }
 
     private static string ResolveDefaultModel(AgentProviderKind kind)
@@ -230,35 +298,5 @@ public sealed class SecondViewModel : ObservableObject
             AgentProviderKind.GitHubCopilot => "gpt-5",
             _ => "debug-echo",
         };
-    }
-
-    private Task RunOnUiThreadAsync(Action action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        if (_dispatcherQueue.HasThreadAccess)
-        {
-            action();
-            return Task.CompletedTask;
-        }
-
-        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_dispatcherQueue.TryEnqueue(() =>
-            {
-                try
-                {
-                    action();
-                    completionSource.SetResult();
-                }
-                catch (Exception exception)
-                {
-                    completionSource.SetException(exception);
-                }
-            }))
-        {
-            completionSource.SetException(new InvalidOperationException("Unable to enqueue work to the UI dispatcher."));
-        }
-
-        return completionSource.Task;
     }
 }

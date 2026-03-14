@@ -136,10 +136,10 @@
             <TextBlock FontSize="14"
                        FontWeight="Medium"
                        Foreground="{StaticResource AppPrimaryTextBrush}"
-                       Text="{Binding Title}" />
+                       Text="{Binding ActiveSession.Title}" />
             <TextBlock FontSize="12"
                        Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="{Binding StatusSummary}"
+                       Text="{Binding ActiveSession.StatusSummary}"
                        TextWrapping="WrapWholeWords" />
           </StackPanel>
 
@@ -206,7 +206,7 @@
 
             <ItemsControl AutomationProperties.AutomationId="ChatMembersList"
                           ItemTemplate="{StaticResource MemberTemplate}"
-                          ItemsSource="{Binding Members}" />
+                          ItemsSource="{Binding ActiveSession.Members}" />
           </StackPanel>
 
           <Rectangle Style="{StaticResource SectionDividerStyle}" />
@@ -245,7 +245,7 @@
 
             <ItemsControl AutomationProperties.AutomationId="ChatAgentsList"
                           ItemTemplate="{StaticResource AgentTemplate}"
-                          ItemsSource="{Binding Agents}" />
+                          ItemsSource="{Binding ActiveSession.Agents}" />
           </StackPanel>
 
           <Rectangle Style="{StaticResource SectionDividerStyle}" />
