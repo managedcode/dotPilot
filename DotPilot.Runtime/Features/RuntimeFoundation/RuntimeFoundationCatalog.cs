@@ -28,7 +28,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         "Agent Framework integration is prepared as a separate slice that can plug into the embedded host without reshaping the UI layer.";
     private readonly IReadOnlyList<ProviderDescriptor> _providers;
 
-    public RuntimeFoundationCatalog() => _providers = CreateProviders();
+    public RuntimeFoundationCatalog() => _providers = Array.AsReadOnly(CreateProviders());
 
     public RuntimeFoundationSnapshot GetSnapshot()
     {
@@ -72,7 +72,7 @@ public sealed class RuntimeFoundationCatalog : IRuntimeFoundationCatalog
         ];
     }
 
-    private static IReadOnlyList<ProviderDescriptor> CreateProviders()
+    private static ProviderDescriptor[] CreateProviders()
     {
         return
         [

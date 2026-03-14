@@ -2,7 +2,7 @@ namespace DotPilot.Tests.Features.ToolchainCenter;
 
 public class ToolchainCenterCatalogTests
 {
-    private const string ToolchainEpicLabel = "PRESESSION READINESS";
+    private const string ToolchainEpicLabel = "PRE-SESSION READINESS";
 
     [Test]
     public void CatalogIncludesEpicIssueCoverageAndAllExternalProviders()
@@ -18,7 +18,7 @@ public class ToolchainCenterCatalogTests
 
         snapshot.EpicLabel.Should().Be(ToolchainEpicLabel);
         snapshot.Summary.Should().NotContain("Issue #");
-        snapshot.Workstreams.Select(workstream => workstream.IssueLabel).Should().Equal("SURFACE", "DIAGNOSTICS", "CONFIGURATION", "POLLING");
+        snapshot.Workstreams.Select(workstream => workstream.SectionLabel).Should().Equal("SURFACE", "DIAGNOSTICS", "CONFIGURATION", "POLLING");
         coveredIssues.Should().Equal(
             ToolchainCenterIssues.ToolchainCenterUi,
             ToolchainCenterIssues.CodexReadiness,
