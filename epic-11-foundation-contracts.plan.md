@@ -47,7 +47,7 @@ Out of scope:
   - `dotnet test DotPilot.slnx`
   - `dotnet format DotPilot.slnx --verify-no-changes`
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- [ ] Commit the epic `#11` work and open one PR with correct GitHub closing refs.
+- [x] Commit the epic `#11` work and open one PR with correct GitHub closing refs.
 
 ## Full-Test Baseline
 
@@ -91,3 +91,5 @@ Out of scope:
   - Passed with overall coverage `91.66%` line and `61.66%` branch.
   - Changed production files met the repo bar:
     - `RuntimeFoundationCatalog`: `100.00%` line / `100.00%` branch
+- Pull request
+  - Opened [PR #82](https://github.com/managedcode/dotPilot/pull/82) from `codex/epic-11-foundation-contracts` to `main` with `Closes #11`, `Closes #22`, and `Closes #23`.
