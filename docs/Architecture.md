@@ -9,13 +9,13 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Contracts boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns the durable non-UI contracts for provider readiness, agent profiles, session lists, transcript entries, commands, and Orleans grain interfaces.
-- **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, `EF Core` + `SQLite` persistence, and the `IAgentSessionService` implementation.
-- **Embedded host boundary:** [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host and the grains that represent session and agent-profile state. The first product wave stays local-first with `UseLocalhostClustering` plus in-memory Orleans storage/reminders, while durable product state lives in the local `SQLite` store.
+- **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, `EF Core` + `SQLite` projection persistence, local folder-backed `AgentSession` storage, local folder-backed chat-history persistence through `ChatHistoryProvider`, and the `IAgentSessionService` implementation.
+- **Embedded host boundary:** [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host and the grains that represent session and agent-profile state. The product stays local-first with `UseLocalhostClustering`, in-memory reminders, and local folder-backed Orleans grain storage through `ManagedCode.Storage`.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
 
 ## Scoping
 
-- **In scope for the active rewrite:** chat-first session UX, provider readiness/settings, agent creation, Orleans-backed session and agent state, local persistence via `SQLite`, deterministic debug provider, transcript/tool streaming, and optional repo/git utilities inside a session.
+- **In scope for the active rewrite:** chat-first session UX, provider readiness/settings, agent creation, Orleans-backed session and agent state, local persistence via `SQLite`, local folder-backed `AgentSession` and chat-history storage, deterministic debug provider, transcript/tool streaming, and optional repo/git utilities inside a session.
 - **In scope for later slices:** multi-agent sessions, richer workflow composition, provider-specific live execution, session export/replay, and deeper git/worktree utilities.
 - **Out of scope in the current repository slice:** remote workers, remote Orleans clustering, cloud persistence, multi-user identity, and external durable stores.
 
@@ -30,8 +30,8 @@ flowchart LR
   Architecture["docs/Architecture.md"]
   Ui["DotPilot Uno desktop shell"]
   Core["DotPilot.Core contracts"]
-  Runtime["DotPilot.Runtime runtime + SQLite"]
-  Host["DotPilot.Runtime.Host Orleans host + grains"]
+  Runtime["DotPilot.Runtime runtime + SQLite + folder session storage"]
+  Host["DotPilot.Runtime.Host Orleans host + grains + folder grain state"]
   Unit["DotPilot.Tests"]
   UiTests["DotPilot.UITests"]
 
@@ -83,18 +83,23 @@ flowchart TD
   Ui["Uno shell"]
   ViewModels["Session / agent / settings view models"]
   Service["IAgentSessionService"]
-  Store["EF Core + SQLite"]
+  ProjectionStore["EF Core + SQLite projections"]
+  SessionStore["Folder AgentSession + chat history"]
   SessionGrain["ISessionGrain"]
   AgentGrain["IAgentProfileGrain"]
+  GrainStore["ManagedCode.Storage Orleans filesystem store"]
   ProviderCatalog["Provider catalog + readiness probe"]
   ProviderClient["Provider SDK / IChatClient or debug client"]
   Stream["SessionStreamEntry updates"]
 
   Ui --> ViewModels
   ViewModels --> Service
-  Service --> Store
+  Service --> ProjectionStore
+  Service --> SessionStore
   Service --> SessionGrain
   Service --> AgentGrain
+  SessionGrain --> GrainStore
+  AgentGrain --> GrainStore
   Service --> ProviderCatalog
   ProviderCatalog --> ProviderClient
   Service --> ProviderClient
@@ -108,22 +113,28 @@ flowchart TD
 sequenceDiagram
   participant UI as Uno UI
   participant Service as AgentSessionService
-  participant DB as SQLite
+  participant DB as SQLite projections
+  participant FS as Local folder AgentSession/history store
   participant SG as SessionGrain
   participant AG as AgentProfileGrain
+  participant GS as Local folder Orleans grain store
   participant Provider as Provider SDK / Debug Client
 
   UI->>Service: CreateAgentAsync(...)
   Service->>DB: Save agent profile
   Service->>AG: UpsertAsync(agent profile)
+  AG->>GS: Persist grain state
   UI->>Service: CreateSessionAsync(...)
   Service->>DB: Save session + initial status entry
+  Service->>FS: Create/persist opaque AgentSession
   Service->>SG: UpsertAsync(session)
+  SG->>GS: Persist grain state
   UI->>Service: SendMessageAsync(...)
   Service->>DB: Save user message
   Service->>Provider: Run / stream
   Provider-->>Service: Streaming updates
   Service->>DB: Persist transcript entries
+  Service->>FS: Persist ChatHistoryProvider state + serialized AgentSession
   Service-->>UI: SessionStreamEntry updates
 ```
 
@@ -163,6 +174,10 @@ sequenceDiagram
 ## Review Focus
 
 - Keep the product framed as a chat-first local-agent client, not as a backlog-shaped workbench.
-- Replace seed-data assumptions with real provider, agent, session, and transcript state.
+- Replace seed-data assumptions with real provider, agent, session, transcript, and durable runtime state.
 - Keep repo/git operations as optional tools inside a session, not as the app's primary information architecture.
 - Prefer provider SDKs and `IChatClient`-style abstractions over custom parallel request/result wrappers unless a concrete gap forces an adapter layer.
+- Keep the persistence split explicit:
+  - `SQLite` for operator-facing projections and settings
+  - local folder-backed `AgentSession` plus chat history for agent continuity
+  - local folder-backed Orleans storage for grain state

@@ -22,7 +22,7 @@ public sealed class AgentSessionPersistenceTests
         try
         {
             SessionId sessionId;
-            AgentSessionStorageOptions storageOptions = CreateStorageOptions(root);
+            var storageOptions = CreateStorageOptions(root);
 
             await using (var firstFixture = CreateFixture(storageOptions))
             {

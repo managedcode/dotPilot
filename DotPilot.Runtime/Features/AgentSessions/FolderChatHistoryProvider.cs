@@ -56,10 +56,23 @@ internal sealed class FolderChatHistoryProvider(LocalAgentChatHistoryStore chatH
             return;
         }
 
+        var existing = await chatHistoryStore.LoadAsync(storageKey, cancellationToken);
+        var knownMessageKeys = existing
+            .Select(CreateMessageKey)
+            .ToHashSet(StringComparer.Ordinal);
         var responseMessages = context.ResponseMessages ?? [];
+        var newMessages = context.RequestMessages
+            .Concat(responseMessages)
+            .Where(message => knownMessageKeys.Add(CreateMessageKey(message)))
+            .ToArray();
+        if (newMessages.Length == 0)
+        {
+            return;
+        }
+
         await chatHistoryStore.AppendAsync(
             storageKey,
-            context.RequestMessages.Concat(responseMessages),
+            newMessages,
             cancellationToken);
     }
 
@@ -69,6 +82,21 @@ internal sealed class FolderChatHistoryProvider(LocalAgentChatHistoryStore chatH
 
         var state = SessionState.GetOrInitializeState(session);
         return string.IsNullOrWhiteSpace(state.StorageKey) ? null : state.StorageKey;
+    }
+
+    private static string CreateMessageKey(ChatMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        return string.IsNullOrWhiteSpace(message.MessageId)
+            ? string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{0}|{1}|{2:O}|{3}",
+                message.Role,
+                message.AuthorName,
+                message.CreatedAt,
+                message.Text)
+            : message.MessageId;
     }
 }
 
