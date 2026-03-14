@@ -98,7 +98,7 @@ public class ControlPlaneDomainContractsTests
             Id = WorkspaceId.New(),
             Name = "dotPilot",
             RootPath = "/repo/dotPilot",
-            BranchName = "codex/epic-11-foundation-contracts",
+            BranchName = "main",
         };
 
         var codingAgent = new AgentProfileDescriptor

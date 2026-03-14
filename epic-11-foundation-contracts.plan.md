@@ -21,7 +21,7 @@ Out of scope:
 - Do not claim the epic is complete unless both direct child issues are covered by real implementation and automated tests.
 - Tests must stay realistic and exercise caller-visible flows through public contracts.
 - Existing open issue state on GitHub may reflect missing PR closing refs rather than missing code; the branch must still produce real repository improvements before opening a new PR.
-- Avoid user-specific local paths or branch names in durable test data and docs.
+- Avoid user-specific local paths and workflow-specific branch names in durable test data and user-facing docs; task-local plan notes may still reference the active branch and PR.
 
 ## Testing Methodology
 
