@@ -57,7 +57,7 @@ Out of scope:
   - `dotnet test DotPilot.slnx`
   - `dotnet format DotPilot.slnx --verify-no-changes`
   - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --settings DotPilot.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"`
-- [ ] Commit the epic branch implementation and open one PR that closes epic `#12` and its covered child issues correctly.
+- [x] Commit the epic branch implementation and open one PR that closes epic `#12` and its covered child issues correctly.
 
 ## Full-Test Baseline
 
@@ -101,3 +101,5 @@ Out of scope:
     - `RuntimeSessionArchiveStore`: `100.00%` line / `100.00%` branch
     - `EmbeddedRuntimeTrafficPolicy`: `100.00%` line / `83.33%` branch
     - `EmbeddedRuntimeTrafficPolicyCatalog`: `100.00%` line / `100.00%` branch
+- Pull request
+  - Opened [PR #81](https://github.com/managedcode/dotPilot/pull/81) from `codex/epic-12-embedded-runtime` to `main` with `Closes #12`, `Closes #24`, `Closes #25`, `Closes #26`, and `Closes #27`.
