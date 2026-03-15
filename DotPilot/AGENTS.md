@@ -17,10 +17,10 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - `App.xaml`
 - `App.xaml.cs`
 - `Platforms/Desktop/Program.cs`
-- `Presentation/Shell/Shell.xaml`
-- `Presentation/AgentSessions/Chat/MainPage.xaml`
-- `Presentation/AgentSessions/Builder/SecondPage.xaml`
-- `Presentation/AgentSessions/Settings/SettingsPage.xaml`
+- `Presentation/Shell/Views/Shell.xaml`
+- `Presentation/Chat/Views/MainPage.xaml`
+- `Presentation/AgentBuilder/Views/SecondPage.xaml`
+- `Presentation/Settings/Views/SettingsPage.xaml`
 - `Styles/ColorPaletteOverride.xaml`
 
 ## Boundaries
@@ -42,6 +42,8 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Avoid duplicated side-panel content and oversized decorative copy; prefer compact navigation, clear current-task headers, and content-first layouts.
 - Avoid placeholder-looking XAML chrome such as ASCII pseudo-icons, duplicate provider lists, inflated pill buttons, or decorative labels that repeat the same state in multiple panes.
 - Do not let the desktop shell collapse into an unstructured visual mash: keep reusable styles, brushes, templates, and spacing rules in dedicated XAML resources or focused controls instead of burying ad hoc visual decisions inline across pages.
+- Do not hide distinct product features under one presentation umbrella directory such as `Presentation/AgentSessions`; keep `Chat`, `AgentBuilder`, `Settings`, `Shell`, and shared infrastructure in explicit feature roots.
+- Inside each presentation feature root, keep `Models`, `Views`, `ViewModels`, `Controls`, and `Configuration` explicit instead of mixing page, view-model, model, and policy files together at the top level.
 - The chat composer must expose an operator setting for send behavior with exactly two modes: `Enter` sends while `Enter` with modifiers inserts a new line, or `Enter` inserts a new line while `Enter` with modifiers sends; do not hardcode only one behavior.
 - Prefer declarative `Uno.Extensions.Navigation` in XAML via `uen:Navigation.Request` over page code-behind navigation calls.
 - Keep business logic, persistence, networking workflows, and non-UI orchestration out of page code-behind.

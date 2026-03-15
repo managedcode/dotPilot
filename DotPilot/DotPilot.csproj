@@ -71,11 +71,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DotPilot.Core\DotPilot.Core.csproj" />
-        <ProjectReference Include="..\DotPilot.Runtime\DotPilot.Runtime.csproj" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)'!='net10.0-browserwasm'">
-        <ProjectReference Include="..\DotPilot.Runtime.Host\DotPilot.Runtime.Host.csproj" />
     </ItemGroup>
 
     <ItemGroup>

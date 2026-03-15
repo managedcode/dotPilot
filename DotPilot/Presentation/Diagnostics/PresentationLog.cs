@@ -1,4 +1,3 @@
-using DotPilot.Core.Features.AgentSessions;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Presentation;

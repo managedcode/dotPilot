@@ -44,7 +44,7 @@ The repository is in the **active foundation and workbench implementation** stag
 
 What already exists:
 
-- the first runtime foundation slices in `DotPilot.Core` and `DotPilot.Runtime`
+- the first non-UI foundation slices in `DotPilot.Core`
 - the first operator workbench slice for repository browsing, document inspection, artifacts, logs, and settings
 - the first Toolchain Center slice for pre-session provider readiness and operator diagnostics
 - a presentation-only `Uno Platform` app shell with separate non-UI class-library boundaries
@@ -102,8 +102,7 @@ GitHub tracking:
 ```text
 .
 ├── DotPilot/                 # Uno desktop presentation host
-├── DotPilot.Core/            # Vertical-slice contracts and typed identifiers
-├── DotPilot.Runtime/         # Provider-independent runtime implementations
+├── DotPilot.Core/            # All non-UI contracts, features, integrations, and local host
 ├── DotPilot.ReleaseTool/     # Release automation utilities
 ├── DotPilot.Tests/           # NUnit contract and composition tests
 ├── DotPilot.UITests/         # Uno.UITest browser coverage

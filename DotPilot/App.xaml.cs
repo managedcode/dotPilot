@@ -2,10 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using DotPilot.Runtime.Features.AgentSessions;
-#if !__WASM__
-using DotPilot.Runtime.Host.Features.AgentSessions;
-#endif
+using DotPilot.Core.LocalAgentHost;
+using DotPilot.Core.ChatSessions;
 
 namespace DotPilot;
 
@@ -59,7 +57,7 @@ public partial class App : Application
                     .UseEnvironment(Environments.Development)
 #endif
 #if !__WASM__
-                    .UseDotPilotAgentSessions()
+                    .UseDotPilotLocalAgentHost()
 #endif
                     .UseLogging(configure: (context, logBuilder) =>
                     {
@@ -108,7 +106,7 @@ public partial class App : Application
 #if DEBUG
                         // DelegatingHandler will be automatically injected
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<DelegatingHandler, DotPilot.Runtime.Features.HttpDiagnostics.DebugHttpHandler>(services);
+                            .AddTransient<DelegatingHandler, DotPilot.Core.HttpDiagnostics.DebugHttpHandler>(services);
 #endif
 
                     })

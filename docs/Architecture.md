@@ -8,9 +8,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
-- **Contracts boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns the durable non-UI contracts for provider readiness, agent profiles, session lists, transcript entries, commands, and Orleans grain interfaces.
-- **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, `EF Core` + `SQLite` projection persistence, local folder-backed `AgentSession` storage, local folder-backed chat-history persistence through `ChatHistoryProvider`, and the `IAgentSessionService` implementation.
-- **Embedded host boundary:** [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host and the grains that represent session and agent-profile state. The product stays local-first with `UseLocalhostClustering`, in-memory reminders, and local folder-backed Orleans grain storage through `ManagedCode.Storage`.
+- **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the single non-UI project. It owns contract-shaped folders such as `ControlPlaneDomain`, `Settings`, and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, `LocalAgentHost`, and `HttpDiagnostics`.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
 
 ## Scoping
@@ -29,9 +27,7 @@ flowchart LR
   Governance["AGENTS.md"]
   Architecture["docs/Architecture.md"]
   Ui["DotPilot Uno desktop shell"]
-  Core["DotPilot.Core contracts"]
-  Runtime["DotPilot.Runtime runtime + SQLite + folder session storage"]
-  Host["DotPilot.Runtime.Host Orleans host + grains + folder grain state"]
+  Core["DotPilot.Core contracts + providers + persistence + local host"]
   Unit["DotPilot.Tests"]
   UiTests["DotPilot.UITests"]
 
@@ -39,20 +35,11 @@ flowchart LR
   Root --> Architecture
   Root --> Ui
   Root --> Core
-  Root --> Runtime
-  Root --> Host
   Root --> Unit
   Root --> UiTests
   Ui --> Core
-  Ui --> Runtime
-  Ui --> Host
-  Runtime --> Core
-  Host --> Core
-  Host --> Runtime
   Unit --> Ui
   Unit --> Core
-  Unit --> Runtime
-  Unit --> Host
   UiTests --> Ui
 ```
 
@@ -144,32 +131,30 @@ sequenceDiagram
 
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
 - `Uno app rules` — [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
-- `Core contracts rules` — [../DotPilot.Core/AGENTS.md](../DotPilot.Core/AGENTS.md)
-- `Runtime rules` — [../DotPilot.Runtime/AGENTS.md](../DotPilot.Runtime/AGENTS.md)
-- `Embedded host rules` — [../DotPilot.Runtime.Host/AGENTS.md](../DotPilot.Runtime.Host/AGENTS.md)
+- `Core rules` — [../DotPilot.Core/AGENTS.md](../DotPilot.Core/AGENTS.md)
 - `Test rules` — [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md), [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
 
 ### Modules
 
 - `Production Uno app` — [../DotPilot/](../DotPilot/)
-- `Contracts and typed identifiers` — [../DotPilot.Core/](../DotPilot.Core/)
-- `Runtime services and provider adapters` — [../DotPilot.Runtime/](../DotPilot.Runtime/)
-- `Embedded Orleans host` — [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/)
+- `Core contracts, providers, persistence, and local host` — [../DotPilot.Core/](../DotPilot.Core/)
 - `Unit and integration-style tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
 - `UI tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
 
 ### High-signal code paths
 
 - `Application startup and route registration` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
-- `Chat shell route` — [../DotPilot/Presentation/AgentSessions/Chat/MainPage.xaml](../DotPilot/Presentation/AgentSessions/Chat/MainPage.xaml)
-- `Agent creation route` — [../DotPilot/Presentation/AgentSessions/Builder/SecondPage.xaml](../DotPilot/Presentation/AgentSessions/Builder/SecondPage.xaml)
-- `Settings shell` — [../DotPilot/Presentation/AgentSessions/Settings/Controls/SettingsShell.xaml](../DotPilot/Presentation/AgentSessions/Settings/Controls/SettingsShell.xaml)
-- `Active runtime contracts` — [../DotPilot.Core/Features/AgentSessions/AgentSessionContracts.cs](../DotPilot.Core/Features/AgentSessions/AgentSessionContracts.cs)
-- `Active runtime commands` — [../DotPilot.Core/Features/AgentSessions/AgentSessionCommands.cs](../DotPilot.Core/Features/AgentSessions/AgentSessionCommands.cs)
-- `Session runtime service` — [../DotPilot.Runtime/Features/AgentSessions/Execution/AgentSessionService.cs](../DotPilot.Runtime/Features/AgentSessions/Execution/AgentSessionService.cs)
-- `Provider readiness catalog` — [../DotPilot.Runtime/Features/AgentSessions/Providers/AgentSessionProviderCatalog.cs](../DotPilot.Runtime/Features/AgentSessions/Providers/AgentSessionProviderCatalog.cs)
-- `Session grain` — [../DotPilot.Runtime.Host/Features/AgentSessions/SessionGrain.cs](../DotPilot.Runtime.Host/Features/AgentSessions/SessionGrain.cs)
-- `UI end-to-end flow` — [../DotPilot.UITests/Features/AgentSessions/Flows/GivenChatSessionsShell.cs](../DotPilot.UITests/Features/AgentSessions/Flows/GivenChatSessionsShell.cs)
+- `Chat shell route` — [../DotPilot/Presentation/Chat/Views/MainPage.xaml](../DotPilot/Presentation/Chat/Views/MainPage.xaml)
+- `Agent creation route` — [../DotPilot/Presentation/AgentBuilder/Views/SecondPage.xaml](../DotPilot/Presentation/AgentBuilder/Views/SecondPage.xaml)
+- `Settings shell` — [../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml](../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml)
+- `Active contracts` — [../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs](../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs)
+- `Active commands` — [../DotPilot.Core/ChatSessions/Commands/AgentSessionCommands.cs](../DotPilot.Core/ChatSessions/Commands/AgentSessionCommands.cs)
+- `Session service interface` — [../DotPilot.Core/ChatSessions/Interfaces/IAgentSessionService.cs](../DotPilot.Core/ChatSessions/Interfaces/IAgentSessionService.cs)
+- `Local host grain interfaces` — [../DotPilot.Core/LocalAgentHost/Grains/ISessionGrain.cs](../DotPilot.Core/LocalAgentHost/Grains/ISessionGrain.cs), [../DotPilot.Core/LocalAgentHost/Grains/IAgentProfileGrain.cs](../DotPilot.Core/LocalAgentHost/Grains/IAgentProfileGrain.cs)
+- `Session application service` — [../DotPilot.Core/ChatSessions/Execution/AgentSessionService.cs](../DotPilot.Core/ChatSessions/Execution/AgentSessionService.cs)
+- `Provider readiness catalog` — [../DotPilot.Core/Providers/Configuration/AgentSessionProviderCatalog.cs](../DotPilot.Core/Providers/Configuration/AgentSessionProviderCatalog.cs)
+- `Session grain` — [../DotPilot.Core/LocalAgentHost/Grains/SessionGrain.cs](../DotPilot.Core/LocalAgentHost/Grains/SessionGrain.cs)
+- `UI end-to-end flow` — [../DotPilot.UITests/ChatSessions/Flows/GivenChatSessionsShell.cs](../DotPilot.UITests/ChatSessions/Flows/GivenChatSessionsShell.cs)
 
 ## Review Focus
 

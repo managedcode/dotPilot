@@ -18,8 +18,6 @@
   </Folder>
   <Folder Name="/Libraries/">
     <Project Path="DotPilot.Core/DotPilot.Core.csproj" />
-    <Project Path="DotPilot.Runtime/DotPilot.Runtime.csproj" />
-    <Project Path="DotPilot.Runtime.Host/DotPilot.Runtime.Host.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="DotPilot.Tests/DotPilot.Tests.csproj" />

@@ -22,8 +22,6 @@ This file defines how AI agents work in this solution.
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
   - `DotPilot.Core`
-  - `DotPilot.Runtime`
-  - `DotPilot.Runtime.Host`
   - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
@@ -143,6 +141,7 @@ For this app:
 - prefer the newest stable `.NET 10` and `C#` language features that are supported by the pinned SDK and do not weaken readability, determinism, or analyzability
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
+- do not run unit tests, UI tests, or coverage commands unless the user explicitly asks for test execution in the current turn; structural refactors and exploratory work should stop at code organization until the operator requests verification
 - do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
 - do not commit user-specific local paths, usernames, or machine-specific identifiers in tests, docs, snapshots, or fixtures; use neutral synthetic values so the repo stays portable and does not leak personal machine details
 - keep local planning artifacts and analyzer scratch files out of git history: ignore `*.plan.md` and `CodeMetricsConfig.txt`, and do not commit or re-stage them because they are operator-local working files
@@ -153,8 +152,12 @@ For this app:
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - when a feature slice grows beyond a few files, split it into responsibility-based subfolders that mirror the slice's real concerns such as chat, drafting, providers, persistence, settings, or tests; do not leave large flat file dumps that force unrelated code to coexist in one directory
-- keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
-- UI-facing shell, app-host, and application-configuration types belong in `DotPilot`, not in `DotPilot.Core`, `DotPilot.Runtime`, or `DotPilot.Runtime.Host`; the non-UI projects are reserved for contracts, runtime logic, and Orleans/host behavior only
+- do not hide multiple real features under one umbrella folder such as `AgentSessions` when the code actually belongs to distinct features like `Chat`, `AgentBuilder`, `Settings`, `Providers`, or `Workspace`; use explicit feature roots and keep logs, models, services, and tests under the feature that owns them
+- inside each feature root, keep structural subfolders explicit: models go under `Models`, configuration and defaults under `Configuration` or `Composition`, views under `Views`, view-models under `ViewModels`, diagnostics under `Diagnostics`, and service/runtime types under a responsibility-specific folder; do not leave those file kinds mixed together at the feature root
+- when a feature exposes commands, public interfaces, or Orleans grain contracts, put them in visible folders such as `Commands`, `Interfaces`, and `Grains`; do not bury them inside a generic `Contracts` folder where their role disappears from the tree
+- keep the Uno app project presentation-only; domain, host, orchestration, integrations, and persistence code must live outside the UI project in class-library code so UI composition does not mix with feature implementation
+- UI-facing shell and application-configuration types belong in `DotPilot`, while `DotPilot.Core` is the single non-UI project for contracts, providers, persistence, orchestration, and local host behavior
+- for this desktop self-host app, embedded Orleans host code, grain implementations, and grain interfaces belong under `DotPilot.Core/LocalAgentHost`; do not split them into a separate host project or leave the grain contracts behind in `DotPilot.Core`
 - when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out
 - epic implementation PRs must include automated tests for every direct child issue they claim to cover, plus the broader runtime and UI regressions required by the touched flows
 - do not claim an epic is implemented unless every direct child issue in the requested scope is both realized in code and covered by automated tests; partial coverage is not an acceptable close-out

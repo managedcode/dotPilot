@@ -13,7 +13,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - `DotPilot.UITests.csproj`
 - `Harness/Constants.cs`
 - `Harness/TestBase.cs`
-- `Features/AgentSessions/Flows/GivenChatSessionsShell.cs`
+- `ChatSessions/Flows/GivenChatSessionsShell.cs`
 
 ## Boundaries
 
@@ -22,7 +22,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - Treat browser-driver setup and app-launch prerequisites as part of the harness, not as assumptions inside individual tests.
 - The harness must make `dotnet test DotPilot.UITests/DotPilot.UITests.csproj` runnable without manual driver-path export and must fail loudly instead of silently skipping coverage.
 - Keep the harness direct and minimal; prefer the smallest deterministic setup needed to run the suite and return a real result.
-- Keep the file layout explicit: browser harness code belongs under `Harness/`, harness self-tests under `Harness/Tests/`, end-to-end slice coverage under `Features/<Slice>/`, and cross-slice operator flows under `Journeys/`.
+- Keep the file layout explicit: browser harness code belongs under `Harness/`, harness self-tests under `Harness/Tests/`, end-to-end slice coverage under `<Slice>/`, and cross-slice operator flows under `Journeys/`.
 - Use the official `Uno` MCP documentation as the source of truth for `Uno.UITest` browser behavior, and align selectors with the documented WebAssembly automation mapping before changing the harness.
 - Do not manually launch the app or a standalone `browserwasm` host while working on this project; browser-path reproduction and debugging must go through `dotnet test` and the real `DotPilot.UITests` harness only.
 - UI tests must cover each feature's interactive elements, expected behaviors, and full operator flows instead of only a top-level smoke path.

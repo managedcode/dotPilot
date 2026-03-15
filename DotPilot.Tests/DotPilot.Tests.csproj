@@ -22,8 +22,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DotPilot.Core\DotPilot.Core.csproj"/>
-        <ProjectReference Include="..\DotPilot.Runtime\DotPilot.Runtime.csproj"/>
-        <ProjectReference Include="..\DotPilot.Runtime.Host\DotPilot.Runtime.Host.csproj"/>
         <ProjectReference Include="..\DotPilot\DotPilot.csproj"/>
     </ItemGroup>
 </Project>
