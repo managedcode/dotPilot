@@ -36,15 +36,7 @@ internal static class AgentSessionCommandProbe
 
     public static string ReadVersion(string executablePath, IReadOnlyList<string> arguments)
     {
-        var execution = Execute(executablePath, arguments);
-        if (!execution.Succeeded)
-        {
-            return EmptyOutput;
-        }
-
-        var output = string.IsNullOrWhiteSpace(execution.StandardOutput)
-            ? execution.StandardError
-            : execution.StandardOutput;
+        var output = ReadOutput(executablePath, arguments);
         var firstLine = output
             .Split(Environment.NewLine, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault();
@@ -58,6 +50,19 @@ internal static class AgentSessionCommandProbe
         return separatorIndex >= 0
             ? firstLine[(separatorIndex + VersionSeparator.Length)..].Trim(' ', ':')
             : firstLine.Trim();
+    }
+
+    public static string ReadOutput(string executablePath, IReadOnlyList<string> arguments)
+    {
+        var execution = Execute(executablePath, arguments);
+        if (!execution.Succeeded)
+        {
+            return EmptyOutput;
+        }
+
+        return string.IsNullOrWhiteSpace(execution.StandardOutput)
+            ? execution.StandardError
+            : execution.StandardOutput;
     }
 
     private static ToolchainCommandExecution Execute(string executablePath, IReadOnlyList<string> arguments)

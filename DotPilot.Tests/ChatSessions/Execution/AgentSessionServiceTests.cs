@@ -1,14 +1,18 @@
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
+using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Tests.Providers;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.ChatSessions;
 
 public sealed class AgentSessionServiceTests
 {
+    private const int LegacyDefaultRole = 4;
+    private const string LegacyEmptyCapabilitiesJson = "[]";
+
     [Test]
     public async Task GetWorkspaceAsyncSeedsDefaultSystemAgentForANewStore()
     {
@@ -27,6 +31,71 @@ public sealed class AgentSessionServiceTests
             provider.Kind == AgentProviderKind.Debug &&
             provider.IsEnabled &&
             provider.CanCreateAgents);
+    }
+
+    [Test]
+    public async Task CreateAgentAsyncPersistsLegacyCompatibilityColumnsInSqliteStore()
+    {
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "legacy-store.db");
+        await CreateSchemaAsync(databasePath, includeLegacyColumns: true);
+        await using var fixture = CreateFixture(CreateSqliteOptions(tempRoot, databasePath), tempRoot);
+
+        var created = (await fixture.Service.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "SQLite Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Use the persisted SQLite path."),
+            CancellationToken.None)).ShouldSucceed();
+
+        created.Name.Should().Be("SQLite Agent");
+
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(CancellationToken.None);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT "Role", "CapabilitiesJson"
+            FROM "AgentProfiles"
+            WHERE "Name" = 'SQLite Agent';
+            """;
+
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken.None);
+        (await reader.ReadAsync(CancellationToken.None)).Should().BeTrue();
+        reader.GetInt32(0).Should().Be(LegacyDefaultRole);
+        reader.GetString(1).Should().Be(LegacyEmptyCapabilitiesJson);
+    }
+
+    [Test]
+    public async Task GetWorkspaceAsyncUpgradesRegressedSqliteSchemaMissingLegacyColumns()
+    {
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "regressed-store.db");
+        await CreateSchemaAsync(databasePath, includeLegacyColumns: false);
+        await using var fixture = CreateFixture(CreateSqliteOptions(tempRoot, databasePath), tempRoot);
+
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+
+        workspace.Agents.Should().ContainSingle(agent => agent.Name == AgentSessionDefaults.SystemAgentName);
+
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(CancellationToken.None);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """PRAGMA table_info("AgentProfiles")""";
+
+        List<string> columns = [];
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken.None);
+        var nameOrdinal = reader.GetOrdinal("name");
+        while (await reader.ReadAsync(CancellationToken.None))
+        {
+            columns.Add(reader.GetString(nameOrdinal));
+        }
+
+        columns.Should().Contain("Role");
+        columns.Should().Contain("CapabilitiesJson");
     }
 
     [Test]
@@ -70,6 +139,44 @@ public sealed class AgentSessionServiceTests
         session.Entries.Should().ContainSingle(entry =>
             entry.Kind == SessionStreamEntryKind.Status &&
             entry.Text.Contains("Session created", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task CreateAgentAndSendMessageFlowPreservesSelectedModelAcrossConversation()
+    {
+        await using var fixture = CreateFixture();
+        (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var agent = (await fixture.Service.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Operator Flow Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Stay deterministic for operator-flow tests."),
+            CancellationToken.None)).ShouldSucceed();
+
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Operator flow session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        List<SessionStreamEntry> streamedEntries = [];
+        await foreach (var entry in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "what model are you using?"),
+                           CancellationToken.None))
+        {
+            streamedEntries.Add(entry.ShouldSucceed());
+        }
+
+        var transcript = (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).ShouldSucceed();
+
+        transcript.Participants.Should().ContainSingle(participant =>
+            participant.Id == agent.Id &&
+            participant.ModelName == "debug-echo");
+        streamedEntries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.AssistantMessage &&
+            entry.Text.Contains("Debug provider received: what model are you using?", StringComparison.Ordinal));
     }
 
     [Test]
@@ -234,6 +341,17 @@ public sealed class AgentSessionServiceTests
         return new TestFixture(provider, service);
     }
 
+    private static TestFixture CreateFixture(AgentSessionStorageOptions options, string tempRootPath)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(TimeProvider.System);
+        services.AddAgentSessions(options);
+
+        var provider = services.BuildServiceProvider();
+        var service = provider.GetRequiredService<IAgentSessionService>();
+        return new TestFixture(provider, service, tempRootPath);
+    }
+
     private static async Task SeedLegacyAgentAsync(
         ServiceProvider provider,
         Guid agentId,
@@ -263,6 +381,8 @@ public sealed class AgentSessionServiceTests
         SetProperty(record, "ProviderKind", (int)providerKind);
         SetProperty(record, "ModelName", modelName);
         SetProperty(record, "SystemPrompt", "Use Codex when available.");
+        TrySetProperty(record, "Role", LegacyDefaultRole);
+        TrySetProperty(record, "CapabilitiesJson", LegacyEmptyCapabilitiesJson);
         SetProperty(record, "CreatedAt", DateTimeOffset.UtcNow);
 
         dbContext.Add(record);
@@ -279,24 +399,123 @@ public sealed class AgentSessionServiceTests
         property.SetValue(instance, value);
     }
 
-    private sealed class TestFixture : IAsyncDisposable
+    private static void TrySetProperty(object instance, string propertyName, object value)
     {
-        private readonly ServiceProvider _provider;
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
 
-        public TestFixture(ServiceProvider provider, IAgentSessionService service)
+        var property = instance.GetType().GetProperty(propertyName);
+        property?.SetValue(instance, value);
+    }
+
+    private static AgentSessionStorageOptions CreateSqliteOptions(string tempRootPath, string databasePath)
+    {
+        return new AgentSessionStorageOptions
         {
-            _provider = provider;
-            Provider = provider;
-            Service = service;
+            DatabasePath = databasePath,
+            RuntimeSessionDirectoryPath = Path.Combine(tempRootPath, "runtime"),
+            ChatHistoryDirectoryPath = Path.Combine(tempRootPath, "history"),
+            PlaygroundDirectoryPath = Path.Combine(tempRootPath, "playgrounds"),
+        };
+    }
+
+    private static string CreateTempRootDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "dotpilot-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static async Task CreateSchemaAsync(string databasePath, bool includeLegacyColumns)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
         }
 
-        public ServiceProvider Provider { get; }
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(CancellationToken.None);
 
-        public IAgentSessionService Service { get; }
+        var agentProfilesTableDefinition = includeLegacyColumns
+            ? """
+              CREATE TABLE "AgentProfiles" (
+                  "Id" TEXT NOT NULL CONSTRAINT "PK_AgentProfiles" PRIMARY KEY,
+                  "Name" TEXT NOT NULL,
+                  "Role" INTEGER NOT NULL,
+                  "ProviderKind" INTEGER NOT NULL,
+                  "ModelName" TEXT NOT NULL,
+                  "SystemPrompt" TEXT NOT NULL,
+                  "CapabilitiesJson" TEXT NOT NULL,
+                  "CreatedAt" TEXT NOT NULL
+              );
+              """
+            : """
+              CREATE TABLE "AgentProfiles" (
+                  "Id" TEXT NOT NULL CONSTRAINT "PK_AgentProfiles" PRIMARY KEY,
+                  "Name" TEXT NOT NULL,
+                  "ProviderKind" INTEGER NOT NULL,
+                  "ModelName" TEXT NOT NULL,
+                  "SystemPrompt" TEXT NOT NULL,
+                  "CreatedAt" TEXT NOT NULL
+              );
+              """;
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            $"""
+              {agentProfilesTableDefinition}
+              CREATE TABLE "Sessions" (
+                  "Id" TEXT NOT NULL CONSTRAINT "PK_Sessions" PRIMARY KEY,
+                  "Title" TEXT NOT NULL,
+                  "PrimaryAgentProfileId" TEXT NOT NULL,
+                  "CreatedAt" TEXT NOT NULL,
+                  "UpdatedAt" TEXT NOT NULL
+              );
+              CREATE TABLE "SessionEntries" (
+                  "Id" TEXT NOT NULL CONSTRAINT "PK_SessionEntries" PRIMARY KEY,
+                  "SessionId" TEXT NOT NULL,
+                  "AgentProfileId" TEXT NULL,
+                  "Kind" INTEGER NOT NULL,
+                  "Author" TEXT NOT NULL,
+                  "Text" TEXT NOT NULL,
+                  "AccentLabel" TEXT NULL,
+                  "Timestamp" TEXT NOT NULL
+              );
+              CREATE TABLE "ProviderPreferences" (
+                  "ProviderKind" INTEGER NOT NULL CONSTRAINT "PK_ProviderPreferences" PRIMARY KEY,
+                  "IsEnabled" INTEGER NOT NULL,
+                  "UpdatedAt" TEXT NOT NULL
+              );
+              CREATE INDEX "IX_Sessions_UpdatedAt" ON "Sessions" ("UpdatedAt");
+              CREATE INDEX "IX_SessionEntries_SessionId_Timestamp" ON "SessionEntries" ("SessionId", "Timestamp");
+              """;
+        _ = await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    private sealed class TestFixture(ServiceProvider provider, IAgentSessionService service, string? tempRootPath = null) : IAsyncDisposable
+    {
+        private readonly ServiceProvider _provider = provider;
+        private readonly string? _tempRootPath = tempRootPath;
+
+        public ServiceProvider Provider { get; } = provider;
+
+        public IAgentSessionService Service { get; } = service;
 
         public ValueTask DisposeAsync()
         {
-            return _provider.DisposeAsync();
+            return DisposeAsyncCore();
+        }
+
+        private async ValueTask DisposeAsyncCore()
+        {
+            await _provider.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(_tempRootPath) && Directory.Exists(_tempRootPath))
+            {
+                Directory.Delete(_tempRootPath, recursive: true);
+            }
         }
     }
 }

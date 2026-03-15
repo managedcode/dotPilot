@@ -157,9 +157,11 @@ internal sealed class AgentSessionService(
             {
                 Id = Guid.CreateVersion7(),
                 Name = agentName,
+                Role = AgentProfileSchemaDefaults.DefaultRole,
                 ProviderKind = (int)command.ProviderKind,
                 ModelName = modelName,
                 SystemPrompt = systemPrompt,
+                CapabilitiesJson = AgentProfileSchemaDefaults.EmptyCapabilitiesJson,
                 CreatedAt = createdAt,
             };
 
@@ -719,6 +721,7 @@ internal sealed class AgentSessionService(
             AgentSessionServiceLog.InitializationStarted(logger);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
             await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            await AgentProfileSchemaCompatibilityEnsurer.EnsureAsync(dbContext, cancellationToken);
             await EnsureDefaultProviderAndAgentAsync(dbContext, cancellationToken);
             _initialized = true;
             AgentSessionServiceLog.InitializationCompleted(logger);
@@ -776,9 +779,11 @@ internal sealed class AgentSessionService(
         {
             Id = Guid.CreateVersion7(),
             Name = AgentSessionDefaults.SystemAgentName,
+            Role = AgentProfileSchemaDefaults.DefaultRole,
             ProviderKind = (int)providerKind,
             ModelName = AgentSessionDefaults.GetDefaultModel(providerKind),
             SystemPrompt = AgentSessionDefaults.SystemAgentPrompt,
+            CapabilitiesJson = AgentProfileSchemaDefaults.EmptyCapabilitiesJson,
             CreatedAt = timeProvider.GetUtcNow(),
         };
 

@@ -17,6 +17,7 @@ public sealed partial record AgentProviderOption(
     string CommandName,
     string StatusSummary,
     string SuggestedModelName,
+    IReadOnlyList<string> SupportedModelNames,
     string? InstalledVersion,
     bool CanCreateAgents);
 

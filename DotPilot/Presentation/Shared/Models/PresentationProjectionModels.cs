@@ -19,6 +19,8 @@ public sealed partial record AgentBuilderView(
     string ProviderVersionLabel,
     bool HasProviderVersion,
     string SuggestedModelName,
+    IReadOnlyList<string> SupportedModelNames,
+    bool HasSupportedModels,
     string ModelHelperText,
     string StatusMessage,
     bool CanCreateAgent);

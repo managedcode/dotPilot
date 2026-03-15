@@ -62,6 +62,11 @@ internal static class AgentProviderStatusSnapshotReader
         string? executablePath = null;
         var installedVersion = profile.IsBuiltIn ? profile.DefaultModelName : (string?)null;
         var suggestedModelName = profile.DefaultModelName;
+        var supportedModelNames = ResolveSupportedModels(
+            profile.DefaultModelName,
+            profile.DefaultModelName,
+            profile.SupportedModelNames,
+            []);
         var status = AgentProviderStatus.Ready;
         var statusSummary = BuiltInStatusSummary;
         var canCreateAgents = profile.IsBuiltIn;
@@ -90,19 +95,18 @@ internal static class AgentProviderStatusSnapshotReader
                 installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
                 actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
 
-                if (profile.Kind == AgentProviderKind.Codex)
-                {
-                    var codexMetadata = CodexCliMetadataReader.TryRead(executablePath);
-                    installedVersion = codexMetadata?.InstalledVersion ?? installedVersion;
-                    suggestedModelName = string.IsNullOrWhiteSpace(codexMetadata?.DefaultModel)
-                        ? suggestedModelName
-                        : codexMetadata.DefaultModel!;
-                    details.AddRange(CreateCodexDetails(installedVersion, suggestedModelName, codexMetadata));
-                }
-                else if (!string.IsNullOrWhiteSpace(installedVersion))
-                {
-                    details.Add(new ProviderDetailDescriptor("Installed version", installedVersion));
-                }
+                var metadata = ResolveMetadata(profile, executablePath);
+                installedVersion = ResolveInstalledVersion(
+                    installedVersion,
+                    metadata.InstalledVersion,
+                    profile.CommandName);
+                suggestedModelName = ResolveSuggestedModel(profile.DefaultModelName, metadata.SuggestedModelName);
+                supportedModelNames = ResolveSupportedModels(
+                    profile.DefaultModelName,
+                    suggestedModelName,
+                    profile.SupportedModelNames,
+                    metadata.SupportedModels);
+                details.AddRange(CreateProviderDetails(installedVersion, suggestedModelName, supportedModelNames));
 
                 if (profile.SupportsLiveExecution)
                 {
@@ -137,6 +141,7 @@ internal static class AgentProviderStatusSnapshotReader
                 status,
                 statusSummary,
                 suggestedModelName,
+                supportedModelNames,
                 installedVersion,
                 preference.IsEnabled,
                 canCreateAgents,
@@ -145,10 +150,97 @@ internal static class AgentProviderStatusSnapshotReader
             executablePath);
     }
 
-    private static List<ProviderDetailDescriptor> CreateCodexDetails(
+    private static ProviderCliMetadataSnapshot ResolveMetadata(
+        AgentSessionProviderProfile profile,
+        string executablePath)
+    {
+        return profile.Kind switch
+        {
+            AgentProviderKind.Codex => CreateCodexSnapshot(CodexCliMetadataReader.TryRead(executablePath)),
+            AgentProviderKind.ClaudeCode => ClaudeCodeCliMetadataReader.TryRead(executablePath, profile),
+            AgentProviderKind.GitHubCopilot => CopilotCliMetadataReader.TryRead(executablePath, profile),
+            _ => new ProviderCliMetadataSnapshot(null, null, []),
+        };
+    }
+
+    private static ProviderCliMetadataSnapshot CreateCodexSnapshot(CodexCliMetadataSnapshot? metadata)
+    {
+        return new ProviderCliMetadataSnapshot(
+            metadata?.InstalledVersion,
+            metadata?.DefaultModel,
+            metadata?.AvailableModels ?? []);
+    }
+
+    private static string ResolveSuggestedModel(string defaultModelName, string? suggestedModelName)
+    {
+        return string.IsNullOrWhiteSpace(suggestedModelName)
+            ? defaultModelName
+            : suggestedModelName;
+    }
+
+    private static string? ResolveInstalledVersion(
+        string? probedInstalledVersion,
+        string? discoveredInstalledVersion,
+        string commandName)
+    {
+        if (LooksLikeInstalledVersion(discoveredInstalledVersion, commandName))
+        {
+            return discoveredInstalledVersion;
+        }
+
+        return string.IsNullOrWhiteSpace(probedInstalledVersion)
+            ? discoveredInstalledVersion
+            : probedInstalledVersion;
+    }
+
+    private static bool LooksLikeInstalledVersion(string? installedVersion, string commandName)
+    {
+        if (string.IsNullOrWhiteSpace(installedVersion))
+        {
+            return false;
+        }
+
+        if (string.Equals(installedVersion, commandName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return installedVersion.Any(char.IsDigit);
+    }
+
+    private static IReadOnlyList<string> ResolveSupportedModels(
+        string defaultModelName,
+        string suggestedModelName,
+        IReadOnlyList<string> fallbackModels,
+        IReadOnlyList<string> discoveredModels)
+    {
+        return [.. EnumerateSupportedModels(defaultModelName, suggestedModelName, fallbackModels, discoveredModels)];
+    }
+
+    private static IEnumerable<string> EnumerateSupportedModels(
+        string defaultModelName,
+        string suggestedModelName,
+        IReadOnlyList<string> fallbackModels,
+        IReadOnlyList<string> discoveredModels)
+    {
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var model in new[] { suggestedModelName, defaultModelName }
+                     .Concat(discoveredModels)
+                     .Concat(fallbackModels))
+        {
+            if (string.IsNullOrWhiteSpace(model) || !seen.Add(model))
+            {
+                continue;
+            }
+
+            yield return model;
+        }
+    }
+
+    private static List<ProviderDetailDescriptor> CreateProviderDetails(
         string? installedVersion,
         string suggestedModelName,
-        CodexCliMetadataSnapshot? metadata)
+        IReadOnlyList<string> supportedModelNames)
     {
         List<ProviderDetailDescriptor> details = [];
         if (!string.IsNullOrWhiteSpace(installedVersion))
@@ -156,20 +248,20 @@ internal static class AgentProviderStatusSnapshotReader
             details.Add(new ProviderDetailDescriptor("Installed version", installedVersion));
         }
 
-        details.Add(new ProviderDetailDescriptor("Default model", suggestedModelName));
+        details.Add(new ProviderDetailDescriptor("Suggested model", suggestedModelName));
 
-        var availableModels = FormatAvailableModels(metadata?.AvailableModels);
-        if (!string.IsNullOrWhiteSpace(availableModels))
+        var supportedModels = FormatSupportedModels(supportedModelNames);
+        if (!string.IsNullOrWhiteSpace(supportedModels))
         {
-            details.Add(new ProviderDetailDescriptor("Available models", availableModels));
+            details.Add(new ProviderDetailDescriptor("Supported models", supportedModels));
         }
 
         return details;
     }
 
-    private static string FormatAvailableModels(IReadOnlyList<string>? models)
+    private static string FormatSupportedModels(IReadOnlyList<string> models)
     {
-        if (models is null || models.Count == 0)
+        if (models.Count == 0)
         {
             return string.Empty;
         }

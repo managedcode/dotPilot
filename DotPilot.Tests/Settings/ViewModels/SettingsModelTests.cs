@@ -1,4 +1,5 @@
 using DotPilot.Core.ChatSessions;
+using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Settings;
@@ -45,6 +46,52 @@ public sealed class SettingsModelTests
         (await model.SelectedProviderTitle).Should().Be(selectedProvider.DisplayName);
         (await model.SelectedProvider).Should().NotBeNull();
         (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Codex);
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesCopilotSuggestedAndSupportedModels()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("copilot", "copilot version 1.0.3");
+        commandScope.WriteCopilotConfig("claude-opus-4.6");
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.GitHubCopilot, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.GitHubCopilot);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail => detail.Label == "Installed version" && detail.Value == "1.0.3");
+        details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4.6");
+        details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("gpt-5", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesClaudeSuggestedAndSupportedModels()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("claude", "claude version 2.0.75");
+        commandScope.WriteClaudeSettings("claude-opus-4-6");
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.ClaudeCode, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.ClaudeCode);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail => detail.Label == "Installed version" && detail.Value == "2.0.75");
+        details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4-6");
+        details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("claude-sonnet-4-5", StringComparison.Ordinal));
     }
 
     [Test]

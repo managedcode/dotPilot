@@ -6,6 +6,7 @@ internal sealed record AgentSessionProviderProfile(
     string DisplayName,
     string CommandName,
     string DefaultModelName,
+    IReadOnlyList<string> SupportedModelNames,
     string InstallCommand,
     bool IsBuiltIn,
     bool SupportsLiveExecution);

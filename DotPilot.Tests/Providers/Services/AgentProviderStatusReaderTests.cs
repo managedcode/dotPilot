@@ -53,9 +53,10 @@ public sealed class AgentProviderStatusReaderTests
         provider.Status.Should().Be(AgentProviderStatus.Ready);
         provider.StatusSummary.Should().Contain("ready for local desktop execution");
         provider.SuggestedModelName.Should().Be("gpt-5.4");
+        provider.SupportedModelNames.Should().Contain("gpt-5-mini");
         provider.InstalledVersion.Should().Be("1.0.0");
-        provider.Details.Should().Contain(detail => detail.Label == "Default model" && detail.Value == "gpt-5.4");
-        provider.Details.Should().Contain(detail => detail.Label == "Available models" && detail.Value.Contains("gpt-5-mini", StringComparison.Ordinal));
+        provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "gpt-5.4");
+        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("gpt-5-mini", StringComparison.Ordinal));
     }
 
     [Test]
@@ -63,6 +64,7 @@ public sealed class AgentProviderStatusReaderTests
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
         commandScope.WriteVersionCommand("copilot", "copilot version 0.0.421");
+        commandScope.WriteCopilotConfig("claude-opus-4.6");
 
         await using var fixture = CreateFixture();
         var provider = (await fixture.Service.UpdateProviderAsync(
@@ -74,6 +76,35 @@ public sealed class AgentProviderStatusReaderTests
         provider.Status.Should().Be(AgentProviderStatus.Unsupported);
         provider.StatusSummary.Should().Contain("profile authoring is available");
         provider.InstalledVersion.Should().Be("0.0.421");
+        provider.SuggestedModelName.Should().Be("claude-opus-4.6");
+        provider.SupportedModelNames.Should().Contain("gpt-5");
+        provider.SupportedModelNames.Should().Contain("claude-opus-4.6");
+        provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4.6");
+        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("gpt-5", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task EnabledClaudeProviderWithoutLiveRuntimeProjectsSuggestedAndSupportedModels()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        commandScope.WriteVersionCommand("claude", "claude version 2.0.75");
+        commandScope.WriteClaudeSettings("claude-opus-4-6");
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.ClaudeCode, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.IsEnabled.Should().BeTrue();
+        provider.CanCreateAgents.Should().BeTrue();
+        provider.Status.Should().Be(AgentProviderStatus.Unsupported);
+        provider.StatusSummary.Should().Contain("profile authoring is available");
+        provider.InstalledVersion.Should().Be("2.0.75");
+        provider.SuggestedModelName.Should().Be("claude-opus-4-6");
+        provider.SupportedModelNames.Should().Contain("claude-sonnet-4-5");
+        provider.SupportedModelNames.Should().Contain("claude-opus-4-6");
+        provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4-6");
+        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("claude-sonnet-4-5", StringComparison.Ordinal));
     }
 
     [Test]
@@ -111,23 +142,15 @@ public sealed class AgentProviderStatusReaderTests
             provider.GetRequiredService<IAgentSessionService>());
     }
 
-    private sealed class TestFixture : IAsyncDisposable
+    private sealed class TestFixture(ServiceProvider provider, IAgentSessionService service) : IAsyncDisposable
     {
-        private readonly ServiceProvider provider;
+        private readonly ServiceProvider provider = provider;
 
-        public TestFixture(ServiceProvider provider, IAgentSessionService service)
-        {
-            this.provider = provider;
-            Provider = provider;
-            Service = service;
-            WorkspaceState = provider.GetRequiredService<IAgentWorkspaceState>();
-        }
+        public ServiceProvider Provider { get; } = provider;
 
-        public ServiceProvider Provider { get; }
+        public IAgentSessionService Service { get; } = service;
 
-        public IAgentSessionService Service { get; }
-
-        public IAgentWorkspaceState WorkspaceState { get; }
+        public IAgentWorkspaceState WorkspaceState { get; } = provider.GetRequiredService<IAgentWorkspaceState>();
 
         public ValueTask DisposeAsync()
         {

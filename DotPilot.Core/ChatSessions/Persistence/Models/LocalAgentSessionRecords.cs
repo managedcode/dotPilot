@@ -6,11 +6,15 @@ internal sealed class AgentProfileRecord
 
     public string Name { get; set; } = string.Empty;
 
+    public int Role { get; set; }
+
     public int ProviderKind { get; set; }
 
     public string ModelName { get; set; } = string.Empty;
 
     public string SystemPrompt { get; set; } = string.Empty;
+
+    public string CapabilitiesJson { get; set; } = AgentProfileSchemaDefaults.EmptyCapabilitiesJson;
 
     public DateTimeOffset CreatedAt { get; set; }
 }

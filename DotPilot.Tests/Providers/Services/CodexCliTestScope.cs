@@ -177,6 +177,34 @@ internal sealed class CodexCliTestScope : IDisposable
             JsonSerializer.Serialize(payload));
     }
 
+    public void WriteClaudeSettings(string model)
+    {
+        var configDirectory = Path.Combine(
+            Environment.GetEnvironmentVariable("HOME") ?? rootPath,
+            ".claude");
+        Directory.CreateDirectory(configDirectory);
+        File.WriteAllText(
+            Path.Combine(configDirectory, "settings.json"),
+            JsonSerializer.Serialize(new
+            {
+                model,
+            }));
+    }
+
+    public void WriteCopilotConfig(string model)
+    {
+        var configDirectory = Path.Combine(
+            Environment.GetEnvironmentVariable("HOME") ?? rootPath,
+            ".copilot");
+        Directory.CreateDirectory(configDirectory);
+        File.WriteAllText(
+            Path.Combine(configDirectory, "config.json"),
+            JsonSerializer.Serialize(new
+            {
+                model,
+            }));
+    }
+
     private string GetCounterFilePath(string commandName)
     {
         return Path.Combine(rootPath, commandName + ".count");

@@ -19,6 +19,7 @@ public sealed record ProviderStatusDescriptor(
     AgentProviderStatus Status,
     string StatusSummary,
     string SuggestedModelName,
+    IReadOnlyList<string> SupportedModelNames,
     string? InstalledVersion,
     bool IsEnabled,
     bool CanCreateAgents,

@@ -387,6 +387,7 @@ Ask first:
 
 ### Likes
 
+- Keep regression coverage tied to real operator flows: when agent creation changes, tests should cover creating an agent, choosing a valid provider model, and sending at least one message through the resulting session path.
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.

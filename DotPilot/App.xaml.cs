@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using DotPilot.Core.ChatSessions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace DotPilot;
 

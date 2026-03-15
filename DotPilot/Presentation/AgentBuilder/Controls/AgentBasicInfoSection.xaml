@@ -55,7 +55,8 @@
                       DisplayMemberPath="DisplayName"
                       ItemsSource="{Binding Providers}"
                       Tag="{Binding ProviderSelectionChangedCommand}"
-                      SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
+                      SelectedValue="{Binding SelectedProviderKind, Mode=TwoWay}"
+                      SelectedValuePath="Kind" />
           </Border>
         </StackPanel>
 
@@ -67,10 +68,12 @@
                      Foreground="{StaticResource AppSecondaryTextBrush}"
                      Text="Model" />
           <Border Style="{StaticResource BuilderInputSurfaceStyle}">
-            <TextBox AutomationProperties.AutomationId="AgentModelInput"
-                     Style="{StaticResource BuilderTextBoxStyle}"
-                     PlaceholderText="{Binding Builder.SuggestedModelName}"
-                     Text="{Binding ModelName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <ComboBox AutomationProperties.AutomationId="AgentModelInput"
+                      IsEnabled="{Binding Builder.HasSupportedModels}"
+                      ItemsSource="{Binding Builder.SupportedModelNames}"
+                      PlaceholderText="{Binding Builder.SuggestedModelName}"
+                      SelectedItem="{Binding ModelName, Mode=TwoWay}"
+                      Style="{StaticResource BuilderComboBoxStyle}" />
           </Border>
           <TextBlock AutomationProperties.AutomationId="AgentSuggestedModelText"
                      FontSize="11.5"

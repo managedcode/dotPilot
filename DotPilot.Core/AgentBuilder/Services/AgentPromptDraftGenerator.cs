@@ -111,6 +111,7 @@ public sealed class AgentPromptDraftGenerator(
                 AgentProviderStatus.Disabled,
                 "Provider is disabled for local agent creation.",
                 AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug),
+                [AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug)],
                 AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug),
                 false,
                 false,
