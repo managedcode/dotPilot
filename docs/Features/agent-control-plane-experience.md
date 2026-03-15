@@ -13,7 +13,6 @@ The product must support coding sessions, but it must not be limited to coding. 
 - desktop chat shell with session list, active transcript, and streaming activity
 - provider readiness settings for `Codex`, `Claude Code`, `GitHub Copilot`, and the deterministic debug provider
 - agent profiles backed by provider SDK or `IChatClient`-style integrations
-- Orleans-backed session and agent-profile state
 - local persistence through `EF Core` + `SQLite`
 - visible tool/status streaming in the transcript
 - optional repo/git actions as tools inside a session
@@ -21,7 +20,7 @@ The product must support coding sessions, but it must not be limited to coding. 
 ### Out Of Scope
 
 - cloud orchestration
-- remote Orleans clustering
+- distributed runtime topology
 - auto-installing provider CLIs without operator confirmation
 - local-model runtime integration beyond the current debug provider
 - adding `MLXSharp` in the first product wave
@@ -70,7 +69,6 @@ sequenceDiagram
   participant UI as Uno UI
   participant Service as AgentSessionService
   participant DB as SQLite
-  participant Grain as SessionGrain
   participant Provider as Provider SDK / Debug Client
 
   Operator->>UI: Send message
@@ -79,7 +77,6 @@ sequenceDiagram
   Service->>Provider: Stream response
   Provider-->>Service: Assistant/status/tool updates
   Service->>DB: Persist transcript entries
-  Service->>Grain: Upsert session state
   Service-->>UI: Stream SessionStreamEntry updates
 ```
 

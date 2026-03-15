@@ -32,7 +32,7 @@ From the workbench, the operator should be able to:
 ### Main Product Capabilities On The Roadmap
 
 - multi-agent session composition and orchestration
-- embedded local-first runtime hosting with `Orleans`
+- richer local-first session runtime and context handling
 - SDK-first provider integrations for `Codex`, `Claude Code`, and `GitHub Copilot`
 - local model runtime support through `LLamaSharp` and `ONNX Runtime`
 - approvals, replay, audit trails, and artifact inspection
@@ -53,7 +53,6 @@ What already exists:
 
 What is planned next:
 
-- embedded `Orleans` hosting inside the desktop app
 - `Microsoft Agent Framework` orchestration and session workflows
 - richer provider adapters and toolchain management
 - MCP and repository-intelligence tooling
@@ -65,8 +64,8 @@ What is planned next:
 The approved architectural defaults are:
 
 - `dotPilot` stays desktop-first and reuses the current shell direction instead of replacing it
-- the first runtime cut is **local-first** with an embedded `Orleans` silo
-- `Session = grain`, with related workspace, fleet, artifact, and policy state
+- the first runtime cut is **local-first** with `SQLite` projections and local session/chat-history persistence
+- sessions are durable local app state, not a separate embedded host subsystem
 - `Microsoft Agent Framework` is the preferred orchestration layer
 - provider integrations are SDK-first:
   - `ManagedCode.CodexSharpSDK`

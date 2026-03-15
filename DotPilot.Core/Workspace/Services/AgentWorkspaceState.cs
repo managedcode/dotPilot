@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
+using ManagedCode.Communication;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.Workspace;
@@ -16,12 +17,12 @@ internal sealed class AgentWorkspaceState(
     private readonly Dictionary<SessionId, SessionTranscriptSnapshot> _sessions = [];
     private AgentWorkspaceSnapshot? _workspace;
 
-    public async ValueTask<AgentWorkspaceSnapshot> GetWorkspaceAsync(CancellationToken cancellationToken)
+    public async ValueTask<Result<AgentWorkspaceSnapshot>> GetWorkspaceAsync(CancellationToken cancellationToken)
     {
         if (_workspace is { } cachedWorkspace)
         {
             LogWorkspaceCacheHit(cachedWorkspace);
-            return cachedWorkspace;
+            return Result<AgentWorkspaceSnapshot>.Succeed(cachedWorkspace);
         }
 
         await _cacheGate.WaitAsync(cancellationToken);
@@ -30,7 +31,7 @@ internal sealed class AgentWorkspaceState(
             if (_workspace is { } gatedWorkspace)
             {
                 LogWorkspaceCacheHit(gatedWorkspace);
-                return gatedWorkspace;
+                return Result<AgentWorkspaceSnapshot>.Succeed(gatedWorkspace);
             }
 
             return await LoadWorkspaceAsync(forceRefresh: false, cancellationToken);
@@ -41,7 +42,7 @@ internal sealed class AgentWorkspaceState(
         }
     }
 
-    public async ValueTask<AgentWorkspaceSnapshot> RefreshWorkspaceAsync(CancellationToken cancellationToken)
+    public async ValueTask<Result<AgentWorkspaceSnapshot>> RefreshWorkspaceAsync(CancellationToken cancellationToken)
     {
         await _cacheGate.WaitAsync(cancellationToken);
         try
@@ -54,25 +55,25 @@ internal sealed class AgentWorkspaceState(
         }
     }
 
-    public async ValueTask<SessionTranscriptSnapshot?> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
+    public async ValueTask<Result<SessionTranscriptSnapshot>> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         if (_sessions.TryGetValue(sessionId, out var cachedSession))
         {
             AgentWorkspaceStateLog.SessionCacheHit(logger, sessionId, cachedSession.Entries.Count);
-            return cachedSession;
+            return Result<SessionTranscriptSnapshot>.Succeed(cachedSession);
         }
 
         var session = await agentSessionService.GetSessionAsync(sessionId, cancellationToken);
-        if (session is null)
+        if (session.IsFailed)
         {
-            return null;
+            return session;
         }
 
         await _cacheGate.WaitAsync(cancellationToken);
         try
         {
-            _sessions[sessionId] = session;
-            _workspace = MergeWorkspaceSession(_workspace, session.Session, selectSession: false);
+            _sessions[sessionId] = session.Value;
+            _workspace = MergeWorkspaceSession(_workspace, session.Value.Session, selectSession: false);
         }
         finally
         {
@@ -82,18 +83,22 @@ internal sealed class AgentWorkspaceState(
         return session;
     }
 
-    public async ValueTask<AgentProfileSummary> CreateAgentAsync(
+    public async ValueTask<Result<AgentProfileSummary>> CreateAgentAsync(
         CreateAgentProfileCommand command,
         CancellationToken cancellationToken)
     {
         var created = await agentSessionService.CreateAgentAsync(command, cancellationToken);
+        if (created.IsFailed)
+        {
+            return created;
+        }
 
         await _cacheGate.WaitAsync(cancellationToken);
         try
         {
             if (_workspace is not null)
             {
-                var agents = OrderAgents(_workspace.Agents.Append(created))
+                var agents = OrderAgents(_workspace.Agents.Append(created.Value))
                     .ToImmutableArray();
                 _workspace = _workspace with
                 {
@@ -106,38 +111,46 @@ internal sealed class AgentWorkspaceState(
             _cacheGate.Release();
         }
 
-        AgentWorkspaceStateLog.AgentCached(logger, created.Id, created.ProviderKind);
+        AgentWorkspaceStateLog.AgentCached(logger, created.Value.Id, created.Value.ProviderKind);
 
         return created;
     }
 
-    public async ValueTask<SessionTranscriptSnapshot> CreateSessionAsync(
+    public async ValueTask<Result<SessionTranscriptSnapshot>> CreateSessionAsync(
         CreateSessionCommand command,
         CancellationToken cancellationToken)
     {
         var created = await agentSessionService.CreateSessionAsync(command, cancellationToken);
+        if (created.IsFailed)
+        {
+            return created;
+        }
 
         await _cacheGate.WaitAsync(cancellationToken);
         try
         {
-            _sessions[created.Session.Id] = created;
-            _workspace = MergeWorkspaceSession(_workspace, created.Session, selectSession: true);
+            _sessions[created.Value.Session.Id] = created.Value;
+            _workspace = MergeWorkspaceSession(_workspace, created.Value.Session, selectSession: true);
         }
         finally
         {
             _cacheGate.Release();
         }
 
-        AgentWorkspaceStateLog.SessionCached(logger, created.Session.Id, created.Session.PrimaryAgentId);
+        AgentWorkspaceStateLog.SessionCached(logger, created.Value.Session.Id, created.Value.Session.PrimaryAgentId);
 
         return created;
     }
 
-    public async ValueTask<ProviderStatusDescriptor> UpdateProviderAsync(
+    public async ValueTask<Result<ProviderStatusDescriptor>> UpdateProviderAsync(
         UpdateProviderPreferenceCommand command,
         CancellationToken cancellationToken)
     {
         var provider = await agentSessionService.UpdateProviderAsync(command, cancellationToken);
+        if (provider.IsFailed)
+        {
+            return provider;
+        }
 
         await _cacheGate.WaitAsync(cancellationToken);
         try
@@ -145,7 +158,7 @@ internal sealed class AgentWorkspaceState(
             if (_workspace is not null)
             {
                 var providers = _workspace.Providers
-                    .Select(existing => existing.Kind == provider.Kind ? provider : existing)
+                    .Select(existing => existing.Kind == provider.Value.Kind ? provider.Value : existing)
                     .ToImmutableArray();
                 _workspace = _workspace with
                 {
@@ -158,16 +171,20 @@ internal sealed class AgentWorkspaceState(
             _cacheGate.Release();
         }
 
-        AgentWorkspaceStateLog.ProviderCached(logger, provider.Kind, provider.IsEnabled);
+        AgentWorkspaceStateLog.ProviderCached(logger, provider.Value.Kind, provider.Value.IsEnabled);
 
         return provider;
     }
 
-    public async ValueTask<OperatorPreferencesSnapshot> UpdateComposerSendBehaviorAsync(
+    public async ValueTask<Result<OperatorPreferencesSnapshot>> UpdateComposerSendBehaviorAsync(
         UpdateComposerSendBehaviorCommand command,
         CancellationToken cancellationToken)
     {
         var preferences = await agentSessionService.UpdateComposerSendBehaviorAsync(command, cancellationToken);
+        if (preferences.IsFailed)
+        {
+            return preferences;
+        }
 
         await _cacheGate.WaitAsync(cancellationToken);
         try
@@ -176,7 +193,7 @@ internal sealed class AgentWorkspaceState(
             {
                 _workspace = _workspace with
                 {
-                    Preferences = preferences,
+                    Preferences = preferences.Value,
                 };
             }
         }
@@ -194,7 +211,7 @@ internal sealed class AgentWorkspaceState(
         return preferences;
     }
 
-    public async IAsyncEnumerable<SessionStreamEntry> SendMessageAsync(
+    public async IAsyncEnumerable<Result<SessionStreamEntry>> SendMessageAsync(
         SendSessionMessageCommand command,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -202,6 +219,12 @@ internal sealed class AgentWorkspaceState(
 
         await foreach (var entry in agentSessionService.SendMessageAsync(command, cancellationToken))
         {
+            if (entry.IsFailed)
+            {
+                yield return entry;
+                yield break;
+            }
+
             await _cacheGate.WaitAsync(cancellationToken);
             try
             {
@@ -209,12 +232,12 @@ internal sealed class AgentWorkspaceState(
                 {
                     var updatedSession = cachedSession with
                     {
-                        Entries = UpsertEntries(cachedSession.Entries, entry),
+                        Entries = UpsertEntries(cachedSession.Entries, entry.Value),
                     };
                     _sessions[command.SessionId] = updatedSession;
                     _workspace = MergeWorkspaceSession(
                         _workspace,
-                        UpdateSessionPreview(updatedSession.Session, entry),
+                        UpdateSessionPreview(updatedSession.Session, entry.Value),
                         selectSession: false);
                 }
             }
@@ -295,7 +318,7 @@ internal sealed class AgentWorkspaceState(
         _cacheGate.Dispose();
     }
 
-    private async ValueTask<AgentWorkspaceSnapshot> LoadWorkspaceAsync(
+    private async ValueTask<Result<AgentWorkspaceSnapshot>> LoadWorkspaceAsync(
         bool forceRefresh,
         CancellationToken cancellationToken)
     {
@@ -305,12 +328,17 @@ internal sealed class AgentWorkspaceState(
         }
 
         var workspace = await agentSessionService.GetWorkspaceAsync(cancellationToken);
-        _workspace = workspace;
+        if (workspace.IsFailed)
+        {
+            return workspace;
+        }
+
+        _workspace = workspace.Value;
         AgentWorkspaceStateLog.WorkspaceRefreshed(
             logger,
-            workspace.Sessions.Count,
-            workspace.Agents.Count,
-            workspace.Providers.Count);
+            workspace.Value.Sessions.Count,
+            workspace.Value.Agents.Count,
+            workspace.Value.Providers.Count);
         return workspace;
     }
 

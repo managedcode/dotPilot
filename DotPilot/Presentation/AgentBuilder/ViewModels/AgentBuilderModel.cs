@@ -7,10 +7,10 @@ using Microsoft.UI.Xaml.Data;
 namespace DotPilot.Presentation;
 
 [Bindable]
-public partial record SecondModel(
+public partial record AgentBuilderModel(
     IAgentWorkspaceState workspaceState,
     AgentPromptDraftGenerator draftGenerator,
-    ILogger<SecondModel> logger)
+    ILogger<AgentBuilderModel> logger)
 {
     private const string EmptyProviderDisplayName = "No provider selected";
     private const string EmptyProviderStatusSummary = "Provider readiness is still loading.";
@@ -138,11 +138,11 @@ public partial record SecondModel(
             await OperationMessage.SetAsync(ManualDraftMessage, cancellationToken);
             await ApplyDraftAsync(await draftGenerator.CreateManualDraftAsync(cancellationToken), cancellationToken);
             await Surface.UpdateAsync(_ => EditorSurface, cancellationToken);
-            SecondViewModelLog.ManualDraftCreated(logger);
+            AgentBuilderModelLog.ManualDraftCreated(logger);
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -199,7 +199,7 @@ public partial record SecondModel(
 
             await AgentRequest.SetAsync(prompt, cancellationToken);
             await OperationMessage.SetAsync(DraftGenerationProgressMessage, cancellationToken);
-            SecondViewModelLog.DraftGenerationRequested(logger, prompt.Length);
+            AgentBuilderModelLog.DraftGenerationRequested(logger, prompt.Length);
             var draft = await draftGenerator.GenerateAsync(prompt, cancellationToken);
             await ApplyDraftAsync(draft, cancellationToken);
             await OperationMessage.SetAsync(
@@ -212,7 +212,7 @@ public partial record SecondModel(
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -243,9 +243,9 @@ public partial record SecondModel(
 
             var modelName = await ResolveEffectiveModelNameAsync(cancellationToken);
             await OperationMessage.SetAsync(AgentCreationProgressMessage, cancellationToken);
-            SecondViewModelLog.AgentCreationRequested(logger, agentName, selectedProvider.Kind, modelName);
+            AgentBuilderModelLog.AgentCreationRequested(logger, agentName, selectedProvider.Kind, modelName);
 
-            var created = await workspaceState.CreateAgentAsync(
+            var createdResult = await workspaceState.CreateAgentAsync(
                 new CreateAgentProfileCommand(
                     agentName,
                     AgentRoleKind.Operator,
@@ -257,6 +257,11 @@ public partial record SecondModel(
                             GetSelectedValues(Skills))
                         .ToArray()),
                 cancellationToken);
+            if (!createdResult.TryGetValue(out var created))
+            {
+                await OperationMessage.SetAsync(createdResult.ToOperatorMessage("Could not save the agent."), cancellationToken);
+                return;
+            }
 
             _workspaceRefresh.Raise();
             await OperationMessage.SetAsync(
@@ -267,11 +272,11 @@ public partial record SecondModel(
                     created.ProviderDisplayName),
                 cancellationToken);
             await Surface.UpdateAsync(_ => CatalogSurface, cancellationToken);
-            SecondViewModelLog.AgentCreated(logger, created.Id.Value, created.Name, created.ProviderKind, created.ModelName);
+            AgentBuilderModelLog.AgentCreated(logger, created.Id.Value, created.Name, created.ProviderKind, created.ModelName);
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -290,10 +295,16 @@ public partial record SecondModel(
 
         try
         {
-            SecondViewModelLog.ChatSessionRequested(logger, agent.Id.Value, agent.Name);
-            await workspaceState.CreateSessionAsync(
+            AgentBuilderModelLog.ChatSessionRequested(logger, agent.Id.Value, agent.Name);
+            var sessionResult = await workspaceState.CreateSessionAsync(
                 new CreateSessionCommand(SessionTitlePrefix + agent.Name, agent.Id),
                 cancellationToken);
+            if (sessionResult.IsFailed)
+            {
+                await OperationMessage.SetAsync(sessionResult.ToOperatorMessage("Could not start a session."), cancellationToken);
+                return;
+            }
+
             _workspaceRefresh.Raise();
             await OperationMessage.SetAsync(
                 string.Format(
@@ -305,7 +316,7 @@ public partial record SecondModel(
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -314,14 +325,20 @@ public partial record SecondModel(
     {
         try
         {
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await OperationMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load agents."), cancellationToken);
+                return ImmutableArray<AgentCatalogItem>.Empty;
+            }
+
             return workspace.Agents
                 .Select(MapAgent)
                 .ToImmutableArray();
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
             return ImmutableArray<AgentCatalogItem>.Empty;
         }
@@ -331,9 +348,15 @@ public partial record SecondModel(
     {
         try
         {
-            SecondViewModelLog.LoadingProviders(logger);
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
-            SecondViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
+            AgentBuilderModelLog.LoadingProviders(logger);
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await OperationMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load providers."), cancellationToken);
+                return ImmutableArray<AgentProviderOption>.Empty;
+            }
+
+            AgentBuilderModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
 
             var providers = workspace.Providers
                 .Select(MapProviderOption)
@@ -344,7 +367,7 @@ public partial record SecondModel(
         }
         catch (Exception exception)
         {
-            SecondViewModelLog.Failure(logger, exception);
+            AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
             return ImmutableArray<AgentProviderOption>.Empty;
         }

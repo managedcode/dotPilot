@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Data;
 namespace DotPilot.Presentation;
 
 [Bindable]
-public partial record MainModel
+public partial record ChatModel
 {
     private const string EmptyTitleValue = "No active session";
     private const string EmptyStatusValue = "A default system agent is ready. Start a session or create another agent.";
@@ -24,16 +24,16 @@ public partial record MainModel
         "L",
         DesignBrushPalette.UserAvatarBrush);
     private readonly IAgentWorkspaceState workspaceState;
-    private readonly ILogger<MainModel> logger;
+    private readonly ILogger<ChatModel> logger;
     private AsyncCommand? _startNewSessionCommand;
     private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
     private readonly Signal _sessionRefresh = new();
 
-    public MainModel(
+    public ChatModel(
         IAgentWorkspaceState workspaceState,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
-        ILogger<MainModel> logger)
+        ILogger<ChatModel> logger)
     {
         this.workspaceState = workspaceState;
         this.logger = logger;
@@ -72,15 +72,21 @@ public partial record MainModel
     {
         try
         {
-            MainViewModelLog.RefreshRequested(logger);
-            await workspaceState.RefreshWorkspaceAsync(cancellationToken);
+            ChatModelLog.RefreshRequested(logger);
+            var refresh = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
+            if (refresh.IsFailed)
+            {
+                await FeedbackMessage.SetAsync(refresh.ToOperatorMessage("Could not refresh workspace."), cancellationToken);
+                return;
+            }
+
             _workspaceRefresh.Raise();
             _sessionRefresh.Raise();
             await EnsureSelectedChatAsync(cancellationToken);
         }
         catch (Exception exception)
         {
-            MainViewModelLog.Failure(logger, exception);
+            ChatModelLog.Failure(logger, exception);
             await FeedbackMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -89,18 +95,29 @@ public partial record MainModel
     {
         try
         {
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await FeedbackMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load workspace."), cancellationToken);
+                return;
+            }
+
             if (workspace.Agents.Count == 0)
             {
                 await FeedbackMessage.SetAsync(StartSessionValidationMessage, cancellationToken);
                 return;
             }
 
-            MainViewModelLog.StartingSession(logger);
+            ChatModelLog.StartingSession(logger);
             var agent = workspace.Agents[0];
-            var session = await workspaceState.CreateSessionAsync(
+            var sessionResult = await workspaceState.CreateSessionAsync(
                 new CreateSessionCommand($"Session with {agent.Name}", agent.Id),
                 cancellationToken);
+            if (!sessionResult.TryGetValue(out var session))
+            {
+                await FeedbackMessage.SetAsync(sessionResult.ToOperatorMessage("Could not start a session."), cancellationToken);
+                return;
+            }
 
             await SelectedChat.UpdateAsync(_ => MapSidebarItem(session.Session), cancellationToken);
             await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
@@ -109,7 +126,7 @@ public partial record MainModel
         }
         catch (Exception exception)
         {
-            MainViewModelLog.Failure(logger, exception);
+            ChatModelLog.Failure(logger, exception);
             await FeedbackMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -137,13 +154,13 @@ public partial record MainModel
             : messageOverride.Trim();
         if (string.IsNullOrWhiteSpace(message))
         {
-            MainViewModelLog.SendIgnoredEmpty(logger);
+            ChatModelLog.SendIgnoredEmpty(logger);
             return;
         }
 
         if (!await HasAgents)
         {
-            MainViewModelLog.SendIgnoredNoAgents(logger);
+            ChatModelLog.SendIgnoredNoAgents(logger);
             await FeedbackMessage.SetAsync(StartSessionValidationMessage, cancellationToken);
             return;
         }
@@ -167,14 +184,22 @@ public partial record MainModel
             if (logger.IsEnabled(LogLevel.Information))
             {
                 var sessionId = selectedChat.Id.Value.ToString("N", CultureInfo.InvariantCulture);
-                MainViewModelLog.SendRequested(logger, sessionId, message.Length);
+                ChatModelLog.SendRequested(logger, sessionId, message.Length);
                 BrowserConsoleDiagnostics.Info($"[DotPilot.Chat] Send requested. SessionId={sessionId} CharacterCount={message.Length}");
             }
 
+            var sendFailed = false;
             await foreach (var _ in workspaceState.SendMessageAsync(
                                new SendSessionMessageCommand(selectedChat.Id, message),
                                cancellationToken))
             {
+                if (_.IsFailed)
+                {
+                    await FeedbackMessage.SetAsync(_.ToOperatorMessage("Message send failed."), cancellationToken);
+                    sendFailed = true;
+                    break;
+                }
+
                 _workspaceRefresh.Raise();
                 _sessionRefresh.Raise();
             }
@@ -182,15 +207,18 @@ public partial record MainModel
             if (logger.IsEnabled(LogLevel.Information))
             {
                 var sessionId = selectedChat.Id.Value.ToString("N", CultureInfo.InvariantCulture);
-                MainViewModelLog.SendCompleted(logger, sessionId);
+                ChatModelLog.SendCompleted(logger, sessionId);
                 BrowserConsoleDiagnostics.Info($"[DotPilot.Chat] Send completed. SessionId={sessionId}");
             }
 
-            await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
+            if (!sendFailed)
+            {
+                await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
+            }
         }
         catch (Exception exception)
         {
-            MainViewModelLog.Failure(logger, exception);
+            ChatModelLog.Failure(logger, exception);
             await FeedbackMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -199,9 +227,15 @@ public partial record MainModel
     {
         try
         {
-            MainViewModelLog.LoadingWorkspace(logger);
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
-            MainViewModelLog.WorkspaceLoaded(logger, workspace.Sessions.Count, workspace.Agents.Count);
+            ChatModelLog.LoadingWorkspace(logger);
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await FeedbackMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load sessions."), cancellationToken);
+                return ImmutableArray<SessionSidebarItem>.Empty;
+            }
+
+            ChatModelLog.WorkspaceLoaded(logger, workspace.Sessions.Count, workspace.Agents.Count);
             var sessions = workspace.Sessions
                 .Select(MapSidebarItem)
                 .ToImmutableArray();
@@ -210,7 +244,7 @@ public partial record MainModel
         }
         catch (Exception exception)
         {
-            MainViewModelLog.Failure(logger, exception);
+            ChatModelLog.Failure(logger, exception);
             await FeedbackMessage.SetAsync(exception.Message, cancellationToken);
             return ImmutableArray<SessionSidebarItem>.Empty;
         }
@@ -245,13 +279,23 @@ public partial record MainModel
 
     private async ValueTask<bool> LoadHasAgentsAsync(CancellationToken cancellationToken)
     {
-        var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        if (!workspaceResult.TryGetValue(out var workspace))
+        {
+            return false;
+        }
+
         return workspace.Agents.Count > 0;
     }
 
     private async ValueTask<ComposerSendBehavior> LoadComposerSendBehaviorAsync(CancellationToken cancellationToken)
     {
-        var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        if (!workspaceResult.TryGetValue(out var workspace))
+        {
+            return global::DotPilot.Core.Settings.Models.ComposerSendBehavior.EnterSends;
+        }
+
         return workspace.Preferences.ComposerSendBehavior;
     }
 
@@ -272,12 +316,19 @@ public partial record MainModel
         var selectedChat = (await SelectedChat) ?? EmptySelectedChat;
         return IsEmptySelectedChat(selectedChat)
             ? null
-            : await workspaceState.GetSessionAsync(selectedChat.Id, cancellationToken);
+            : (await workspaceState.GetSessionAsync(selectedChat.Id, cancellationToken)).TryGetValue(out var session)
+                ? session
+                : null;
     }
 
     private async ValueTask EnsureSelectedChatAsync(CancellationToken cancellationToken)
     {
-        var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        if (!workspaceResult.TryGetValue(out var workspace))
+        {
+            return;
+        }
+
         var sessions = workspace.Sessions
             .Select(MapSidebarItem)
             .ToImmutableArray();

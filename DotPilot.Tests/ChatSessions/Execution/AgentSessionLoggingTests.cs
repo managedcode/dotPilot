@@ -14,11 +14,11 @@ public sealed class AgentSessionLoggingTests
         var recordingProvider = new RecordingLoggerProvider();
         await using var fixture = CreateFixture(recordingProvider);
 
-        await fixture.Service.UpdateProviderAsync(
+        (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        var agent = await fixture.Service.CreateAgentAsync(
+        var agent = (await fixture.Service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Logged Agent",
                 AgentRoleKind.Operator,
@@ -26,16 +26,17 @@ public sealed class AgentSessionLoggingTests
                 "debug-echo",
                 "Be explicit in tests.",
                 ["Shell"]),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        var session = await fixture.Service.CreateSessionAsync(
+        var session = (await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Logged session", agent.Id),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        await foreach (var _ in fixture.Service.SendMessageAsync(
+        await foreach (var result in fixture.Service.SendMessageAsync(
                            new SendSessionMessageCommand(session.Session.Id, "hello logs"),
                            CancellationToken.None))
         {
+            result.ShouldSucceed();
         }
 
         var messages = recordingProvider.Entries

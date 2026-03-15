@@ -1,5 +1,4 @@
 using DotPilot.Core.ChatSessions;
-using DotPilot.Core.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Providers;
@@ -14,15 +13,15 @@ public sealed class AgentProviderStatusCacheTests
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
 
         await using var fixture = CreateFixture();
-        var initial = await fixture.Service.UpdateProviderAsync(
+        var initial = (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         initial.InstalledVersion.Should().Be("1.0.0");
 
         commandScope.WriteVersionCommand("codex", "codex version 2.0.0");
 
-        var cachedWorkspace = await fixture.Service.GetWorkspaceAsync(CancellationToken.None);
+        var cachedWorkspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         cachedWorkspace.Providers
             .Single(provider => provider.Kind == AgentProviderKind.Codex)
             .InstalledVersion
@@ -31,7 +30,7 @@ public sealed class AgentProviderStatusCacheTests
 
         await fixture.ProviderStatusCache.RefreshAsync(CancellationToken.None);
 
-        var refreshedWorkspace = await fixture.Service.GetWorkspaceAsync(CancellationToken.None);
+        var refreshedWorkspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         refreshedWorkspace.Providers
             .Single(provider => provider.Kind == AgentProviderKind.Codex)
             .InstalledVersion
@@ -46,9 +45,9 @@ public sealed class AgentProviderStatusCacheTests
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
 
         await using var fixture = CreateFixture();
-        var provider = await fixture.Service.UpdateProviderAsync(
+        var provider = (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         provider.IsEnabled.Should().BeTrue();
         provider.CanCreateAgents.Should().BeFalse();
@@ -64,9 +63,9 @@ public sealed class AgentProviderStatusCacheTests
         commandScope.WriteVersionCommand("copilot", "copilot version 0.0.421");
 
         await using var fixture = CreateFixture();
-        var provider = await fixture.Service.UpdateProviderAsync(
+        var provider = (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.GitHubCopilot, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         provider.IsEnabled.Should().BeTrue();
         provider.CanCreateAgents.Should().BeFalse();

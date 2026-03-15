@@ -1,8 +1,7 @@
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.Providers;
+using ManagedCode.Communication;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.ChatSessions;
@@ -12,7 +11,6 @@ internal sealed class AgentSessionService(
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
     AgentProviderStatusCache providerStatusCache,
     AgentRuntimeConversationFactory runtimeConversationFactory,
-    IServiceProvider serviceProvider,
     TimeProvider timeProvider,
     ILogger<AgentSessionService> logger)
     : IAgentSessionService, IDisposable
@@ -34,82 +32,98 @@ internal sealed class AgentSessionService(
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private bool _initialized;
 
-    public async ValueTask<AgentWorkspaceSnapshot> GetWorkspaceAsync(CancellationToken cancellationToken)
+    public async ValueTask<Result<AgentWorkspaceSnapshot>> GetWorkspaceAsync(CancellationToken cancellationToken)
     {
-        await EnsureInitializedAsync(cancellationToken);
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var agents = await dbContext.AgentProfiles
-            .ToListAsync(cancellationToken);
-        agents = OrderAgents(agents);
-        var sessions = (await dbContext.Sessions
-                .ToListAsync(cancellationToken))
-            .OrderByDescending(record => record.UpdatedAt)
-            .ToList();
-        var entries = (await dbContext.SessionEntries
-                .ToListAsync(cancellationToken))
-            .OrderBy(record => record.Timestamp)
-            .ToList();
-
-        var agentsById = agents.ToDictionary(record => record.Id);
-        var sessionItems = sessions
-            .Select(record => MapSessionListItem(record, agentsById, entries))
-            .ToArray();
-        var providers = await providerStatusCache.GetSnapshotAsync(cancellationToken);
-        var preferences = await LoadOperatorPreferencesAsync(dbContext, cancellationToken);
-
-        AgentSessionServiceLog.WorkspaceLoaded(
-            logger,
-            sessionItems.Length,
-            agents.Count,
-            providers.Count);
-
-        return new AgentWorkspaceSnapshot(
-            sessionItems,
-            agents.Select(MapAgentSummary).ToArray(),
-            providers,
-            preferences,
-            sessionItems.Length > 0 ? sessionItems[0].Id : null);
-    }
-
-    public async ValueTask<SessionTranscriptSnapshot?> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
-    {
-        await EnsureInitializedAsync(cancellationToken);
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var session = await dbContext.Sessions
-            .FirstOrDefaultAsync(record => record.Id == sessionId.Value, cancellationToken);
-        if (session is null)
+        try
         {
-            AgentSessionServiceLog.SessionNotFound(logger, sessionId);
-            return null;
+            await EnsureInitializedAsync(cancellationToken);
+
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var agents = await dbContext.AgentProfiles
+                .ToListAsync(cancellationToken);
+            agents = OrderAgents(agents);
+            var sessions = (await dbContext.Sessions
+                    .ToListAsync(cancellationToken))
+                .OrderByDescending(record => record.UpdatedAt)
+                .ToList();
+            var entries = (await dbContext.SessionEntries
+                    .ToListAsync(cancellationToken))
+                .OrderBy(record => record.Timestamp)
+                .ToList();
+
+            var agentsById = agents.ToDictionary(record => record.Id);
+            var sessionItems = sessions
+                .Select(record => MapSessionListItem(record, agentsById, entries))
+                .ToArray();
+            var providers = await providerStatusCache.GetSnapshotAsync(cancellationToken);
+            var preferences = await LoadOperatorPreferencesAsync(dbContext, cancellationToken);
+
+            AgentSessionServiceLog.WorkspaceLoaded(
+                logger,
+                sessionItems.Length,
+                agents.Count,
+                providers.Count);
+
+            return Result<AgentWorkspaceSnapshot>.Succeed(new AgentWorkspaceSnapshot(
+                sessionItems,
+                agents.Select(MapAgentSummary).ToArray(),
+                providers,
+                preferences,
+                sessionItems.Length > 0 ? sessionItems[0].Id : null));
         }
-
-        var agents = await dbContext.AgentProfiles
-            .Where(record => record.Id == session.PrimaryAgentProfileId)
-            .ToListAsync(cancellationToken);
-        var agentsById = agents.ToDictionary(record => record.Id);
-        var entries = (await dbContext.SessionEntries
-                .Where(record => record.SessionId == sessionId.Value)
-                .ToListAsync(cancellationToken))
-            .OrderBy(record => record.Timestamp)
-            .ToList();
-
-        var snapshot = new SessionTranscriptSnapshot(
-            MapSessionListItem(session, agentsById, entries),
-            entries.Select(MapEntry).ToArray(),
-            agents.Select(MapAgentSummary).ToArray());
-
-        AgentSessionServiceLog.SessionLoaded(
-            logger,
-            sessionId,
-            snapshot.Entries.Count,
-            snapshot.Participants.Count);
-
-        return snapshot;
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.WorkspaceLoadFailed(logger, exception);
+            return Result<AgentWorkspaceSnapshot>.Fail(exception);
+        }
     }
 
-    public async ValueTask<AgentProfileSummary> CreateAgentAsync(
+    public async ValueTask<Result<SessionTranscriptSnapshot>> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await EnsureInitializedAsync(cancellationToken);
+
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var session = await dbContext.Sessions
+                .FirstOrDefaultAsync(record => record.Id == sessionId.Value, cancellationToken);
+            if (session is null)
+            {
+                AgentSessionServiceLog.SessionNotFound(logger, sessionId);
+                return Result<SessionTranscriptSnapshot>.FailNotFound($"Session '{sessionId}' was not found.");
+            }
+
+            var agents = await dbContext.AgentProfiles
+                .Where(record => record.Id == session.PrimaryAgentProfileId)
+                .ToListAsync(cancellationToken);
+            var agentsById = agents.ToDictionary(record => record.Id);
+            var entries = (await dbContext.SessionEntries
+                    .Where(record => record.SessionId == sessionId.Value)
+                    .ToListAsync(cancellationToken))
+                .OrderBy(record => record.Timestamp)
+                .ToList();
+
+            var snapshot = new SessionTranscriptSnapshot(
+                MapSessionListItem(session, agentsById, entries),
+                entries.Select(MapEntry).ToArray(),
+                agents.Select(MapAgentSummary).ToArray());
+
+            AgentSessionServiceLog.SessionLoaded(
+                logger,
+                sessionId,
+                snapshot.Entries.Count,
+                snapshot.Participants.Count);
+
+            return Result<SessionTranscriptSnapshot>.Succeed(snapshot);
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SessionLoadFailed(logger, exception, sessionId);
+            return Result<SessionTranscriptSnapshot>.Fail(exception);
+        }
+    }
+
+    public async ValueTask<Result<AgentProfileSummary>> CreateAgentAsync(
         CreateAgentProfileCommand command,
         CancellationToken cancellationToken)
     {
@@ -127,7 +141,7 @@ internal sealed class AgentSessionService(
             var provider = providers.First(status => status.Kind == command.ProviderKind);
             if (!provider.CanCreateAgents)
             {
-                throw new InvalidOperationException(provider.StatusSummary);
+                return Result<AgentProfileSummary>.FailForbidden(provider.StatusSummary);
             }
 
             var createdAt = timeProvider.GetUtcNow();
@@ -145,7 +159,6 @@ internal sealed class AgentSessionService(
 
             dbContext.AgentProfiles.Add(record);
             await dbContext.SaveChangesAsync(cancellationToken);
-            await UpsertAgentGrainAsync(MapAgentDescriptor(record));
 
             AgentSessionServiceLog.AgentCreated(
                 logger,
@@ -153,56 +166,69 @@ internal sealed class AgentSessionService(
                 record.Name,
                 command.ProviderKind);
 
-            return MapAgentSummary(record);
+            return Result<AgentProfileSummary>.Succeed(MapAgentSummary(record));
         }
         catch (Exception exception)
         {
             AgentSessionServiceLog.AgentCreationFailed(logger, exception, agentName, command.ProviderKind);
-            throw;
+            return Result<AgentProfileSummary>.Fail(exception);
         }
     }
 
-    public async ValueTask<SessionTranscriptSnapshot> CreateSessionAsync(
+    public async ValueTask<Result<SessionTranscriptSnapshot>> CreateSessionAsync(
         CreateSessionCommand command,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        await EnsureInitializedAsync(cancellationToken);
-        var sessionTitle = command.Title.Trim();
-        AgentSessionServiceLog.SessionCreationStarted(logger, sessionTitle, command.AgentProfileId);
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var agent = await dbContext.AgentProfiles
-            .FirstAsync(record => record.Id == command.AgentProfileId.Value, cancellationToken);
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
-        var now = timeProvider.GetUtcNow();
-        var sessionId = SessionId.New();
-        var session = new SessionRecord
+        try
         {
-            Id = sessionId.Value,
-            Title = sessionTitle,
-            PrimaryAgentProfileId = agent.Id,
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
+            await EnsureInitializedAsync(cancellationToken);
+            var sessionTitle = command.Title.Trim();
+            AgentSessionServiceLog.SessionCreationStarted(logger, sessionTitle, command.AgentProfileId);
 
-        dbContext.Sessions.Add(session);
-        dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
-        await dbContext.SaveChangesAsync(cancellationToken);
-        if (providerProfile.SupportsLiveExecution)
-        {
-            await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var agent = await dbContext.AgentProfiles
+                .FirstOrDefaultAsync(record => record.Id == command.AgentProfileId.Value, cancellationToken);
+            if (agent is null)
+            {
+                return Result<SessionTranscriptSnapshot>.FailNotFound($"Agent '{command.AgentProfileId}' was not found.");
+            }
+
+            var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
+            var now = timeProvider.GetUtcNow();
+            var sessionId = SessionId.New();
+            var session = new SessionRecord
+            {
+                Id = sessionId.Value,
+                Title = sessionTitle,
+                PrimaryAgentProfileId = agent.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+
+            dbContext.Sessions.Add(session);
+            dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (providerProfile.SupportsLiveExecution)
+            {
+                await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
+            }
+
+            AgentSessionServiceLog.SessionCreated(logger, sessionId, session.Title, command.AgentProfileId);
+
+            var reloaded = await GetSessionAsync(sessionId, cancellationToken);
+            return reloaded.IsSuccess
+                ? reloaded
+                : Result<SessionTranscriptSnapshot>.Fail("SessionCreationFailed", "Created session could not be reloaded.");
         }
-
-        await UpsertSessionGrainAsync(session);
-
-        AgentSessionServiceLog.SessionCreated(logger, sessionId, session.Title, command.AgentProfileId);
-
-        return await GetSessionAsync(sessionId, cancellationToken) ??
-            throw new InvalidOperationException("Created session could not be reloaded.");
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SessionCreationFailed(logger, exception, command.Title, command.AgentProfileId);
+            return Result<SessionTranscriptSnapshot>.Fail(exception);
+        }
     }
 
-    public async ValueTask<ProviderStatusDescriptor> UpdateProviderAsync(
+    public async ValueTask<Result<ProviderStatusDescriptor>> UpdateProviderAsync(
         UpdateProviderPreferenceCommand command,
         CancellationToken cancellationToken)
     {
@@ -231,7 +257,7 @@ internal sealed class AgentSessionService(
 
             AgentSessionServiceLog.ProviderPreferenceUpdated(logger, command.ProviderKind, command.IsEnabled);
 
-            return provider;
+            return Result<ProviderStatusDescriptor>.Succeed(provider);
         }
         catch (Exception exception)
         {
@@ -240,214 +266,359 @@ internal sealed class AgentSessionService(
                 exception,
                 command.ProviderKind,
                 command.IsEnabled);
-            throw;
+            return Result<ProviderStatusDescriptor>.Fail(exception);
         }
     }
 
-    public async ValueTask<OperatorPreferencesSnapshot> UpdateComposerSendBehaviorAsync(
+    public async ValueTask<Result<OperatorPreferencesSnapshot>> UpdateComposerSendBehaviorAsync(
         UpdateComposerSendBehaviorCommand command,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        await EnsureInitializedAsync(cancellationToken);
+        try
+        {
+            await EnsureInitializedAsync(cancellationToken);
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var record = await GetOrCreateOperatorPreferenceRecordAsync(dbContext, cancellationToken);
-        record.ComposerSendBehavior = (int)command.Behavior;
-        record.UpdatedAt = timeProvider.GetUtcNow();
-        await dbContext.SaveChangesAsync(cancellationToken);
-        AgentSessionServiceLog.ComposerSendBehaviorUpdated(logger, command.Behavior);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var record = await GetOrCreateOperatorPreferenceRecordAsync(dbContext, cancellationToken);
+            record.ComposerSendBehavior = (int)command.Behavior;
+            record.UpdatedAt = timeProvider.GetUtcNow();
+            await dbContext.SaveChangesAsync(cancellationToken);
+            AgentSessionServiceLog.ComposerSendBehaviorUpdated(logger, command.Behavior);
 
-        return MapOperatorPreferences(record);
+            return Result<OperatorPreferencesSnapshot>.Succeed(MapOperatorPreferences(record));
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.ComposerSendBehaviorUpdateFailed(logger, exception, command.Behavior);
+            return Result<OperatorPreferencesSnapshot>.Fail(exception);
+        }
     }
 
-    public async IAsyncEnumerable<SessionStreamEntry> SendMessageAsync(
+    public async IAsyncEnumerable<Result<SessionStreamEntry>> SendMessageAsync(
         SendSessionMessageCommand command,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        await EnsureInitializedAsync(cancellationToken);
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var session = await dbContext.Sessions
-            .FirstAsync(record => record.Id == command.SessionId.Value, cancellationToken);
-        var agent = await dbContext.AgentProfiles
-            .FirstAsync(record => record.Id == session.PrimaryAgentProfileId, cancellationToken);
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
-        var now = timeProvider.GetUtcNow();
-
-        AgentSessionServiceLog.SendStarted(
-            logger,
-            command.SessionId,
-            agent.Id,
-            providerProfile.Kind);
-
-        var userEntry = CreateEntryRecord(command.SessionId, SessionStreamEntryKind.UserMessage, UserAuthor, command.Message.Trim(), now);
-        dbContext.SessionEntries.Add(userEntry);
-        session.UpdatedAt = now;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        yield return MapEntry(userEntry);
-
-        var statusEntry = CreateEntryRecord(
-            command.SessionId,
-            SessionStreamEntryKind.Status,
-            StatusAuthor,
-            $"Running {agent.Name} with {providerProfile.DisplayName}.",
-            timeProvider.GetUtcNow(),
-            accentLabel: StatusAccentLabel);
-        yield return MapEntry(statusEntry);
-
-        var providerStatuses = await providerStatusCache.GetSnapshotAsync(cancellationToken);
-        var providerStatus = providerStatuses.First(status => status.Kind == providerProfile.Kind);
-
-        if (!providerStatus.IsEnabled)
+        Result initializeResult;
+        try
         {
-            AgentSessionServiceLog.SendBlockedDisabled(logger, command.SessionId, providerProfile.Kind);
-            var disabledEntry = CreateEntryRecord(
-                command.SessionId,
-                SessionStreamEntryKind.Error,
-                StatusAuthor,
-                DisabledProviderSendText,
-                timeProvider.GetUtcNow(),
-                accentLabel: ErrorAccentLabel);
-            dbContext.SessionEntries.Add(disabledEntry);
-            session.UpdatedAt = disabledEntry.Timestamp;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await EnsureInitializedAsync(cancellationToken);
+            initializeResult = Result.Succeed();
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, Guid.Empty);
+            initializeResult = Result.Fail(exception);
+        }
 
-            yield return MapEntry(disabledEntry);
+        if (initializeResult.IsFailed)
+        {
+            yield return Result<SessionStreamEntry>.Fail(initializeResult.Problem!);
             yield break;
         }
 
-        if (!providerProfile.SupportsLiveExecution)
+        LocalAgentSessionDbContext? dbContext = null;
+        Result dbContextResult;
+        try
         {
-            AgentSessionServiceLog.SendBlockedNotWired(logger, command.SessionId, providerProfile.Kind);
-            var notImplementedEntry = CreateEntryRecord(
-                command.SessionId,
-                SessionStreamEntryKind.Error,
-                StatusAuthor,
-                string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    LiveExecutionUnavailableCompositeFormat,
-                    providerProfile.DisplayName),
-                timeProvider.GetUtcNow(),
-                accentLabel: ErrorAccentLabel);
-            dbContext.SessionEntries.Add(notImplementedEntry);
-            session.UpdatedAt = notImplementedEntry.Timestamp;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            dbContextResult = Result.Succeed();
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, Guid.Empty);
+            dbContextResult = Result.Fail(exception);
+        }
 
-            yield return MapEntry(notImplementedEntry);
+        if (dbContextResult.IsFailed || dbContext is null)
+        {
+            yield return Result<SessionStreamEntry>.Fail(dbContextResult.Problem!);
             yield break;
         }
 
-        var runtimeConversation = await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken);
-        var toolStartEntry = CreateEntryRecord(
-            command.SessionId,
-            SessionStreamEntryKind.ToolStarted,
-            ToolAuthor,
-            DebugToolStartText,
-            timeProvider.GetUtcNow(),
-            agentProfileId: new AgentProfileId(agent.Id),
-            accentLabel: ToolAccentLabel);
-        dbContext.SessionEntries.Add(toolStartEntry);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        yield return MapEntry(toolStartEntry);
-
-        string? streamedMessageId = null;
-        var accumulated = new System.Text.StringBuilder();
-        var runConfiguration = executionLoggingMiddleware.CreateRunConfiguration(
-            runtimeConversation.Descriptor,
-            command.SessionId);
-        AgentSessionServiceLog.SendRunPrepared(
-            logger,
-            command.SessionId,
-            agent.Id,
-            runConfiguration.Context.RunId,
-            providerProfile.Kind,
-            agent.ModelName);
-
-        await using var updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
-                command.Message.Trim(),
-                runtimeConversation.Session,
-                runConfiguration.Options,
-                cancellationToken)
-            .GetAsyncEnumerator(cancellationToken);
-
-        while (true)
+        await using (dbContext)
         {
-            Microsoft.Agents.AI.AgentResponseUpdate update;
+            Result<(SessionRecord Session, AgentProfileRecord Agent, AgentSessionProviderProfile ProviderProfile, DateTimeOffset Timestamp)> contextResult;
             try
             {
-                if (!await updateEnumerator.MoveNextAsync())
+                var sessionRecord = await dbContext.Sessions
+                    .FirstOrDefaultAsync(record => record.Id == command.SessionId.Value, cancellationToken);
+                if (sessionRecord is null)
                 {
-                    break;
+                    contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.FailNotFound(
+                        $"Session '{command.SessionId}' was not found.");
                 }
+                else
+                {
+                    var agentRecord = await dbContext.AgentProfiles
+                        .FirstOrDefaultAsync(record => record.Id == sessionRecord.PrimaryAgentProfileId, cancellationToken);
+                    if (agentRecord is null)
+                    {
+                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.FailNotFound(
+                            $"Agent '{sessionRecord.PrimaryAgentProfileId}' was not found.");
+                    }
+                    else
+                    {
+                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.Succeed((
+                            sessionRecord,
+                            agentRecord,
+                            AgentSessionProviderCatalog.Get((AgentProviderKind)agentRecord.ProviderKind),
+                            timeProvider.GetUtcNow()));
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, Guid.Empty);
+                contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.Fail(exception);
+            }
 
-                update = updateEnumerator.Current;
+            if (contextResult.IsFailed)
+            {
+                yield return Result<SessionStreamEntry>.Fail(contextResult.Problem!);
+                yield break;
+            }
+
+            var (session, agent, providerProfile, now) = contextResult.Value;
+            AgentSessionServiceLog.SendStarted(
+                logger,
+                command.SessionId,
+                agent.Id,
+                providerProfile.Kind);
+
+            Result<SessionEntryRecord> userEntryResult;
+            try
+            {
+                var userEntry = CreateEntryRecord(command.SessionId, SessionStreamEntryKind.UserMessage, UserAuthor, command.Message.Trim(), now);
+                dbContext.SessionEntries.Add(userEntry);
+                session.UpdatedAt = now;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                userEntryResult = Result<SessionEntryRecord>.Succeed(userEntry);
             }
             catch (Exception exception)
             {
                 AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
-                throw;
+                userEntryResult = Result<SessionEntryRecord>.Fail(exception);
             }
 
-            if (string.IsNullOrEmpty(update.Text))
+            if (userEntryResult.IsFailed)
             {
-                continue;
+                yield return Result<SessionStreamEntry>.Fail(userEntryResult.Problem!);
+                yield break;
             }
 
-            streamedMessageId ??= string.IsNullOrWhiteSpace(update.MessageId)
-                ? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
-                : update.MessageId;
-            accumulated.Append(update.Text);
-            yield return new SessionStreamEntry(
-                streamedMessageId,
+            yield return Result<SessionStreamEntry>.Succeed(MapEntry(userEntryResult.Value));
+
+            var statusEntry = CreateEntryRecord(
                 command.SessionId,
-                SessionStreamEntryKind.AssistantMessage,
-                agent.Name,
-                accumulated.ToString(),
-                update.CreatedAt ?? timeProvider.GetUtcNow(),
-                new AgentProfileId(agent.Id));
-        }
+                SessionStreamEntryKind.Status,
+                StatusAuthor,
+                $"Running {agent.Name} with {providerProfile.DisplayName}.",
+                timeProvider.GetUtcNow(),
+                accentLabel: StatusAccentLabel);
+            yield return Result<SessionStreamEntry>.Succeed(MapEntry(statusEntry));
 
-        SessionStreamEntry toolDoneStreamEntry;
-        try
-        {
-            await runtimeConversationFactory.SaveAsync(runtimeConversation, command.SessionId, cancellationToken);
-
-            var assistantEntry = new SessionEntryRecord
+            Result<ProviderStatusDescriptor> providerStatusResult;
+            try
             {
-                Id = streamedMessageId ?? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture),
-                SessionId = command.SessionId.Value,
-                AgentProfileId = agent.Id,
-                Kind = (int)SessionStreamEntryKind.AssistantMessage,
-                Author = agent.Name,
-                Text = accumulated.ToString(),
-                Timestamp = timeProvider.GetUtcNow(),
-            };
-            var toolDoneEntry = CreateEntryRecord(
+                var providerStatuses = await providerStatusCache.GetSnapshotAsync(cancellationToken);
+                providerStatusResult = Result<ProviderStatusDescriptor>.Succeed(
+                    providerStatuses.First(status => status.Kind == providerProfile.Kind));
+            }
+            catch (Exception exception)
+            {
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                providerStatusResult = Result<ProviderStatusDescriptor>.Fail(exception);
+            }
+
+            if (providerStatusResult.IsFailed)
+            {
+                yield return Result<SessionStreamEntry>.Fail(providerStatusResult.Problem!);
+                yield break;
+            }
+
+            var providerStatus = providerStatusResult.Value;
+            if (!providerStatus.IsEnabled)
+            {
+                AgentSessionServiceLog.SendBlockedDisabled(logger, command.SessionId, providerProfile.Kind);
+                var disabledEntry = CreateEntryRecord(
+                    command.SessionId,
+                    SessionStreamEntryKind.Error,
+                    StatusAuthor,
+                    DisabledProviderSendText,
+                    timeProvider.GetUtcNow(),
+                    accentLabel: ErrorAccentLabel);
+                dbContext.SessionEntries.Add(disabledEntry);
+                session.UpdatedAt = disabledEntry.Timestamp;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                yield return Result<SessionStreamEntry>.Succeed(MapEntry(disabledEntry));
+                yield break;
+            }
+
+            if (!providerProfile.SupportsLiveExecution)
+            {
+                AgentSessionServiceLog.SendBlockedNotWired(logger, command.SessionId, providerProfile.Kind);
+                var notImplementedEntry = CreateEntryRecord(
+                    command.SessionId,
+                    SessionStreamEntryKind.Error,
+                    StatusAuthor,
+                    string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        LiveExecutionUnavailableCompositeFormat,
+                        providerProfile.DisplayName),
+                    timeProvider.GetUtcNow(),
+                    accentLabel: ErrorAccentLabel);
+                dbContext.SessionEntries.Add(notImplementedEntry);
+                session.UpdatedAt = notImplementedEntry.Timestamp;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                yield return Result<SessionStreamEntry>.Succeed(MapEntry(notImplementedEntry));
+                yield break;
+            }
+
+            Result<RuntimeConversationContext> runtimeConversationResult;
+            try
+            {
+                runtimeConversationResult = Result<RuntimeConversationContext>.Succeed(
+                    await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                runtimeConversationResult = Result<RuntimeConversationContext>.Fail(exception);
+            }
+
+            if (runtimeConversationResult.IsFailed)
+            {
+                yield return Result<SessionStreamEntry>.Fail(runtimeConversationResult.Problem!);
+                yield break;
+            }
+
+            var runtimeConversation = runtimeConversationResult.Value;
+            var toolStartEntry = CreateEntryRecord(
                 command.SessionId,
-                SessionStreamEntryKind.ToolCompleted,
+                SessionStreamEntryKind.ToolStarted,
                 ToolAuthor,
-                DebugToolDoneText,
+                DebugToolStartText,
                 timeProvider.GetUtcNow(),
                 agentProfileId: new AgentProfileId(agent.Id),
                 accentLabel: ToolAccentLabel);
-
-            dbContext.SessionEntries.Add(assistantEntry);
-            dbContext.SessionEntries.Add(toolDoneEntry);
-            session.UpdatedAt = assistantEntry.Timestamp;
+            dbContext.SessionEntries.Add(toolStartEntry);
             await dbContext.SaveChangesAsync(cancellationToken);
+            yield return Result<SessionStreamEntry>.Succeed(MapEntry(toolStartEntry));
 
-            AgentSessionServiceLog.SendCompleted(logger, command.SessionId, agent.Id, accumulated.Length);
-            toolDoneStreamEntry = MapEntry(toolDoneEntry);
-        }
-        catch (Exception exception)
-        {
-            AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
-            throw;
-        }
+            string? streamedMessageId = null;
+            var accumulated = new System.Text.StringBuilder();
+            var runConfiguration = executionLoggingMiddleware.CreateRunConfiguration(
+                runtimeConversation.Descriptor,
+                command.SessionId);
+            AgentSessionServiceLog.SendRunPrepared(
+                logger,
+                command.SessionId,
+                agent.Id,
+                runConfiguration.Context.RunId,
+                providerProfile.Kind,
+                agent.ModelName);
 
-        yield return toolDoneStreamEntry;
+            await using var updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
+                    command.Message.Trim(),
+                    runtimeConversation.Session,
+                    runConfiguration.Options,
+                    cancellationToken)
+                .GetAsyncEnumerator(cancellationToken);
+
+            while (true)
+            {
+                Microsoft.Agents.AI.AgentResponseUpdate? update = null;
+                Result<bool> nextUpdateResult;
+                try
+                {
+                    var hasNext = await updateEnumerator.MoveNextAsync();
+                    if (hasNext)
+                    {
+                        update = updateEnumerator.Current;
+                    }
+
+                    nextUpdateResult = Result<bool>.Succeed(hasNext);
+                }
+                catch (Exception exception)
+                {
+                    AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                    nextUpdateResult = Result<bool>.Fail(exception);
+                }
+
+                if (nextUpdateResult.IsFailed)
+                {
+                    yield return Result<SessionStreamEntry>.Fail(nextUpdateResult.Problem!);
+                    yield break;
+                }
+
+                if (!nextUpdateResult.Value)
+                {
+                    break;
+                }
+
+                if (string.IsNullOrEmpty(update?.Text))
+                {
+                    continue;
+                }
+
+                streamedMessageId ??= string.IsNullOrWhiteSpace(update.MessageId)
+                    ? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
+                    : update.MessageId;
+                accumulated.Append(update.Text);
+                yield return Result<SessionStreamEntry>.Succeed(new SessionStreamEntry(
+                    streamedMessageId,
+                    command.SessionId,
+                    SessionStreamEntryKind.AssistantMessage,
+                    agent.Name,
+                    accumulated.ToString(),
+                    update.CreatedAt ?? timeProvider.GetUtcNow(),
+                    new AgentProfileId(agent.Id)));
+            }
+
+            Result<SessionStreamEntry> completionResult;
+            try
+            {
+                await runtimeConversationFactory.SaveAsync(runtimeConversation, command.SessionId, cancellationToken);
+
+                var assistantEntry = new SessionEntryRecord
+                {
+                    Id = streamedMessageId ?? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture),
+                    SessionId = command.SessionId.Value,
+                    AgentProfileId = agent.Id,
+                    Kind = (int)SessionStreamEntryKind.AssistantMessage,
+                    Author = agent.Name,
+                    Text = accumulated.ToString(),
+                    Timestamp = timeProvider.GetUtcNow(),
+                };
+                var toolDoneEntry = CreateEntryRecord(
+                    command.SessionId,
+                    SessionStreamEntryKind.ToolCompleted,
+                    ToolAuthor,
+                    DebugToolDoneText,
+                    timeProvider.GetUtcNow(),
+                    agentProfileId: new AgentProfileId(agent.Id),
+                    accentLabel: ToolAccentLabel);
+
+                dbContext.SessionEntries.Add(assistantEntry);
+                dbContext.SessionEntries.Add(toolDoneEntry);
+                session.UpdatedAt = assistantEntry.Timestamp;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                AgentSessionServiceLog.SendCompleted(logger, command.SessionId, agent.Id, accumulated.Length);
+                completionResult = Result<SessionStreamEntry>.Succeed(MapEntry(toolDoneEntry));
+            }
+            catch (Exception exception)
+            {
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                completionResult = Result<SessionStreamEntry>.Fail(exception);
+            }
+
+            yield return completionResult;
+        }
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
@@ -533,7 +704,6 @@ internal sealed class AgentSessionService(
 
         dbContext.AgentProfiles.Add(record);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await UpsertAgentGrainAsync(MapAgentDescriptor(record));
         AgentSessionServiceLog.DefaultAgentSeeded(logger, record.Id, providerKind, record.ModelName);
     }
 
@@ -664,20 +834,6 @@ internal sealed class AgentSessionService(
             .ToList();
     }
 
-    private static AgentProfileDescriptor MapAgentDescriptor(AgentProfileRecord record)
-    {
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)record.ProviderKind);
-        return new AgentProfileDescriptor
-        {
-            Id = new AgentProfileId(record.Id),
-            Name = record.Name,
-            Role = (AgentRoleKind)record.Role,
-            ProviderId = AgentSessionDeterministicIdentity.CreateProviderId(providerProfile.CommandName),
-            ModelRuntimeId = null,
-            Tags = DeserializeCapabilities(record.CapabilitiesJson).ToArray(),
-        };
-    }
-
     private static string SerializeCapabilities(IReadOnlyList<string> capabilities)
     {
         return System.Text.Json.JsonSerializer.Serialize(
@@ -690,44 +846,6 @@ internal sealed class AgentSessionService(
         return System.Text.Json.JsonSerializer.Deserialize(
             capabilitiesJson,
             AgentSessionJsonSerializerContext.Default.StringArray) ?? [];
-    }
-
-    private async Task UpsertAgentGrainAsync(AgentProfileDescriptor descriptor)
-    {
-        var grainFactory = serviceProvider.GetService<IGrainFactory>();
-        if (grainFactory is null)
-        {
-            return;
-        }
-
-        await grainFactory
-            .GetGrain<IAgentProfileGrain>(descriptor.Id.ToString())
-            .UpsertAsync(descriptor);
-    }
-
-    private async Task UpsertSessionGrainAsync(SessionRecord record)
-    {
-        var grainFactory = serviceProvider.GetService<IGrainFactory>();
-        if (grainFactory is null)
-        {
-            return;
-        }
-
-        await grainFactory
-            .GetGrain<ISessionGrain>(record.Id.ToString("N", System.Globalization.CultureInfo.InvariantCulture))
-            .UpsertAsync(
-                new SessionDescriptor
-                {
-                    Id = new SessionId(record.Id),
-                    WorkspaceId = WorkspaceId.New(),
-                    Title = record.Title,
-                    Phase = SessionPhase.Execute,
-                    ApprovalState = ApprovalState.NotRequired,
-                    FleetId = null,
-                    AgentProfileIds = [new AgentProfileId(record.PrimaryAgentProfileId)],
-                    CreatedAt = record.CreatedAt,
-                    UpdatedAt = record.UpdatedAt,
-                });
     }
 
     public void Dispose()

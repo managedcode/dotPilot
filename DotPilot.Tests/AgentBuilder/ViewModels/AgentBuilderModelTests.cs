@@ -4,13 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.AgentBuilder;
 
-public sealed class SecondModelTests
+public sealed class AgentBuilderModelTests
 {
     [Test]
     public async Task GenerateDraftAndSaveAgentUsesSuggestedDebugModelWhenModelOverrideIsBlank()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);
         await model.AgentRequest.SetAsync("Create a repository reviewer", CancellationToken.None);
@@ -25,7 +25,7 @@ public sealed class SecondModelTests
 
         await model.SaveAgent(CancellationToken.None);
 
-        var workspace = await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Agents.Should().Contain(agent =>
             agent.Name == "Repository Reviewer Agent" &&
             agent.ProviderKind == AgentProviderKind.Debug &&
@@ -38,7 +38,7 @@ public sealed class SecondModelTests
     public async Task BuilderProjectionReflectsSelectedProviderSuggestionAndVersion()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.SelectedProvider.UpdateAsync(
             _ => new AgentProviderOption(
@@ -65,7 +65,7 @@ public sealed class SecondModelTests
     public async Task BuildManuallyOpensEditorWithDefaultDraft()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);
         await model.BuildManually(CancellationToken.None);
@@ -81,7 +81,7 @@ public sealed class SecondModelTests
     public async Task HandleSelectedProviderChangedKeepsRunnableModelWhenProviderCannotCreateAgents()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.BuildManually(CancellationToken.None);
         (await model.ModelName).Should().Be("debug-echo");
@@ -104,7 +104,7 @@ public sealed class SecondModelTests
     public async Task StartChatForAgentCreatesAndSelectsSessionForChosenCatalogAgent()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);
         await model.AgentRequest.SetAsync("Create a repository reviewer", CancellationToken.None);
@@ -118,7 +118,7 @@ public sealed class SecondModelTests
 
         await model.StartChatForAgent(createdAgent, CancellationToken.None);
 
-        var workspace = await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Sessions.Should().Contain(session => session.Title == "Session with Repository Reviewer Agent");
         workspace.SelectedSessionId.Should().NotBeNull();
         (await model.OperationMessage).Should().Be("Started a session with Repository Reviewer Agent. Switch to Chat to continue.");

@@ -13,7 +13,7 @@ public sealed class AgentSessionServiceTests
     {
         await using var fixture = CreateFixture();
 
-        var workspace = await fixture.Service.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
 
         workspace.Sessions.Should().BeEmpty();
         workspace.Agents.Should().ContainSingle(agent =>
@@ -32,11 +32,11 @@ public sealed class AgentSessionServiceTests
     public async Task CreateAgentAsyncPersistsAnEnabledDebugProviderProfile()
     {
         await using var fixture = CreateFixture();
-        await fixture.Service.UpdateProviderAsync(
+        (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        var created = await fixture.Service.CreateAgentAsync(
+        var created = (await fixture.Service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Debug Agent",
                 AgentRoleKind.Coding,
@@ -44,9 +44,9 @@ public sealed class AgentSessionServiceTests
                 "debug-echo",
                 "Act as a deterministic local test agent.",
                 ["Shell", "Files"]),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        var workspace = await fixture.Service.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
 
         created.Name.Should().Be("Debug Agent");
         created.ProviderKind.Should().Be(AgentProviderKind.Debug);
@@ -63,9 +63,9 @@ public sealed class AgentSessionServiceTests
         await using var fixture = CreateFixture();
         var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Session Agent");
 
-        var session = await fixture.Service.CreateSessionAsync(
+        var session = (await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Session with Session Agent", agent.Id),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         session.Session.Title.Should().Be("Session with Session Agent");
         session.Entries.Should().ContainSingle(entry =>
@@ -78,19 +78,19 @@ public sealed class AgentSessionServiceTests
     {
         await using var fixture = CreateFixture();
         var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Streaming Agent");
-        var session = await fixture.Service.CreateSessionAsync(
+        var session = (await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Streaming session", agent.Id),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         List<SessionStreamEntry> streamedEntries = [];
         await foreach (var entry in fixture.Service.SendMessageAsync(
                            new SendSessionMessageCommand(session.Session.Id, "hello from tests"),
                            CancellationToken.None))
         {
-            streamedEntries.Add(entry);
+            streamedEntries.Add(entry.ShouldSucceed());
         }
 
-        var reloaded = await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None);
+        var reloaded = (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).ShouldSucceed();
 
         streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.UserMessage);
         streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.ToolStarted);
@@ -99,8 +99,7 @@ public sealed class AgentSessionServiceTests
             entry.Kind == SessionStreamEntryKind.AssistantMessage &&
             entry.Text.Contains("Debug provider received: hello from tests", StringComparison.Ordinal));
 
-        reloaded.Should().NotBeNull();
-        reloaded!.Entries.Should().Contain(entry =>
+        reloaded.Entries.Should().Contain(entry =>
             entry.Kind == SessionStreamEntryKind.AssistantMessage &&
             entry.Text.Contains("Debug provider received: hello from tests", StringComparison.Ordinal));
         reloaded.Entries.Should().Contain(entry =>
@@ -118,16 +117,16 @@ public sealed class AgentSessionServiceTests
             PreferTransientRuntimeConversation = true,
         });
         var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Transient Agent");
-        var session = await fixture.Service.CreateSessionAsync(
+        var session = (await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Transient session", agent.Id),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         List<SessionStreamEntry> streamedEntries = [];
         await foreach (var entry in fixture.Service.SendMessageAsync(
                            new SendSessionMessageCommand(session.Session.Id, "hello from transient tests"),
                            CancellationToken.None))
         {
-            streamedEntries.Add(entry);
+            streamedEntries.Add(entry.ShouldSucceed());
         }
 
         streamedEntries.Should().Contain(entry =>
@@ -142,26 +141,26 @@ public sealed class AgentSessionServiceTests
     public async Task LegacyUnsupportedProviderSessionReturnsExplicitErrorWithoutRuntimePlaceholderClient()
     {
         await using var fixture = CreateFixture();
-        await fixture.Service.UpdateProviderAsync(
+        (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         var legacyAgentId = Guid.CreateVersion7();
         await SeedLegacyAgentAsync(fixture.Provider, legacyAgentId);
 
-        var session = await fixture.Service.CreateSessionAsync(
+        var session = (await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Legacy session", new AgentProfileId(legacyAgentId)),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
         List<SessionStreamEntry> streamedEntries = [];
         await foreach (var entry in fixture.Service.SendMessageAsync(
                            new SendSessionMessageCommand(session.Session.Id, "hello legacy"),
                            CancellationToken.None))
         {
-            streamedEntries.Add(entry);
+            streamedEntries.Add(entry.ShouldSucceed());
         }
 
-        var reloaded = await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None);
+        var reloaded = (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).ShouldSucceed();
 
         streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.UserMessage);
         streamedEntries.Should().Contain(entry =>
@@ -171,8 +170,7 @@ public sealed class AgentSessionServiceTests
         streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolCompleted);
         streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.AssistantMessage);
 
-        reloaded.Should().NotBeNull();
-        reloaded!.Entries.Should().Contain(entry =>
+        reloaded.Entries.Should().Contain(entry =>
             entry.Kind == SessionStreamEntryKind.Error &&
             entry.Text.Contains("Codex live CLI execution is not wired yet in this slice.", StringComparison.Ordinal));
     }
@@ -181,11 +179,11 @@ public sealed class AgentSessionServiceTests
         IAgentSessionService service,
         string name)
     {
-        await service.UpdateProviderAsync(
+        (await service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        return await service.CreateAgentAsync(
+        return (await service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 name,
                 AgentRoleKind.Operator,
@@ -193,7 +191,7 @@ public sealed class AgentSessionServiceTests
                 "debug-echo",
                 "Be deterministic for automated verification.",
                 ["Shell"]),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
     }
 
     private static TestFixture CreateFixture(AgentSessionStorageOptions? options = null)

@@ -138,8 +138,14 @@ public partial record SettingsModel
     {
         try
         {
-            SettingsViewModelLog.RefreshRequested(logger);
-            var workspace = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
+            SettingsModelLog.RefreshRequested(logger);
+            var workspaceResult = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await StatusMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not refresh provider readiness."), cancellationToken);
+                return;
+            }
+
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
             await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
@@ -148,7 +154,7 @@ public partial record SettingsModel
         }
         catch (Exception exception)
         {
-            SettingsViewModelLog.Failure(logger, exception);
+            SettingsModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -164,10 +170,22 @@ public partial record SettingsModel
         try
         {
             var currentSelectedProvider = await SelectedProvider ?? EmptySelectedProvider;
-            var updated = await workspaceState.UpdateProviderAsync(
+            var updatedResult = await workspaceState.UpdateProviderAsync(
                 new UpdateProviderPreferenceCommand(currentSelectedProvider.Kind, !currentSelectedProvider.IsEnabled),
                 cancellationToken);
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!updatedResult.TryGetValue(out var updated))
+            {
+                await StatusMessage.SetAsync(updatedResult.ToOperatorMessage("Could not update provider state."), cancellationToken);
+                return;
+            }
+
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await StatusMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not reload workspace."), cancellationToken);
+                return;
+            }
+
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
             await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
@@ -177,7 +195,7 @@ public partial record SettingsModel
         }
         catch (Exception exception)
         {
-            SettingsViewModelLog.Failure(logger, exception);
+            SettingsModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -212,9 +230,15 @@ public partial record SettingsModel
 
         try
         {
-            var preferences = await workspaceState.UpdateComposerSendBehaviorAsync(
+            var preferencesResult = await workspaceState.UpdateComposerSendBehaviorAsync(
                 new UpdateComposerSendBehaviorCommand(behavior),
                 cancellationToken);
+            if (!preferencesResult.TryGetValue(out var preferences))
+            {
+                await StatusMessage.SetAsync(preferencesResult.ToOperatorMessage("Could not update message behavior."), cancellationToken);
+                return;
+            }
+
             await SynchronizeComposerSendBehaviorAsync(preferences, cancellationToken);
             await StatusMessage.SetAsync(ComposerBehaviorSavedMessage, cancellationToken);
             _workspaceRefresh.Raise();
@@ -222,7 +246,7 @@ public partial record SettingsModel
         }
         catch (Exception exception)
         {
-            SettingsViewModelLog.Failure(logger, exception);
+            SettingsModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
         }
     }
@@ -258,9 +282,15 @@ public partial record SettingsModel
     {
         try
         {
-            SettingsViewModelLog.LoadingProviders(logger);
-            var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
-            SettingsViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
+            SettingsModelLog.LoadingProviders(logger);
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await StatusMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load providers."), cancellationToken);
+                return ImmutableArray<ProviderStatusItem>.Empty;
+            }
+
+            SettingsModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: (await SelectedProvider) ?? EmptySelectedProvider);
             var selectedProvider = await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
             await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
@@ -268,7 +298,7 @@ public partial record SettingsModel
         }
         catch (Exception exception)
         {
-            SettingsViewModelLog.Failure(logger, exception);
+            SettingsModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
             return ImmutableArray<ProviderStatusItem>.Empty;
         }
@@ -314,7 +344,7 @@ public partial record SettingsModel
 
         if (!IsEmptySelectedProvider(selectedProvider))
         {
-            SettingsViewModelLog.ProviderSelected(logger, selectedProvider.Kind, selectedProvider.DisplayName);
+            SettingsModelLog.ProviderSelected(logger, selectedProvider.Kind, selectedProvider.DisplayName);
         }
 
         await SynchronizeSelectedProviderProjectionAsync(selectedProvider, cancellationToken);

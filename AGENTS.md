@@ -22,7 +22,6 @@ This file defines how AI agents work in this solution.
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
   - `DotPilot.Core`
-  - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
 - Shared solution artifacts:
@@ -150,23 +149,27 @@ For this app:
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
+- solution folders in `DotPilot.slnx` are allowed when they provide stable project categories such as `Libraries` and `Tests`; use them to keep the IDE readable, but keep project directory names, `.csproj` names, and namespaces honest to the real extracted subsystem
+- project extraction must stay structurally honest: once a subsystem becomes its own DLL, keep its files, namespaces, local `AGENTS.md`, and direct app references inside that subsystem instead of leaving half of it behind in `DotPilot.Core`
+- when a library already names the subsystem, do not add a duplicate same-name root folder inside it; expose its real slices directly from the project root instead of nesting them again under another copy of the subsystem name
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
+- `DotPilot.Core` is the default home for non-UI code, but once a feature becomes large enough to deserve an architectural boundary, extract it into its own DLL instead of bloating `DotPilot.Core`
+- do not create or reintroduce generic project, folder, namespace, or product language named `Runtime` unless the user explicitly asks for that exact boundary; the default non-UI home is `DotPilot.Core`, and vague runtime naming is considered architectural noise in this repo
+- every new large feature DLL must reference `DotPilot.Core` for shared abstractions and contracts, and the desktop app should reference that feature DLL explicitly instead of dragging the feature back into the UI project
 - when a feature slice grows beyond a few files, split it into responsibility-based subfolders that mirror the slice's real concerns such as chat, drafting, providers, persistence, settings, or tests; do not leave large flat file dumps that force unrelated code to coexist in one directory
 - do not hide multiple real features under one umbrella folder such as `AgentSessions` when the code actually belongs to distinct features like `Chat`, `AgentBuilder`, `Settings`, `Providers`, or `Workspace`; use explicit feature roots and keep logs, models, services, and tests under the feature that owns them
 - inside each feature root, keep structural subfolders explicit: models go under `Models`, configuration and defaults under `Configuration` or `Composition`, views under `Views`, view-models under `ViewModels`, diagnostics under `Diagnostics`, and service/runtime types under a responsibility-specific folder; do not leave those file kinds mixed together at the feature root
-- when a feature exposes commands, public interfaces, or Orleans grain contracts, put them in visible folders such as `Commands`, `Interfaces`, and `Grains`; do not bury them inside a generic `Contracts` folder where their role disappears from the tree
+- when a feature exposes commands, public interfaces, or specialized runtime contracts, put them in visible folders such as `Commands`, `Interfaces`, and other role-specific folders; do not bury them inside a generic `Contracts` folder where their role disappears from the tree
 - keep the Uno app project presentation-only; domain, host, orchestration, integrations, and persistence code must live outside the UI project in class-library code so UI composition does not mix with feature implementation
-- UI-facing shell and application-configuration types belong in `DotPilot`, while `DotPilot.Core` is the single non-UI project for contracts, providers, persistence, orchestration, and local host behavior
-- for this desktop self-host app, embedded Orleans host code, grain implementations, and grain interfaces belong under `DotPilot.Core/LocalAgentHost`; do not split them into a separate host project or leave the grain contracts behind in `DotPilot.Core`
+- UI-facing shell and application-configuration types belong in `DotPilot`; `DotPilot.Core` stays the shared non-UI contract/application layer, while any future large subsystem should move into its own DLL only when it earns a clear architectural boundary
 - when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out
 - epic implementation PRs must include automated tests for every direct child issue they claim to cover, plus the broader runtime and UI regressions required by the touched flows
 - do not claim an epic is implemented unless every direct child issue in the requested scope is both realized in code and covered by automated tests; partial coverage is not an acceptable close-out
 - structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
-- the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; do not introduce remote clustering or external durable stores until a later backlog item explicitly requires them, and keep durable resume/replay outside Orleans storage until the cluster topology is intentionally upgraded
 - GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
 - never claim an epic is complete until its current GitHub scope is verified against the live issue graph; check which issues are real children versus issues that merely depend on the epic or belong to a different parent epic
 - Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
-- Prefer a thin desktop presentation layer over UI-owned orchestration: long-running work, background coordination, and durable session state should live in Orleans/runtime boundaries, while the Uno UI mainly renders state and forwards operator commands
+- Prefer a thin desktop presentation layer over UI-owned orchestration: long-running work, background coordination, and durable session state should live in `DotPilot.Core` services and persistence boundaries, while the Uno UI mainly renders state and forwards operator commands
 - Uno controls and page code-behind must not cast `DataContext` to concrete view-model/model types or invoke orchestration methods directly; route framework events through bindable commands, attached behaviors, dependency properties, or other presentation-safe seams so the view stays decoupled from runtime logic
 - Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
 - The primary product IA is a desktop chat client for local agents: session list, active session transcript, terminal-like streaming activity, agent management, and provider settings must be the default mental model instead of workbench, issue-tracking, domain-browser, or toolchain-center concepts
@@ -177,13 +180,11 @@ For this app:
 - Provider integrations should stay SDK-first: when Codex, Claude Code, GitHub Copilot, or debug/test providers already expose an `IChatClient`-style abstraction, build agent orchestration on top of that instead of inventing parallel request/result wrappers without a clear gap
 - Do not leave Uno binding on reflection fallback: when the shell binds to view models or option models, annotate or shape those types so the generated metadata provider can resolve them without runtime reflection warnings or performance loss
 - Persist app models and durable session state through `SQLite` plus `EF Core` when the data must survive restarts; do not keep the core chat/session experience trapped in seed data or transient in-memory catalogs
-- Model agents and sessions as Orleans grains, with each session acting as the workflow container that coordinates participant agents and streams messages, tool activity, and status updates into the UI
 - When agent conversations must survive restarts, persist the full `AgentSession` plus chat history through an Agent Framework history/storage provider backed by a local desktop folder; do not reduce durable conversation state to transcript text rows only
-- When Orleans grain state for agents or sessions must survive restarts on the local desktop host, use a local folder-backed Orleans storage provider instead of leaving those grains on in-memory persistence
 - Local desktop navigation must not reprobe provider CLIs, model catalogs, or other expensive environment state on every screen switch; keep an internal cached loop for installed toolchain/model state and refresh it explicitly or in the background
 - Runtime and orchestration flows must emit structured `ILogger` logs for provider readiness, agent creation, session creation, send execution, and failure paths; ad hoc console-only startup traces are not enough to debug the product
 - When the runtime uses `Microsoft Agent Framework`, prefer agent or run-scope middleware for detailed lifecycle logging and correlation instead of scattering ad hoc logging around UI callbacks or provider shims
-- UI-facing view models must stay projection-only: do not keep orchestration, provider probing, session loading pipelines, or other runtime coordination in the Uno presentation layer when the same work can live in runtime or Orleans services
+- UI-facing view models must stay projection-only: do not keep orchestration, provider probing, session loading pipelines, or other runtime coordination in the Uno presentation layer when the same work can live in `DotPilot.Core` services
 - Desktop navigation and tab/menu switching must stay memory-fast: screen changes should reuse cached in-memory state and background refresh loops instead of starting fresh filesystem, process, or provider work from the UI thread
 - Agent-management UX must be proven end-to-end: prompt-first creation, default-agent availability, provider enable/disable or readiness changes, and starting a chat with an agent all require real `DotPilot.UITests` coverage instead of unit-only verification
 - The desktop app is one shell, not three unrelated page layouts: keep one stable left navigation rail/app chrome across chat, agents, and providers, and switch the main content state instead of rebuilding different sidebars per screen
@@ -339,6 +340,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Every class, object, module, and service MUST have a clear single responsibility and explicit boundaries.
 - SOLID is mandatory.
 - SRP and strong cohesion are mandatory for files, types, and functions.
+- project structure must also follow SOLID and cohesion rules: keep related code together, keep unrelated responsibilities apart, and introduce a project boundary when a feature has become too large or too independent to stay clean inside `DotPilot.Core`
 - Prefer composition over inheritance unless inheritance is explicitly justified.
 - Large files, types, functions, and deep nesting are design smells. Split them or document a justified exception under `exception_policy`.
 - Hardcoded values are forbidden.

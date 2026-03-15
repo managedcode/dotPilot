@@ -14,7 +14,6 @@ Stack: `.NET 10`, `NUnit`, `FluentAssertions`, `coverlet.collector`
 - `AgentBuilder/*`
 - `Chat/*`
 - `ChatSessions/*`
-- `LocalAgentHost/*`
 - `Providers/*`
 - `Settings/*`
 - `Workspace/*`

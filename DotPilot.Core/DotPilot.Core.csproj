@@ -12,18 +12,12 @@
         <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AI" />
         <PackageReference Include="ManagedCode.CodexSharpSDK" />
         <PackageReference Include="ManagedCode.Communication" />
-        <PackageReference Include="ManagedCode.Communication.Orleans" />
-        <PackageReference Include="ManagedCode.Storage.FileSystem" />
-        <PackageReference Include="ManagedCode.Storage.Orleans" />
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
         <PackageReference Include="Microsoft.Extensions.AI" />
-        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
-        <PackageReference Include="Microsoft.Orleans.Reminders" />
-        <PackageReference Include="Microsoft.Orleans.Server" />
     </ItemGroup>
 
 </Project>

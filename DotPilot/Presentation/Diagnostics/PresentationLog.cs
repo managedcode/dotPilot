@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Presentation;
 
-internal static partial class MainViewModelLog
+internal static partial class ChatModelLog
 {
     [LoggerMessage(EventId = 2000, Level = LogLevel.Information, Message = "Loading chat workspace snapshot.")]
     public static partial void LoadingWorkspace(ILogger logger);
@@ -47,7 +47,7 @@ internal static partial class MainViewModelLog
     public static partial void Failure(ILogger logger, Exception exception);
 }
 
-internal static partial class SecondViewModelLog
+internal static partial class AgentBuilderModelLog
 {
     [LoggerMessage(EventId = 2100, Level = LogLevel.Information, Message = "Loading provider list for agent creation.")]
     public static partial void LoadingProviders(ILogger logger);
@@ -98,7 +98,7 @@ internal static partial class SecondViewModelLog
     public static partial void Failure(ILogger logger, Exception exception);
 }
 
-internal static partial class SettingsViewModelLog
+internal static partial class SettingsModelLog
 {
     [LoggerMessage(EventId = 2200, Level = LogLevel.Information, Message = "Loading provider readiness settings.")]
     public static partial void LoadingProviders(ILogger logger);

@@ -4,11 +4,11 @@ public sealed partial class Shell : Page, IContentControlProvider
 {
     private const string SidebarButtonStyleKey = "SidebarButtonStyle";
     private const string SidebarButtonSelectedStyleKey = "SidebarButtonSelectedStyle";
-    private const string MainRoute = "Main";
-    private const string SecondRoute = "Second";
+    private const string ChatRoute = "Chat";
+    private const string AgentsRoute = "Agents";
     private const string SettingsRoute = "Settings";
     private const string UnknownContentTypeName = "<null>";
-    private string _currentRoute = MainRoute;
+    private string _currentRoute = ChatRoute;
 
     public Shell()
     {
@@ -17,7 +17,7 @@ public sealed partial class Shell : Page, IContentControlProvider
             BrowserConsoleDiagnostics.Info("[DotPilot.Startup] Shell constructor started.");
             InitializeComponent();
             RegisterContentHostObserver();
-            UpdateNavigationSelection(MainRoute);
+            UpdateNavigationSelection(ChatRoute);
             UpdateNavigationSelectionFromContent();
             BrowserConsoleDiagnostics.Info("[DotPilot.Startup] Shell constructor completed.");
         }
@@ -32,12 +32,12 @@ public sealed partial class Shell : Page, IContentControlProvider
 
     private void OnChatNavButtonClick(object sender, RoutedEventArgs e)
     {
-        _ = NavigateToRouteAsync(MainRoute);
+        _ = NavigateToRouteAsync(ChatRoute);
     }
 
     private void OnAgentsNavButtonClick(object sender, RoutedEventArgs e)
     {
-        _ = NavigateToRouteAsync(SecondRoute);
+        _ = NavigateToRouteAsync(AgentsRoute);
     }
 
     private void OnProvidersNavButtonClick(object sender, RoutedEventArgs e)
@@ -73,8 +73,8 @@ public sealed partial class Shell : Page, IContentControlProvider
     {
         var route = ContentHost.Content switch
         {
-            MainPage => MainRoute,
-            SecondPage => SecondRoute,
+            ChatPage => ChatRoute,
+            AgentBuilderPage => AgentsRoute,
             SettingsPage => SettingsRoute,
             _ => string.Empty,
         };
@@ -95,10 +95,10 @@ public sealed partial class Shell : Page, IContentControlProvider
         var selectedStyle = ResolveStyle(SidebarButtonSelectedStyleKey);
         var normalStyle = ResolveStyle(SidebarButtonStyleKey);
 
-        ChatNavButton.Style = string.Equals(_currentRoute, MainRoute, StringComparison.Ordinal)
+        ChatNavButton.Style = string.Equals(_currentRoute, ChatRoute, StringComparison.Ordinal)
             ? selectedStyle
             : normalStyle;
-        AgentsNavButton.Style = string.Equals(_currentRoute, SecondRoute, StringComparison.Ordinal)
+        AgentsNavButton.Style = string.Equals(_currentRoute, AgentsRoute, StringComparison.Ordinal)
             ? selectedStyle
             : normalStyle;
         ProvidersNavButton.Style = string.Equals(_currentRoute, SettingsRoute, StringComparison.Ordinal)

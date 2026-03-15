@@ -6,13 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Chat;
 
-public sealed class MainModelTests
+public sealed class ChatModelTests
 {
     [Test]
     public async Task StartNewSessionUsesSeededDefaultSystemAgentWhenNoCustomAgentExists()
     {
         await using var fixture = await CreateFixtureAsync();
-        var model = ActivatorUtilities.CreateInstance<MainModel>(fixture.Provider);
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
 
         await model.StartNewSession(CancellationToken.None);
 
@@ -26,7 +26,7 @@ public sealed class MainModelTests
     public async Task SendMessageStreamsDebugTranscriptForAnActiveSession()
     {
         await using var fixture = await CreateFixtureAsync();
-        await fixture.WorkspaceState.CreateAgentAsync(
+        (await fixture.WorkspaceState.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Debug Agent",
                 AgentRoleKind.Operator,
@@ -34,8 +34,8 @@ public sealed class MainModelTests
                 "debug-echo",
                 "Be deterministic for automated verification.",
                 ["Shell"]),
-            CancellationToken.None);
-        var model = ActivatorUtilities.CreateInstance<MainModel>(fixture.Provider);
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
 
         await model.StartNewSession(CancellationToken.None);
         await model.ComposerText.SetAsync("hello from model", CancellationToken.None);
@@ -55,7 +55,7 @@ public sealed class MainModelTests
     public async Task StartNewSessionUsesNewestCustomAgentWhenCustomNameSortsAfterSystemAgent()
     {
         await using var fixture = await CreateFixtureAsync();
-        await fixture.WorkspaceState.CreateAgentAsync(
+        (await fixture.WorkspaceState.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Repository Reviewer Agent",
                 AgentRoleKind.Reviewer,
@@ -63,8 +63,8 @@ public sealed class MainModelTests
                 "debug-echo",
                 "Review repository changes and explain the diff.",
                 ["Git", "Files"]),
-            CancellationToken.None);
-        var model = ActivatorUtilities.CreateInstance<MainModel>(fixture.Provider);
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
 
         await model.StartNewSession(CancellationToken.None);
 

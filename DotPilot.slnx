@@ -16,6 +16,9 @@
     <File Path="Directory.Packages.props" />
     <File Path="global.json" />
   </Folder>
+  <Project Path="DotPilot/DotPilot.csproj">
+    <Deploy />
+  </Project>
   <Folder Name="/Libraries/">
     <Project Path="DotPilot.Core/DotPilot.Core.csproj" />
   </Folder>
@@ -23,7 +26,4 @@
     <Project Path="DotPilot.Tests/DotPilot.Tests.csproj" />
     <Project Path="DotPilot.UITests/DotPilot.UITests.csproj" />
   </Folder>
-  <Project Path="DotPilot/DotPilot.csproj">
-    <Deploy />
-  </Project>
 </Solution>

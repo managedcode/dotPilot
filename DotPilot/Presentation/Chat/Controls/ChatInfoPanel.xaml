@@ -123,7 +123,7 @@
 
           <Button AutomationProperties.AutomationId="ChatInfoAgentsButton"
                   Style="{StaticResource SecondaryActionButtonStyle}"
-                  uen:Navigation.Request="Second">
+                  uen:Navigation.Request="Agents">
             <TextBlock FontSize="12.5"
                        FontWeight="SemiBold"
                        Text="Agents" />

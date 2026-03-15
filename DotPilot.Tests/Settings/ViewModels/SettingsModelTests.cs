@@ -25,7 +25,7 @@ public sealed class SettingsModelTests
         (await model.SelectedProvider).Should().NotBeNull();
         (await model.SelectedProvider)!.IsEnabled.Should().BeFalse();
 
-        var workspace = await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
             !provider.IsEnabled &&
@@ -63,7 +63,7 @@ public sealed class SettingsModelTests
         (await model.IsEnterInsertsNewLineSelected).Should().BeTrue();
         (await model.ComposerSendBehaviorHint).Should().Be("Enter adds a new line. Enter with a modifier sends.");
 
-        var workspace = await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None);
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Preferences.ComposerSendBehavior.Should().Be(ComposerSendBehavior.EnterInsertsNewLine);
     }
 

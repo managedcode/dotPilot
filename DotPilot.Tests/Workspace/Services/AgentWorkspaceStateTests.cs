@@ -16,7 +16,7 @@ public sealed class AgentWorkspaceStateTests
 
         await Task.WhenAll(
             Enumerable.Range(0, 4)
-                .Select(_ => fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None).AsTask()));
+                .Select(async _ => (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed()));
 
         commandScope.ReadInvocationCount("codex").Should().Be(1);
     }

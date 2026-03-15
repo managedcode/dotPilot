@@ -27,9 +27,9 @@ public sealed class AgentSessionPersistenceTests
             await using (var firstFixture = CreateFixture(storageOptions))
             {
                 var agent = await EnableDebugAndCreateAgentAsync(firstFixture.Service, "Persistent Agent");
-                var session = await firstFixture.Service.CreateSessionAsync(
+                var session = (await firstFixture.Service.CreateSessionAsync(
                     new CreateSessionCommand("Persistent session", agent.Id),
-                    CancellationToken.None);
+                    CancellationToken.None)).ShouldSucceed();
                 sessionId = session.Session.Id;
 
                 await DrainAsync(
@@ -58,9 +58,8 @@ public sealed class AgentSessionPersistenceTests
 
             await using (var secondFixture = CreateFixture(storageOptions))
             {
-                var reloaded = await secondFixture.Service.GetSessionAsync(sessionId, CancellationToken.None);
-                reloaded.Should().NotBeNull();
-                reloaded!.Entries.Should().Contain(entry =>
+                var reloaded = (await secondFixture.Service.GetSessionAsync(sessionId, CancellationToken.None)).ShouldSucceed();
+                reloaded.Entries.Should().Contain(entry =>
                     entry.Kind == SessionStreamEntryKind.AssistantMessage &&
                     entry.Text.Contains("Debug provider received: first persisted prompt", StringComparison.Ordinal));
 
@@ -108,10 +107,11 @@ public sealed class AgentSessionPersistenceTests
         return new TestFixture(provider, service);
     }
 
-    private static async Task DrainAsync(IAsyncEnumerable<SessionStreamEntry> stream)
+    private static async Task DrainAsync(IAsyncEnumerable<ManagedCode.Communication.Result<SessionStreamEntry>> stream)
     {
-        await foreach (var _ in stream)
+        await foreach (var result in stream)
         {
+            result.ShouldSucceed();
         }
     }
 
@@ -130,11 +130,11 @@ public sealed class AgentSessionPersistenceTests
         IAgentSessionService service,
         string name)
     {
-        await service.UpdateProviderAsync(
+        (await service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
 
-        return await service.CreateAgentAsync(
+        return (await service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 name,
                 AgentRoleKind.Operator,
@@ -142,7 +142,7 @@ public sealed class AgentSessionPersistenceTests
                 "debug-echo",
                 "Be deterministic for automated verification.",
                 ["Shell"]),
-            CancellationToken.None);
+            CancellationToken.None)).ShouldSucceed();
     }
 
     private static string CreateRootPath()

@@ -10,10 +10,10 @@ internal static class PresentationServiceCollectionExtensions
 
         services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddSingleton<ShellViewModel>();
-        services.AddSingleton<MainModel>();
-        services.AddSingleton<MainViewModel>();
-        services.AddSingleton<SecondModel>();
-        services.AddSingleton<SecondViewModel>();
+        services.AddSingleton<ChatModel>();
+        services.AddSingleton<ChatViewModel>();
+        services.AddSingleton<AgentBuilderModel>();
+        services.AddSingleton<AgentBuilderViewModel>();
         services.AddSingleton<SettingsModel>();
         services.AddSingleton<SettingsViewModel>();
 

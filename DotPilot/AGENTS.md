@@ -18,8 +18,8 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - `App.xaml.cs`
 - `Platforms/Desktop/Program.cs`
 - `Presentation/Shell/Views/Shell.xaml`
-- `Presentation/Chat/Views/MainPage.xaml`
-- `Presentation/AgentBuilder/Views/SecondPage.xaml`
+- `Presentation/Chat/Views/ChatPage.xaml`
+- `Presentation/AgentBuilder/Views/AgentBuilderPage.xaml`
 - `Presentation/Settings/Views/SettingsPage.xaml`
 - `Styles/ColorPaletteOverride.xaml`
 
@@ -27,7 +27,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 
 - Keep this project focused on app composition, presentation, routing, and platform startup concerns.
 - Keep feature/domain/runtime code out of this project; reference it through slice-owned contracts and application services from separate DLLs.
-- Keep the Uno UI as a thin representation layer: background orchestration, long-running commands, and durable session updates should come from Orleans/runtime services instead of page-owned workflows.
+- Keep the Uno UI as a thin representation layer: background orchestration, long-running commands, and durable session updates should come from `DotPilot.Core` services instead of page-owned workflows.
 - Build the visible product around a desktop chat shell: session list, active transcript, terminal-like activity pane, agent/profile controls, and provider settings are the primary surfaces.
 - Keep agent creation prompt-first in the UI: the default `New agent` experience should start from a natural-language description that generates a draft agent, while manual field-by-field configuration stays a secondary fallback path.
 - Keep a visible default-agent path in the shell: the app should surface a usable system/default agent by default and must not make the operator build everything manually before they can start a session.
@@ -39,6 +39,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Keep one consistent desktop app chrome across all primary routes: the left rail, branding, and operator footer should stay structurally stable while the main content region changes.
 - Treat primary navigation as a state switch inside one desktop shell, not as a chance to rebuild page-specific chrome; `Chat`, `Agents`, and `Providers` should share the same shell rhythm and only replace the main working surface.
 - Keep shell geometry and control sizing stable across route changes; the left rail, nav rows, footer profile block, and main page header rhythm must not jump or reflow between `Chat`, `Agents`, and `Providers`.
+- Do not leave placeholder screen names in the presentation layer: page, model, and generated view-model names must describe the actual feature surface such as `ChatPage` or `AgentBuilderModel`, not scaffolding leftovers like `MainPage` or `SecondModel`.
 - Avoid duplicated side-panel content and oversized decorative copy; prefer compact navigation, clear current-task headers, and content-first layouts.
 - Avoid placeholder-looking XAML chrome such as ASCII pseudo-icons, duplicate provider lists, inflated pill buttons, or decorative labels that repeat the same state in multiple panes.
 - Do not let the desktop shell collapse into an unstructured visual mash: keep reusable styles, brushes, templates, and spacing rules in dedicated XAML resources or focused controls instead of burying ad hoc visual decisions inline across pages.

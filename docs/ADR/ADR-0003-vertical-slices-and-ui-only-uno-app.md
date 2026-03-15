@@ -29,9 +29,9 @@ We will use these architectural defaults for implementation work going forward:
    - desktop startup
    - app composition
 2. Non-UI feature work moves into separate class libraries:
-   - `DotPilot.Core` for contracts, typed identifiers, public slice interfaces, provider integration, persistence, and embedded desktop local-host infrastructure
-3. Feature code must be organized as vertical slices under top-level feature folders such as `ChatSessions/`, `Providers/`, or `LocalAgentHost/`, not under an extra `Features/` wrapper and not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
-4. The active core slices are `ChatSessions`, `AgentBuilder`, `Providers`, and `LocalAgentHost`, built around provider readiness, durable agent profiles, durable sessions, transcript streaming, local persistence, and embedded self-host infrastructure. `LocalAgentHost` stays desktop-only and uses localhost clustering plus folder-backed grain storage with in-memory reminders before any remote or durable topology is introduced.
+   - `DotPilot.Core` for contracts, typed identifiers, public slice interfaces, provider integration, persistence, and local desktop session runtime infrastructure
+3. Feature code must be organized as vertical slices under top-level feature folders such as `ChatSessions/`, `Providers/`, or `AgentBuilder/`, not under an extra `Features/` wrapper and not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
+4. The active core slices are `ChatSessions`, `AgentBuilder`, and `Providers`, built around provider readiness, durable agent profiles, durable sessions, transcript streaming, and local persistence.
 5. CI-safe agent-flow verification must use a deterministic in-repo runtime client as a first-class implementation of the same public contracts, not a mock or hand-wired test double.
 6. Tests that require real `Codex`, `Claude Code`, or `GitHub Copilot` toolchains may run only when the corresponding toolchain is available; their absence must not weaken the provider-independent baseline.
 
@@ -79,7 +79,7 @@ CI does not guarantee those toolchains, so the repo would lose an honest agent-f
 - Future slices can land without merging unrelated feature logic into shared buckets.
 - Contracts from the shared domain and `AgentSessions` slice become reusable across UI, runtime, and tests before broader live-provider integration expands.
 - CI keeps a real provider-independent verification path through the deterministic runtime client.
-- The embedded Orleans host can evolve inside `DotPilot.Core` without leaking server-only dependencies into the presentation project.
+- The local desktop session runtime can evolve inside `DotPilot.Core` without leaking UI concerns into the presentation project.
 
 ### Negative
 

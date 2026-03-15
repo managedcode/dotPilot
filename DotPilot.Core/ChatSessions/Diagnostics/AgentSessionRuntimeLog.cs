@@ -123,6 +123,12 @@ internal static partial class AgentSessionServiceLog
     public static partial void WorkspaceLoaded(ILogger logger, int sessionCount, int agentCount, int providerCount);
 
     [LoggerMessage(
+        EventId = 1220,
+        Level = LogLevel.Error,
+        Message = "Workspace snapshot load failed.")]
+    public static partial void WorkspaceLoadFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
         EventId = 1203,
         Level = LogLevel.Information,
         Message = "Loaded session transcript. SessionId={SessionId} EntryCount={EntryCount} ParticipantCount={ParticipantCount}.")]
@@ -133,6 +139,12 @@ internal static partial class AgentSessionServiceLog
         Level = LogLevel.Information,
         Message = "Session transcript was requested but not found. SessionId={SessionId}.")]
     public static partial void SessionNotFound(ILogger logger, SessionId sessionId);
+
+    [LoggerMessage(
+        EventId = 1221,
+        Level = LogLevel.Error,
+        Message = "Session transcript load failed. SessionId={SessionId}.")]
+    public static partial void SessionLoadFailed(ILogger logger, Exception exception, SessionId sessionId);
 
     [LoggerMessage(
         EventId = 1205,
@@ -181,6 +193,16 @@ internal static partial class AgentSessionServiceLog
         AgentProfileId agentId);
 
     [LoggerMessage(
+        EventId = 1222,
+        Level = LogLevel.Error,
+        Message = "Session creation failed. Title={SessionTitle} AgentId={AgentId}.")]
+    public static partial void SessionCreationFailed(
+        ILogger logger,
+        Exception exception,
+        string sessionTitle,
+        AgentProfileId agentId);
+
+    [LoggerMessage(
         EventId = 1210,
         Level = LogLevel.Information,
         Message = "Updated provider preference. Provider={ProviderKind} IsEnabled={IsEnabled}.")]
@@ -205,6 +227,15 @@ internal static partial class AgentSessionServiceLog
         Message = "Updated composer send behavior preference. Behavior={Behavior}.")]
     public static partial void ComposerSendBehaviorUpdated(
         ILogger logger,
+        ComposerSendBehavior behavior);
+
+    [LoggerMessage(
+        EventId = 1223,
+        Level = LogLevel.Error,
+        Message = "Composer send behavior update failed. Behavior={Behavior}.")]
+    public static partial void ComposerSendBehaviorUpdateFailed(
+        ILogger logger,
+        Exception exception,
         ComposerSendBehavior behavior);
 
     [LoggerMessage(

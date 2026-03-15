@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using DotPilot.Core.LocalAgentHost;
 using DotPilot.Core.ChatSessions;
 
 namespace DotPilot;
@@ -55,9 +54,6 @@ public partial class App : Application
 #if DEBUG
                     // Switch to Development environment when running in DEBUG
                     .UseEnvironment(Environments.Development)
-#endif
-#if !__WASM__
-                    .UseDotPilotLocalAgentHost()
 #endif
                     .UseLogging(configure: (context, logBuilder) =>
                     {
@@ -310,8 +306,8 @@ public partial class App : Application
     {
         views.Register(
             new ViewMap(ViewModel: typeof(ShellViewModel)),
-            new ViewMap<MainPage, MainViewModel>(),
-            new ViewMap<SecondPage, SecondViewModel>(),
+            new ViewMap<ChatPage, ChatViewModel>(),
+            new ViewMap<AgentBuilderPage, AgentBuilderViewModel>(),
             new ViewMap<SettingsPage, SettingsViewModel>()
         );
 
@@ -319,8 +315,8 @@ public partial class App : Application
             new RouteMap("", View: views.FindByViewModel<ShellViewModel>(),
                 Nested:
                 [
-                    new ("Main", View: views.FindByViewModel<MainViewModel>(), IsDefault:true),
-                    new ("Second", View: views.FindByViewModel<SecondViewModel>()),
+                    new ("Chat", View: views.FindByViewModel<ChatViewModel>(), IsDefault:true),
+                    new ("Agents", View: views.FindByViewModel<AgentBuilderViewModel>()),
                     new ("Settings", View: views.FindByViewModel<SettingsViewModel>()),
                 ]
             )

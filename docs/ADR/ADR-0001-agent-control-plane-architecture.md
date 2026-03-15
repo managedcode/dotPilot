@@ -26,26 +26,23 @@ The main architectural choice is how to shape the long-term product platform wit
 We will treat `dotPilot` as a **local-first desktop agent control plane** with these architectural defaults:
 
 1. The desktop app remains the primary operator surface and is shaped as a session-first chat client with session list, active transcript, streaming activity, provider settings, and agent-builder concepts.
-2. The v1 runtime is built around an **embedded Orleans silo** hosted inside the desktop app.
-3. Each operator session is modeled as a durable **session grain**, and each durable agent profile is modeled as an **agent-profile grain**.
-4. **Microsoft Agent Framework** is the preferred orchestration layer for agent sessions, workflows, HITL, MCP-aware tool use, and OpenTelemetry-friendly observability.
-5. Provider integrations are **SDK-first**:
+2. The v1 runtime is local-first inside the desktop app, using `SQLite` projections plus local `AgentSession` and chat-history persistence instead of a separate embedded host subsystem.
+3. **Microsoft Agent Framework** is the preferred orchestration layer for agent sessions, workflows, HITL, MCP-aware tool use, and OpenTelemetry-friendly observability.
+4. Provider integrations are **SDK-first**:
    - `ManagedCode.CodexSharpSDK`
    - `ManagedCode.ClaudeCodeSharpSDK`
    - `GitHub.Copilot.SDK`
-6. Tool federation is centered on `ManagedCode.MCPGateway`, and repository intelligence is centered on `ManagedCode.RagSharp`.
-7. Quality, safety, and agent evaluation should use the official `Microsoft.Extensions.AI.Evaluation*` libraries.
-8. Observability should be **OpenTelemetry-first**, aligned with Agent Framework patterns, with local visualization first and optional Azure Monitor / Foundry export later.
-9. Local model support is planned through `LLamaSharp` and `ONNX Runtime`. `MLXSharp` is explicitly excluded from the first roadmap wave.
+5. Tool federation is centered on `ManagedCode.MCPGateway`, and repository intelligence is centered on `ManagedCode.RagSharp`.
+6. Quality, safety, and agent evaluation should use the official `Microsoft.Extensions.AI.Evaluation*` libraries.
+7. Observability should be **OpenTelemetry-first**, aligned with Agent Framework patterns, with local visualization first and optional Azure Monitor / Foundry export later.
+8. Local model support is planned through `LLamaSharp` and `ONNX Runtime`. `MLXSharp` is explicitly excluded from the first roadmap wave.
 
 ## Decision Diagram
 
 ```mermaid
 flowchart LR
   Client["dotPilot desktop chat client"]
-  Silo["Embedded Orleans silo"]
-  Session["Session grains"]
-  AgentProfiles["Agent-profile grains"]
+  Runtime["Local session runtime"]
   MAF["Microsoft Agent Framework"]
   Providers["Provider adapters"]
   Tools["MCPGateway + built-in tools + RagSharp"]
@@ -53,10 +50,8 @@ flowchart LR
   Eval["Microsoft.Extensions.AI.Evaluation*"]
   OTel["OpenTelemetry-first observability"]
 
-  Client --> Silo
-  Silo --> Session
-  Silo --> AgentProfiles
-  Session --> MAF
+  Client --> Runtime
+  Runtime --> MAF
   MAF --> Providers
   MAF --> Tools
   MAF --> Local
@@ -88,7 +83,7 @@ This would duplicate maintenance effort, weaken typed contracts, and ignore mana
 
 Rejected for the first roadmap wave.
 
-The approved default is local-first with an embedded host. Remote fleet expansion can be planned later on top of the same contracts.
+The approved default is local-first inside the desktop app. Remote fleet expansion can be planned later on top of the same contracts.
 
 ### 5. Include MLXSharp in the first runtime wave
 
@@ -109,7 +104,7 @@ The dependency is not ready for the first roadmap wave and would distract from t
 ### Negative
 
 - The target architecture is larger than the current codebase and will require a substantial implementation backlog.
-- An embedded Orleans host raises startup, lifecycle, and local state-management complexity.
+- A local-first session runtime still raises startup, lifecycle, and local state-management complexity.
 - Provider CLIs and SDKs each bring distinct operational prerequisites that the UI must surface clearly.
 - Evaluation and observability requirements add product scope before user-visible automation features are complete.
 
