@@ -202,7 +202,6 @@ internal sealed class AgentSessionService(
                 return Result<SessionTranscriptSnapshot>.FailNotFound($"Agent '{command.AgentProfileId}' was not found.");
             }
 
-            var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
             var now = timeProvider.GetUtcNow();
             var sessionId = SessionId.New();
             var session = new SessionRecord
@@ -217,10 +216,6 @@ internal sealed class AgentSessionService(
             dbContext.Sessions.Add(session);
             dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
             await dbContext.SaveChangesAsync(cancellationToken);
-            if (providerProfile.SupportsLiveExecution)
-            {
-                await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
-            }
 
             AgentSessionServiceLog.SessionCreated(logger, sessionId, session.Title, command.AgentProfileId);
 

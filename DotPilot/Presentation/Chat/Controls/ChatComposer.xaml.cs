@@ -6,7 +6,7 @@ namespace DotPilot.Presentation.Controls;
 public sealed partial class ChatComposer : UserControl
 {
     private const string NewLineValue = "\n";
-    private readonly ChatComposerModifierState modifierState = new();
+    private readonly ChatComposerModifierState _modifierState = new();
     public static readonly DependencyProperty SendBehaviorProperty =
         DependencyProperty.Register(
             nameof(SendBehavior),
@@ -32,11 +32,11 @@ public sealed partial class ChatComposer : UserControl
             return;
         }
 
-        modifierState.RegisterKeyDown(e.Key);
+        _modifierState.RegisterKeyDown(e.Key);
         var action = ChatComposerKeyboardPolicy.Resolve(
             behavior: SendBehavior,
             isEnterKey: e.Key is VirtualKey.Enter,
-            hasModifier: modifierState.HasPressedModifier);
+            hasModifier: _modifierState.HasPressedModifier);
         if (action is ChatComposerKeyboardAction.SendMessage)
         {
             ExecuteSubmitAction(textBox);
@@ -55,12 +55,12 @@ public sealed partial class ChatComposer : UserControl
 
     private void OnComposerInputKeyUp(object sender, KeyRoutedEventArgs e)
     {
-        modifierState.RegisterKeyUp(e.Key);
+        _modifierState.RegisterKeyUp(e.Key);
     }
 
     private void OnComposerInputLostFocus(object sender, RoutedEventArgs e)
     {
-        modifierState.Reset();
+        _modifierState.Reset();
     }
 
     private void OnSendButtonClick(object sender, RoutedEventArgs e)

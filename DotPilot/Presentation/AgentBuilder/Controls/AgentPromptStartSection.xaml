@@ -58,7 +58,8 @@
 
         <Button Grid.Column="1"
                 AutomationProperties.AutomationId="BuildManuallyButton"
-                Command="{Binding BuildManuallyCommand}"
+                Click="OnBuildManuallyButtonClick"
+                Tag="{Binding BuildManuallyCommand}"
                 Style="{StaticResource SecondaryActionButtonStyle}">
           <TextBlock Text="Build manually" />
         </Button>

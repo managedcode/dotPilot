@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.AgentBuilder;
 
+[NonParallelizable]
 public sealed class AgentPromptDraftGeneratorTests
 {
     [Test]

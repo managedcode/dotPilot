@@ -19,7 +19,20 @@ public sealed partial record AgentProviderOption(
     string SuggestedModelName,
     IReadOnlyList<string> SupportedModelNames,
     string? InstalledVersion,
-    bool CanCreateAgents);
+    bool CanCreateAgents)
+{
+    public string SelectionAutomationId => AgentBuilderAutomationIds.ForProvider(Kind);
+}
+
+[Bindable]
+public sealed partial record AgentModelOption(
+    string DisplayName,
+    string SelectionAutomationId);
+
+[Bindable]
+public sealed partial record AgentCatalogStartChatRequest(
+    AgentProfileId AgentId,
+    string AgentName);
 
 [Bindable]
 public sealed partial record AgentCatalogItem(
@@ -29,7 +42,10 @@ public sealed partial record AgentCatalogItem(
     string Description,
     string ProviderDisplayName,
     string ModelName,
-    bool IsDefault);
+    bool IsDefault,
+    string StartChatAutomationId,
+    AgentCatalogStartChatRequest StartChatRequest,
+    ICommand? StartChatCommand);
 
 [Bindable]
 public sealed partial record AgentBuilderSurface(
@@ -44,4 +60,23 @@ public sealed partial record AgentBuilderSurface(
     public bool ShowPromptComposer => Kind == AgentBuilderSurfaceKind.PromptComposer;
 
     public bool ShowEditor => Kind == AgentBuilderSurfaceKind.Editor;
+}
+
+internal static class AgentBuilderAutomationIds
+{
+    public static string ForProvider(AgentProviderKind kind)
+    {
+        return "AgentProviderOption_" + CreateAutomationIdSuffix(kind.ToString());
+    }
+
+    public static string ForModel(string modelName)
+    {
+        return "AgentModelOption_" + CreateAutomationIdSuffix(modelName);
+    }
+
+    private static string CreateAutomationIdSuffix(string value)
+    {
+        var characters = value.Where(char.IsLetterOrDigit).ToArray();
+        return characters.Length == 0 ? "Unknown" : new string(characters);
+    }
 }

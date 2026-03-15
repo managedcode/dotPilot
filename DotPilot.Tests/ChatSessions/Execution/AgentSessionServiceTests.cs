@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.ChatSessions;
 
+[NonParallelizable]
 public sealed class AgentSessionServiceTests
 {
     private const int LegacyDefaultRole = 4;

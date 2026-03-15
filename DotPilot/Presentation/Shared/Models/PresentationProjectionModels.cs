@@ -23,4 +23,9 @@ public sealed partial record AgentBuilderView(
     bool HasSupportedModels,
     string ModelHelperText,
     string StatusMessage,
-    bool CanCreateAgent);
+    bool CanCreateAgent)
+{
+    public IReadOnlyList<AgentModelOption> SupportedModels =>
+        [.. SupportedModelNames.Select(modelName =>
+            new AgentModelOption(modelName, AgentBuilderAutomationIds.ForModel(modelName)))];
+}

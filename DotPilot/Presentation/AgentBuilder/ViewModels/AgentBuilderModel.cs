@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using DotPilot.Core.AgentBuilder;
+using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Data;
 
@@ -9,6 +10,8 @@ namespace DotPilot.Presentation;
 public partial record AgentBuilderModel(
     IAgentWorkspaceState workspaceState,
     AgentPromptDraftGenerator draftGenerator,
+    WorkspaceProjectionNotifier workspaceProjectionNotifier,
+    ShellNavigationNotifier shellNavigationNotifier,
     ILogger<AgentBuilderModel> logger)
 {
     private const string EmptyProviderDisplayName = "Select a provider";
@@ -35,7 +38,7 @@ public partial record AgentBuilderModel(
     private const string CreateActionLabel = "Create agent";
     private const string SaveActionLabel = "Save agent";
     private const string SessionTitlePrefix = "Session with ";
-    private const string StartedChatMessageFormat = "Started a session with {0}. Switch to Chat to continue.";
+    private const string StartedChatMessageFormat = "Started a session with {0}.";
     private static readonly System.Text.CompositeFormat SavedAgentCompositeFormat =
         System.Text.CompositeFormat.Parse(SavedAgentMessageFormat);
     private static readonly System.Text.CompositeFormat GeneratedDraftCompositeFormat =
@@ -59,6 +62,7 @@ public partial record AgentBuilderModel(
     private AsyncCommand? _saveAgentCommand;
     private AsyncCommand? _startChatForAgentCommand;
     private AsyncCommand? _providerSelectionChangedCommand;
+    private AsyncCommand? _selectModelCommand;
     private readonly Signal _workspaceRefresh = new();
 
     public IState<AgentBuilderSurface> Surface => State.Value(this, static () => CatalogSurface);
@@ -111,11 +115,15 @@ public partial record AgentBuilderModel(
 
     public ICommand StartChatForAgentCommand =>
         _startChatForAgentCommand ??= new AsyncCommand(
-            parameter => StartChatForAgent(parameter as AgentCatalogItem, CancellationToken.None));
+            parameter => StartChatForParameter(parameter, CancellationToken.None));
 
     public ICommand ProviderSelectionChangedCommand =>
         _providerSelectionChangedCommand ??= new AsyncCommand(
-            parameter => HandleSelectedProviderChanged(parameter as AgentProviderOption, CancellationToken.None));
+            parameter => HandleProviderSelectionChanged(parameter, CancellationToken.None));
+
+    public ICommand SelectModelCommand =>
+        _selectModelCommand ??= new AsyncCommand(
+            parameter => SelectModel(parameter, CancellationToken.None));
 
     public async ValueTask OpenCreateAgent(CancellationToken cancellationToken)
     {
@@ -182,6 +190,37 @@ public partial record AgentBuilderModel(
         {
             await ModelName.UpdateAsync(_ => nextSuggestedModel, cancellationToken);
         }
+    }
+
+    public async ValueTask HandleProviderSelectionChanged(
+        object? parameter,
+        CancellationToken cancellationToken)
+    {
+        var provider = parameter switch
+        {
+            AgentProviderOption option => option,
+            AgentProviderKind providerKind => FindProviderByKind(await Providers, providerKind),
+            _ => EmptySelectedProvider,
+        };
+
+        await HandleSelectedProviderChanged(provider, cancellationToken);
+    }
+
+    public async ValueTask SelectModel(object? parameter, CancellationToken cancellationToken)
+    {
+        var modelName = parameter switch
+        {
+            AgentModelOption option => option.DisplayName,
+            string value => value,
+            _ => string.Empty,
+        };
+
+        if (string.IsNullOrWhiteSpace(modelName))
+        {
+            return;
+        }
+
+        await ModelName.UpdateAsync(_ => modelName.Trim(), cancellationToken);
     }
 
     private async ValueTask SubmitAgentDraftCore(string? promptOverride, CancellationToken cancellationToken)
@@ -258,16 +297,18 @@ public partial record AgentBuilderModel(
                 return;
             }
 
+            var savedMessage = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                SavedAgentCompositeFormat,
+                created.Name,
+                created.ProviderDisplayName);
             _workspaceRefresh.Raise();
-            await OperationMessage.SetAsync(
-                string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    SavedAgentCompositeFormat,
-                    created.Name,
-                    created.ProviderDisplayName),
-                cancellationToken);
+            workspaceProjectionNotifier.Publish();
+            await OperationMessage.SetAsync(savedMessage, cancellationToken);
             await Surface.UpdateAsync(_ => CatalogSurface, cancellationToken);
             AgentBuilderModelLog.AgentCreated(logger, created.Id.Value, created.Name, created.ProviderKind, created.ModelName);
+            await StartSessionAndOpenChatAsync(created.Id, created.Name, successMessage: null, cancellationToken);
+            await OperationMessage.SetAsync(savedMessage, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -290,30 +331,50 @@ public partial record AgentBuilderModel(
 
         try
         {
+            var startedChatMessage = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                StartedChatCompositeFormat,
+                agent.Name);
             AgentBuilderModelLog.ChatSessionRequested(logger, agent.Id.Value, agent.Name);
-            var sessionResult = await workspaceState.CreateSessionAsync(
-                new CreateSessionCommand(SessionTitlePrefix + agent.Name, agent.Id),
+            await StartSessionAndOpenChatAsync(
+                agent.Id,
+                agent.Name,
+                startedChatMessage,
                 cancellationToken);
-            if (sessionResult.IsFailed)
-            {
-                await OperationMessage.SetAsync(sessionResult.ToOperatorMessage("Could not start a session."), cancellationToken);
-                return;
-            }
-
-            _workspaceRefresh.Raise();
-            await OperationMessage.SetAsync(
-                string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    StartedChatCompositeFormat,
-                    agent.Name),
-                cancellationToken);
-            await Surface.UpdateAsync(_ => CatalogSurface, cancellationToken);
+            await OperationMessage.SetAsync(startedChatMessage, cancellationToken);
         }
         catch (Exception exception)
         {
             AgentBuilderModelLog.Failure(logger, exception);
             await OperationMessage.SetAsync(exception.Message, cancellationToken);
         }
+    }
+
+    private ValueTask StartChatForParameter(object? parameter, CancellationToken cancellationToken)
+    {
+        return parameter switch
+        {
+            AgentCatalogItem item => StartChatForAgent(item, cancellationToken),
+            AgentCatalogStartChatRequest request => StartChatForRequest(request, cancellationToken),
+            _ => ValueTask.CompletedTask,
+        };
+    }
+
+    private async ValueTask StartChatForRequest(
+        AgentCatalogStartChatRequest request,
+        CancellationToken cancellationToken)
+    {
+        var startedChatMessage = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            StartedChatCompositeFormat,
+            request.AgentName);
+        AgentBuilderModelLog.ChatSessionRequested(logger, request.AgentId.Value, request.AgentName);
+        await StartSessionAndOpenChatAsync(
+            request.AgentId,
+            request.AgentName,
+            startedChatMessage,
+            cancellationToken);
+        await OperationMessage.SetAsync(startedChatMessage, cancellationToken);
     }
 
     private async ValueTask<IImmutableList<AgentCatalogItem>> LoadAgentsAsync(CancellationToken cancellationToken)
@@ -330,6 +391,10 @@ public partial record AgentBuilderModel(
             return workspace.Agents
                 .Select(MapAgent)
                 .ToImmutableArray();
+        }
+        catch (TaskCanceledException)
+        {
+            return ImmutableArray<AgentCatalogItem>.Empty;
         }
         catch (Exception exception)
         {
@@ -360,6 +425,10 @@ public partial record AgentBuilderModel(
 
             await EnsureSelectedProviderAsync(providers, cancellationToken);
             return providers;
+        }
+        catch (TaskCanceledException)
+        {
+            return ImmutableArray<AgentProviderOption>.Empty;
         }
         catch (Exception exception)
         {
@@ -443,6 +512,7 @@ public partial record AgentBuilderModel(
         var resolvedProvider = IsEmptySelectedProvider(selectedProvider)
             ? FindProviderByKind(providers, selectedProviderKind)
             : FindProviderByKind(providers, selectedProvider.Kind);
+
         if (IsEmptySelectedProvider(resolvedProvider))
         {
             resolvedProvider = FindFirstCreatableProvider(providers);
@@ -467,20 +537,20 @@ public partial record AgentBuilderModel(
             return selectedProvider;
         }
 
-        var providers = await Providers;
         var selectedProviderKind = await SelectedProviderKind;
-        var resolvedByKind = FindProviderByKind(providers, selectedProviderKind);
-        if (!IsEmptySelectedProvider(resolvedByKind))
-        {
-            await HandleSelectedProviderChanged(resolvedByKind, cancellationToken);
-            return resolvedByKind;
-        }
-
-        var resolvedProvider = FindFirstCreatableProvider(providers);
+        var providers = await Providers;
+        var resolvedProvider = FindProviderByKind(providers, selectedProviderKind);
         if (!IsEmptySelectedProvider(resolvedProvider))
         {
             await HandleSelectedProviderChanged(resolvedProvider, cancellationToken);
             return resolvedProvider;
+        }
+
+        var creatableProvider = FindFirstCreatableProvider(providers);
+        if (!IsEmptySelectedProvider(creatableProvider))
+        {
+            await HandleSelectedProviderChanged(creatableProvider, cancellationToken);
+            return creatableProvider;
         }
 
         if (providers.Count > 0)
@@ -490,6 +560,45 @@ public partial record AgentBuilderModel(
         }
 
         return EmptySelectedProvider;
+    }
+
+    private async ValueTask StartSessionAndOpenChatAsync(
+        AgentProfileId agentId,
+        string agentName,
+        string? successMessage,
+        CancellationToken cancellationToken)
+    {
+        var sessionResult = await workspaceState.CreateSessionAsync(
+            new CreateSessionCommand(SessionTitlePrefix + agentName, agentId),
+            cancellationToken);
+        if (sessionResult.IsFailed)
+        {
+            await OperationMessage.SetAsync(sessionResult.ToOperatorMessage("Could not start a session."), cancellationToken);
+            return;
+        }
+
+        _workspaceRefresh.Raise();
+        workspaceProjectionNotifier.Publish();
+        if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            await OperationMessage.SetAsync(successMessage, cancellationToken);
+        }
+
+        BrowserConsoleDiagnostics.Info(
+            $"[DotPilot.AgentBuilder] Session created. AgentId={agentId.Value} AgentName={agentName}. Requesting chat navigation.");
+        await TryReturnToCatalogSurfaceAsync(cancellationToken);
+        shellNavigationNotifier.Request(ShellRoute.Chat);
+    }
+
+    private async ValueTask TryReturnToCatalogSurfaceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Surface.UpdateAsync(_ => CatalogSurface, cancellationToken);
+        }
+        catch (TaskCanceledException)
+        {
+        }
     }
 
     private async ValueTask<string> ResolveEffectiveModelNameAsync(CancellationToken cancellationToken)
@@ -504,8 +613,9 @@ public partial record AgentBuilderModel(
         return ResolveSuggestedModelName(selectedProvider);
     }
 
-    private static AgentCatalogItem MapAgent(AgentProfileSummary agent)
+    private AgentCatalogItem MapAgent(AgentProfileSummary agent)
     {
+        var automationIdSuffix = CreateAutomationIdSuffix(agent.Name);
         return new AgentCatalogItem(
             agent.Id,
             agent.Name[..1],
@@ -513,7 +623,10 @@ public partial record AgentBuilderModel(
             AgentSessionDefaults.CreateAgentDescription(agent.SystemPrompt),
             agent.ProviderDisplayName,
             agent.ModelName,
-            AgentSessionDefaults.IsSystemAgent(agent.Name));
+            AgentSessionDefaults.IsSystemAgent(agent.Name),
+            "AgentCatalogStartChatButton_" + automationIdSuffix,
+            new AgentCatalogStartChatRequest(agent.Id, agent.Name),
+            StartChatForAgentCommand);
     }
 
     private static AgentProviderOption MapProviderOption(ProviderStatusDescriptor provider)
@@ -618,6 +731,12 @@ public partial record AgentBuilderModel(
     private static bool IsEmptySelectedProvider(AgentProviderOption? provider)
     {
         return provider is null || string.IsNullOrWhiteSpace(provider.DisplayName);
+    }
+
+    private static string CreateAutomationIdSuffix(string value)
+    {
+        var characters = value.Where(char.IsLetterOrDigit).ToArray();
+        return characters.Length == 0 ? "Unknown" : new string(characters);
     }
 
 }

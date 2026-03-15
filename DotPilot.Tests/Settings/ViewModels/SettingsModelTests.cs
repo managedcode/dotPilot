@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Settings;
 
+[NonParallelizable]
 public sealed class SettingsModelTests
 {
     [Test]

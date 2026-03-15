@@ -17,7 +17,9 @@ public class TestBase
     private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
     private const int BrowserWindowHeight = 960;
+    private static readonly TimeSpan QueryRetryFrequency = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan AppCleanupTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan PostClickTransitionProbeTimeout = TimeSpan.FromSeconds(1);
 
     private static readonly BrowserAutomationSettings? _browserAutomation =
         Constants.CurrentPlatform == UITestPlatform.Browser
@@ -475,7 +477,7 @@ public class TestBase
         App.EnterText(automationId, text);
     }
 
-    protected void ClickActionAutomationElement(string automationId)
+    protected void ClickActionAutomationElement(string automationId, bool expectElementToDisappear = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
@@ -487,7 +489,12 @@ public class TestBase
             {
                 App.Tap(automationId);
                 HarnessLog.Write($"Uno.UITest action tap outcome for '{automationId}': tapped");
-                return;
+                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after Uno.UITest tap; trying stronger browser fallbacks.");
             }
             catch (Exception exception)
             {
@@ -496,21 +503,42 @@ public class TestBase
 
             if (TryPerformBrowserClickAction(automationId))
             {
-                return;
+                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after DOM click; trying the next browser fallback.");
             }
 
             if (TryClickBrowserAutomationElement(automationId))
             {
-                return;
+                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after browser element click; trying the next fallback.");
             }
 
             if (TryClickBrowserAutomationElementAtCenter(automationId))
             {
-                return;
+                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after center-point click; trying keyboard activation.");
             }
+
             if (TryActivateBrowserAutomationElement(automationId))
             {
-                return;
+                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after keyboard activation; trying coordinate tap.");
             }
 
             try
@@ -521,7 +549,10 @@ public class TestBase
                     var target = matches[0];
                     App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
                     HarnessLog.Write($"Coordinate action tap outcome for '{automationId}': tapped");
-                    return;
+                    if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                    {
+                        return;
+                    }
                 }
             }
             catch (Exception exception)
@@ -531,6 +562,22 @@ public class TestBase
         }
 
         TapAutomationElement(automationId);
+    }
+
+    private bool WaitForAutomationElementToDisappear(string automationId)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow.Add(PostClickTransitionProbeTimeout);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            if (!BrowserHasAutomationElement(automationId))
+            {
+                return true;
+            }
+
+            Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
+        }
+
+        return !BrowserHasAutomationElement(automationId);
     }
 
     protected void PressEnterAutomationElement(string automationId)
@@ -543,6 +590,22 @@ public class TestBase
         }
 
         App.EnterText(automationId, Keys.Enter);
+    }
+
+    protected void SelectComboBoxAutomationElementOption(string automationId, string optionText)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(optionText);
+
+        if (TrySelectBrowserComboBoxOption(automationId, optionText))
+        {
+            return;
+        }
+
+        WriteBrowserAutomationDiagnostics(automationId);
+        WriteBrowserDomSnapshot($"select-combo:{automationId}", automationId);
+        throw new InvalidOperationException(
+            $"Could not select combo-box option '{optionText}' for automation id '{automationId}'.");
     }
 
     private bool TryActivateBrowserAutomationElement(string automationId)
@@ -671,7 +734,6 @@ public class TestBase
             return false;
         }
     }
-
     private bool TryClickBrowserAutomationElement(string automationId)
     {
         if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
@@ -735,8 +797,6 @@ public class TestBase
                             const element = host.matches(clickableSelector)
                                 ? host
                                 : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
-                            const isNativeClickElement = element.matches(clickableSelector);
-
                             element.scrollIntoView({ block: 'center', inline: 'center' });
                             if (typeof host.focus === 'function') {
                                 host.focus({ preventScroll: true });
@@ -745,7 +805,7 @@ public class TestBase
                                 element.focus({ preventScroll: true });
                             }
 
-                            if (isNativeClickElement && typeof element.click === 'function') {
+                            if (typeof element.click === 'function') {
                                 element.click();
                                 return 'clicked';
                             }
@@ -968,6 +1028,32 @@ public class TestBase
                 """,
                 resolvedElement);
 
+            var directClickOutcome = javaScriptExecutor.ExecuteScript(
+                """
+                const host = arguments[0];
+                if (!host) {
+                    return false;
+                }
+
+                const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href], .uno-button, .uno-buttonbase';
+                const element = host.matches(clickableSelector)
+                    ? host
+                    : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+                if (typeof element.click !== 'function') {
+                    return false;
+                }
+
+                element.scrollIntoView({ block: 'center', inline: 'center' });
+                element.click();
+                return true;
+                """,
+                resolvedElement);
+            if (directClickOutcome is true)
+            {
+                HarnessLog.Write($"Browser native click outcome for '{automationId}': clicked via DOM click");
+                return true;
+            }
+
             try
             {
                 if (javaScriptExecutor.ExecuteScript(
@@ -1017,6 +1103,243 @@ public class TestBase
             HarnessLog.Write($"Browser native click failed for '{automationId}': {exception.Message}");
             return false;
         }
+    }
+
+    private bool TrySelectBrowserComboBoxOption(string automationId, string optionText)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver ||
+                driver is not IJavaScriptExecutor javaScriptExecutor)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var escapedOptionText = optionText.Replace("'", "\\'", StringComparison.Ordinal);
+            var outcome = Convert.ToString(
+                javaScriptExecutor.ExecuteScript(
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const optionText = '
+                        """,
+                        escapedOptionText,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const host = matches.find(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0;
+                            }) ?? matches[0];
+                            if (!host) {
+                                return 'missing';
+                            }
+
+                            host.scrollIntoView({ block: 'center', inline: 'center' });
+
+                            const select = host.matches('select')
+                                ? host
+                                : host.querySelector('select');
+                            if (select) {
+                                const option = Array.from(select.options).find(candidate =>
+                                    (candidate.textContent ?? '').trim() === optionText ||
+                                    (candidate.value ?? '').trim() === optionText);
+                                if (!option) {
+                                    return 'option-missing';
+                                }
+
+                                option.selected = true;
+                                select.value = option.value;
+                                select.dispatchEvent(new Event('input', { bubbles: true }));
+                                select.dispatchEvent(new Event('change', { bubbles: true }));
+                                return 'selected';
+                            }
+
+                            const combobox = host.matches('[role="combobox"], button, input, div')
+                                ? host
+                                : host.querySelector('[role="combobox"], button, input, div');
+                            if (!combobox) {
+                                return 'combobox-missing';
+                            }
+
+                            combobox.click();
+
+                            const option = Array.from(document.querySelectorAll('[role="option"], option, li, button, div, p, span'))
+                                .filter(candidate => candidate !== host && candidate !== combobox)
+                                .find(candidate => {
+                                    const rect = candidate.getBoundingClientRect();
+                                    const style = window.getComputedStyle(candidate);
+                                    const isHidden = style.display === 'none' ||
+                                        style.visibility === 'hidden' ||
+                                        candidate.getAttribute('aria-hidden') === 'true';
+
+                                    return rect.width > 0 &&
+                                        rect.height > 0 &&
+                                        rect.right > 0 &&
+                                        rect.bottom > 0 &&
+                                        rect.left < window.innerWidth &&
+                                        rect.top < window.innerHeight &&
+                                        !isHidden &&
+                                        (candidate.textContent ?? '').trim() === optionText;
+                                });
+                            if (!option) {
+                                return 'option-missing';
+                            }
+
+                            option.scrollIntoView({ block: 'center', inline: 'center' });
+                            option.click();
+                            return 'selected';
+                        })();
+                        """)),
+                System.Globalization.CultureInfo.InvariantCulture);
+
+            HarnessLog.Write(
+                $"Browser combo-box selection outcome for '{automationId}' and option '{optionText}': {outcome}");
+            if (string.Equals(outcome, "selected", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return TrySelectBrowserComboBoxOptionWithKeyboard(driver, automationId, optionText);
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write(
+                $"Browser combo-box selection failed for '{automationId}' and option '{optionText}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TrySelectBrowserComboBoxOptionWithKeyboard(
+        IWebDriver driver,
+        string automationId,
+        string optionText)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(optionText);
+
+        static bool MatchesTarget(string[] texts, string optionText)
+        {
+            return texts.Any(text =>
+                text.Contains(optionText, StringComparison.Ordinal) ||
+                text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Any(line => string.Equals(line, optionText, StringComparison.Ordinal)));
+        }
+
+        bool SelectionReachedTarget()
+        {
+            return TryReadBrowserAutomationTexts(automationId, out var texts) && MatchesTarget(texts, optionText);
+        }
+
+        void LogCurrentSelection(string context)
+        {
+            if (!TryReadBrowserAutomationTexts(automationId, out var texts))
+            {
+                HarnessLog.Write($"Browser combo-box text probe for '{automationId}' during '{context}': <unavailable>");
+                return;
+            }
+
+            HarnessLog.Write(
+                $"Browser combo-box text probe for '{automationId}' during '{context}': {string.Join(" | ", texts)}");
+        }
+
+        static void SendKeysToFocusedElement(IWebDriver driver, string keys)
+        {
+            driver.SwitchTo().ActiveElement().SendKeys(keys);
+        }
+
+        try
+        {
+            var host = TryResolveBrowserInputHost(driver, automationId);
+            if (host is null)
+            {
+                return false;
+            }
+
+            if (!TryFocusBrowserInput(driver, automationId, host))
+            {
+                new Actions(driver)
+                    .MoveToElement(host)
+                    .Click()
+                    .Perform();
+            }
+
+            LogCurrentSelection("focus");
+            if (SelectionReachedTarget())
+            {
+                return true;
+            }
+
+            var actionSteps = new (string Name, Action<IWebDriver, IWebElement> Execute)[]
+            {
+                ("home", static (webDriver, _) => SendKeysToFocusedElement(webDriver, Keys.Home)),
+                ("space", static (webDriver, _) => SendKeysToFocusedElement(webDriver, Keys.Space)),
+                ("arrow-down", static (webDriver, _) => SendKeysToFocusedElement(webDriver, Keys.ArrowDown)),
+                ("alt-arrow-down", static (webDriver, element) =>
+                {
+                    new Actions(webDriver)
+                        .MoveToElement(element)
+                        .Click()
+                        .KeyDown(Keys.Alt)
+                        .SendKeys(Keys.ArrowDown)
+                        .KeyUp(Keys.Alt)
+                        .Perform();
+                }),
+            };
+
+            foreach (var (name, execute) in actionSteps)
+            {
+                execute(driver, host);
+                Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
+                LogCurrentSelection(name);
+                if (SelectionReachedTarget())
+                {
+                    SendKeysToFocusedElement(driver, Keys.Enter);
+                    HarnessLog.Write(
+                        $"Browser combo-box keyboard fallback selected '{optionText}' for '{automationId}'.");
+                    return true;
+                }
+            }
+
+            for (var index = 0; index < 8; index++)
+            {
+                SendKeysToFocusedElement(driver, Keys.ArrowDown);
+                Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
+                LogCurrentSelection($"arrow-loop-{index + 1}");
+                if (!SelectionReachedTarget())
+                {
+                    continue;
+                }
+
+                SendKeysToFocusedElement(driver, Keys.Enter);
+                HarnessLog.Write(
+                    $"Browser combo-box arrow fallback selected '{optionText}' for '{automationId}' after {index + 1} moves.");
+                return true;
+            }
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write(
+                $"Browser combo-box keyboard fallback failed for '{automationId}' and option '{optionText}': {exception.Message}");
+        }
+
+        return false;
     }
 
     private bool TryScrollBrowserAutomationElementIntoView(string automationId)

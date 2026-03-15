@@ -25,7 +25,7 @@
 
         <Button Grid.Column="1"
                 AutomationProperties.AutomationId="OpenCreateAgentButton"
-                Command="{Binding OpenCreateAgentCommand}"
+                Click="OnOpenCreateAgentButtonClick"
                 Style="{StaticResource AccentActionButtonStyle}"
                 VerticalAlignment="Top">
           <TextBlock Text="New agent" />
@@ -118,9 +118,9 @@
 
                 <Button Grid.Column="1"
                         Grid.RowSpan="3"
-                        AutomationProperties.AutomationId="AgentCatalogStartChatButton"
-                        Command="{Binding DataContext.StartChatForAgentCommand, ElementName=Root}"
-                        CommandParameter="{Binding}"
+                        AutomationProperties.AutomationId="{x:Bind StartChatAutomationId}"
+                        Command="{x:Bind StartChatCommand}"
+                        CommandParameter="{x:Bind StartChatRequest}"
                         Style="{StaticResource InlineActionButtonStyle}"
                         VerticalAlignment="Center">
                   <TextBlock Text="Start chat" />

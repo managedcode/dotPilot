@@ -1,9 +1,11 @@
 using DotPilot.Core.ChatSessions;
+using DotPilot.Core.AgentBuilder;
 using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.AgentBuilder;
 
+[NonParallelizable]
 public sealed class AgentBuilderModelTests
 {
     [Test]
@@ -37,7 +39,9 @@ public sealed class AgentBuilderModelTests
             agent.Name == "Repository Reviewer Agent" &&
             agent.ProviderKind == AgentProviderKind.Codex &&
             agent.ModelName == "gpt-5.4");
-        (await model.OperationMessage).Should().Be("Saved Repository Reviewer Agent using Codex.");
+        workspace.Sessions.Should().Contain(session => session.Title == "Session with Repository Reviewer Agent");
+        workspace.SelectedSessionId.Should().NotBeNull();
+        fixture.RequestedRoutes.Should().Contain(ShellRoute.Chat);
         (await model.Builder)!.StatusMessage.Should().Contain("ready for local desktop execution");
     }
 
@@ -47,8 +51,8 @@ public sealed class AgentBuilderModelTests
         await using var fixture = await CreateFixtureAsync();
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
-        await model.SelectedProvider.UpdateAsync(
-            _ => new AgentProviderOption(
+        await model.HandleSelectedProviderChanged(
+            new AgentProviderOption(
                 AgentProviderKind.GitHubCopilot,
                 "GitHub Copilot",
                 "copilot",
@@ -123,6 +127,18 @@ public sealed class AgentBuilderModelTests
 
         await model.BuildManually(CancellationToken.None);
         (await model.ModelName).Should().Be("gpt-5");
+        await model.SelectedProvider.UpdateAsync(
+            _ => new AgentProviderOption(
+                AgentProviderKind.Codex,
+                "Codex",
+                "codex",
+                "Codex CLI is ready for local desktop execution.",
+                "gpt-5",
+                ["gpt-5", "gpt-5.4"],
+                "1.0.0",
+                true),
+            CancellationToken.None);
+        await model.SelectedProviderKind.SetAsync(AgentProviderKind.Codex, CancellationToken.None);
 
         await model.HandleSelectedProviderChanged(
             new AgentProviderOption(
@@ -158,6 +174,7 @@ public sealed class AgentBuilderModelTests
                 "1.0.0",
                 true),
             CancellationToken.None);
+        await model.SelectedProviderKind.SetAsync(AgentProviderKind.Codex, CancellationToken.None);
 
         await model.HandleSelectedProviderChanged(
             new AgentProviderOption(
@@ -173,6 +190,89 @@ public sealed class AgentBuilderModelTests
 
         (await model.ModelName).Should().Be("claude-opus-4.6");
         (await model.SelectedProviderKind).Should().Be(AgentProviderKind.GitHubCopilot);
+    }
+
+    [Test]
+    public async Task BuilderProjectionUsesSelectedProviderKindWhenThePreviousProviderStateIsStale()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+        commandScope.WriteVersionCommand("claude", "2.0.75 (Claude Code)");
+        commandScope.WriteClaudeSettings("claude-opus-4-6");
+
+        await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.ClaudeCode, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        await model.SelectedProvider.UpdateAsync(
+            _ => new AgentProviderOption(
+                AgentProviderKind.Debug,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                [],
+                null,
+                false),
+            CancellationToken.None);
+        await model.SelectedProviderKind.SetAsync(AgentProviderKind.ClaudeCode, CancellationToken.None);
+
+        var builder = await model.Builder;
+
+        builder.Should().NotBeNull();
+
+        builder!.ProviderDisplayName.Should().Be("Claude Code");
+        builder.SuggestedModelName.Should().Be("claude-opus-4-6");
+        (await model.SelectedProvider).Should().NotBeNull();
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.ClaudeCode);
+    }
+
+    [Test]
+    public async Task BuilderProjectionPrefersTheSelectedProviderWhenTheProviderKindStateIsStale()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+        commandScope.WriteVersionCommand("claude", "2.0.75 (Claude Code)");
+        commandScope.WriteClaudeSettings("claude-opus-4-6");
+
+        await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.ClaudeCode, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        await model.SelectedProvider.UpdateAsync(
+            _ => new AgentProviderOption(
+                AgentProviderKind.ClaudeCode,
+                "Claude Code",
+                "claude",
+                "Claude Code profile authoring is available.",
+                "claude-opus-4-6",
+                ["claude-opus-4-6", "claude-sonnet-4-5"],
+                "2.0.75",
+                true),
+            CancellationToken.None);
+        await model.SelectedProviderKind.SetAsync(AgentProviderKind.Codex, CancellationToken.None);
+
+        var builder = await model.Builder;
+
+        builder.Should().NotBeNull();
+        builder!.ProviderDisplayName.Should().Be("Claude Code");
+        builder.SuggestedModelName.Should().Be("claude-opus-4-6");
     }
 
     [Test]
@@ -221,17 +321,30 @@ public sealed class AgentBuilderModelTests
         await model.GenerateAgentDraft(CancellationToken.None);
         await model.SaveAgent(CancellationToken.None);
 
-        var createdAgent = (await model.Agents)
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        var createdAgentSummary = workspace.Agents
             .Should()
             .ContainSingle(agent => agent.Name == "Repository Reviewer Agent")
             .Which;
+        var createdAgent = new AgentCatalogItem(
+            createdAgentSummary.Id,
+            "R",
+            createdAgentSummary.Name,
+            AgentSessionDefaults.CreateAgentDescription(createdAgentSummary.SystemPrompt),
+            createdAgentSummary.ProviderDisplayName,
+            createdAgentSummary.ModelName,
+            false,
+            "AgentCatalogStartChatButton_RepositoryReviewerAgent",
+            new AgentCatalogStartChatRequest(createdAgentSummary.Id, createdAgentSummary.Name),
+            null);
 
         await model.StartChatForAgent(createdAgent, CancellationToken.None);
 
-        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Sessions.Should().Contain(session => session.Title == "Session with Repository Reviewer Agent");
         workspace.SelectedSessionId.Should().NotBeNull();
-        (await model.OperationMessage).Should().Be("Started a session with Repository Reviewer Agent. Switch to Chat to continue.");
+        fixture.RequestedRoutes.Should().Contain(ShellRoute.Chat);
+        (await model.OperationMessage).Should().Be("Started a session with Repository Reviewer Agent.");
     }
 
     private static async Task<TestFixture> CreateFixtureAsync()
@@ -243,21 +356,43 @@ public sealed class AgentBuilderModelTests
             UseInMemoryDatabase = true,
             InMemoryDatabaseName = Guid.NewGuid().ToString("N"),
         });
+        services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton<ShellNavigationNotifier>();
 
         var provider = services.BuildServiceProvider();
         var workspaceState = provider.GetRequiredService<IAgentWorkspaceState>();
-        return new TestFixture(provider, workspaceState);
+        var navigationNotifier = provider.GetRequiredService<ShellNavigationNotifier>();
+        return new TestFixture(provider, workspaceState, navigationNotifier);
     }
 
-    private sealed class TestFixture(ServiceProvider provider, IAgentWorkspaceState workspaceState) : IAsyncDisposable
+    private sealed class TestFixture : IAsyncDisposable
     {
-        public ServiceProvider Provider { get; } = provider;
+        private readonly ShellNavigationNotifier navigationNotifier;
+        private readonly List<ShellRoute> requestedRoutes = [];
 
-        public IAgentWorkspaceState WorkspaceState { get; } = workspaceState;
+        public TestFixture(ServiceProvider provider, IAgentWorkspaceState workspaceState, ShellNavigationNotifier navigationNotifier)
+        {
+            Provider = provider;
+            WorkspaceState = workspaceState;
+            this.navigationNotifier = navigationNotifier;
+            this.navigationNotifier.Requested += OnNavigationRequested;
+        }
+
+        public ServiceProvider Provider { get; }
+
+        public IAgentWorkspaceState WorkspaceState { get; }
+
+        public IReadOnlyList<ShellRoute> RequestedRoutes => requestedRoutes;
 
         public ValueTask DisposeAsync()
         {
+            navigationNotifier.Requested -= OnNavigationRequested;
             return Provider.DisposeAsync();
+        }
+
+        private void OnNavigationRequested(object? sender, ShellNavigationRequestedEventArgs e)
+        {
+            requestedRoutes.Add(e.Route);
         }
     }
 }

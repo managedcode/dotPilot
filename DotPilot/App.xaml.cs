@@ -40,6 +40,8 @@ public partial class App : Application
 
     protected Window? MainWindow { get; private set; }
     protected IHost? Host { get; private set; }
+    internal IServiceProvider? Services => Host?.Services;
+    internal event EventHandler? ServicesReady;
 
     [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "Uno.Extensions APIs are used in a way that is safe for trimming in this template context.")]
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -118,6 +120,7 @@ public partial class App : Application
             WriteStartupMarker(NavigateStartedMarker);
             Host = await builder.NavigateAsync<Shell>();
             WriteStartupMarker(NavigateCompletedMarker);
+            ServicesReady?.Invoke(this, EventArgs.Empty);
             var appLogger = Host.Services.GetRequiredService<ILogger<App>>();
             AppLog.StartupMarker(
                 appLogger,

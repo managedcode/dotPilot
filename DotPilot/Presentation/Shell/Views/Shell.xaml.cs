@@ -1,14 +1,14 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace DotPilot.Presentation;
 
 public sealed partial class Shell : Page, IContentControlProvider
 {
     private const string SidebarButtonStyleKey = "SidebarButtonStyle";
     private const string SidebarButtonSelectedStyleKey = "SidebarButtonSelectedStyle";
-    private const string ChatRoute = "Chat";
-    private const string AgentsRoute = "Agents";
-    private const string SettingsRoute = "Settings";
     private const string UnknownContentTypeName = "<null>";
-    private string _currentRoute = ChatRoute;
+    private ShellNavigationNotifier? _shellNavigationNotifier;
+    private string _currentRoute = ResolveRouteName(ShellRoute.Chat);
 
     public Shell()
     {
@@ -16,8 +16,10 @@ public sealed partial class Shell : Page, IContentControlProvider
         {
             BrowserConsoleDiagnostics.Info("[DotPilot.Startup] Shell constructor started.");
             InitializeComponent();
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
             RegisterContentHostObserver();
-            UpdateNavigationSelection(ChatRoute);
+            UpdateNavigationSelection(ResolveRouteName(ShellRoute.Chat));
             UpdateNavigationSelectionFromContent();
             BrowserConsoleDiagnostics.Info("[DotPilot.Startup] Shell constructor completed.");
         }
@@ -32,34 +34,96 @@ public sealed partial class Shell : Page, IContentControlProvider
 
     private void OnChatNavButtonClick(object sender, RoutedEventArgs e)
     {
-        _ = NavigateToRouteAsync(ChatRoute);
+        _ = NavigateToRouteAsync(ShellRoute.Chat);
     }
 
     private void OnAgentsNavButtonClick(object sender, RoutedEventArgs e)
     {
-        _ = NavigateToRouteAsync(AgentsRoute);
+        _ = NavigateToRouteAsync(ShellRoute.Agents);
     }
 
     private void OnProvidersNavButtonClick(object sender, RoutedEventArgs e)
     {
-        _ = NavigateToRouteAsync(SettingsRoute);
+        _ = NavigateToRouteAsync(ShellRoute.Settings);
     }
 
-    private async Task NavigateToRouteAsync(string route)
+    private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(route);
-
-        UpdateNavigationSelection(route);
-        var navigator = ContentHost.Navigator() ?? this.Navigator();
-        if (navigator is null)
+        if (Application.Current is App app)
         {
-            BrowserConsoleDiagnostics.Error($"[DotPilot.Navigation] Missing navigator for route '{route}'.");
+            app.ServicesReady -= OnAppServicesReady;
+            app.ServicesReady += OnAppServicesReady;
+        }
+
+        TryRegisterNavigationNotifier();
+    }
+
+    private void TryRegisterNavigationNotifier()
+    {
+        if (_shellNavigationNotifier is not null)
+        {
             return;
         }
 
-        var response = await navigator.NavigateRouteAsync(ContentHost, route);
+        if (Application.Current is not App { Services: { } services })
+        {
+            BrowserConsoleDiagnostics.Info("[DotPilot.Navigation] Shell navigation notifier is waiting for app services.");
+            return;
+        }
+
+        _shellNavigationNotifier = services.GetRequiredService<ShellNavigationNotifier>();
+        _shellNavigationNotifier.Requested += OnShellNavigationRequested;
+        BrowserConsoleDiagnostics.Info("[DotPilot.Navigation] Shell navigation notifier registered.");
+    }
+
+    private void OnAppServicesReady(object? sender, EventArgs e)
+    {
+        TryRegisterNavigationNotifier();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (Application.Current is App app)
+        {
+            app.ServicesReady -= OnAppServicesReady;
+        }
+
+        if (_shellNavigationNotifier is null)
+        {
+            return;
+        }
+
+        _shellNavigationNotifier.Requested -= OnShellNavigationRequested;
+        _shellNavigationNotifier = null;
+    }
+
+    private void OnShellNavigationRequested(object? sender, ShellNavigationRequestedEventArgs e)
+    {
+        BrowserConsoleDiagnostics.Info($"[DotPilot.Navigation] Shell navigation requested for route '{ResolveRouteName(e.Route)}'.");
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            _ = NavigateToRouteAsync(e.Route);
+            return;
+        }
+
+        _ = DispatcherQueue.TryEnqueue(() => _ = NavigateToRouteAsync(e.Route));
+    }
+
+    private async Task NavigateToRouteAsync(ShellRoute route)
+    {
+        var routeName = ResolveRouteName(route);
+
+        UpdateNavigationSelection(routeName);
+        var navigator = ContentHost.Navigator() ?? this.Navigator();
+        if (navigator is null)
+        {
+            BrowserConsoleDiagnostics.Error($"[DotPilot.Navigation] Missing navigator for route '{routeName}'.");
+            return;
+        }
+
+        var response = await navigator.NavigateRouteAsync(ContentHost, routeName);
         var success = response?.Success ?? false;
-        BrowserConsoleDiagnostics.Info($"[DotPilot.Navigation] Route '{route}' success={success}.");
+        BrowserConsoleDiagnostics.Info($"[DotPilot.Navigation] Route '{routeName}' success={success}.");
     }
 
     private void RegisterContentHostObserver()
@@ -73,9 +137,9 @@ public sealed partial class Shell : Page, IContentControlProvider
     {
         var route = ContentHost.Content switch
         {
-            ChatPage => ChatRoute,
-            AgentBuilderPage => AgentsRoute,
-            SettingsPage => SettingsRoute,
+            ChatPage => ResolveRouteName(ShellRoute.Chat),
+            AgentBuilderPage => ResolveRouteName(ShellRoute.Agents),
+            SettingsPage => ResolveRouteName(ShellRoute.Settings),
             _ => string.Empty,
         };
 
@@ -95,15 +159,26 @@ public sealed partial class Shell : Page, IContentControlProvider
         var selectedStyle = ResolveStyle(SidebarButtonSelectedStyleKey);
         var normalStyle = ResolveStyle(SidebarButtonStyleKey);
 
-        ChatNavButton.Style = string.Equals(_currentRoute, ChatRoute, StringComparison.Ordinal)
+        ChatNavButton.Style = string.Equals(_currentRoute, ResolveRouteName(ShellRoute.Chat), StringComparison.Ordinal)
             ? selectedStyle
             : normalStyle;
-        AgentsNavButton.Style = string.Equals(_currentRoute, AgentsRoute, StringComparison.Ordinal)
+        AgentsNavButton.Style = string.Equals(_currentRoute, ResolveRouteName(ShellRoute.Agents), StringComparison.Ordinal)
             ? selectedStyle
             : normalStyle;
-        ProvidersNavButton.Style = string.Equals(_currentRoute, SettingsRoute, StringComparison.Ordinal)
+        ProvidersNavButton.Style = string.Equals(_currentRoute, ResolveRouteName(ShellRoute.Settings), StringComparison.Ordinal)
             ? selectedStyle
             : normalStyle;
+    }
+
+    private static string ResolveRouteName(ShellRoute route)
+    {
+        return route switch
+        {
+            ShellRoute.Chat => "Chat",
+            ShellRoute.Agents => "Agents",
+            ShellRoute.Settings => "Settings",
+            _ => throw new ArgumentOutOfRangeException(nameof(route), route, "Unknown shell route."),
+        };
     }
 
     private static Style ResolveStyle(string key)

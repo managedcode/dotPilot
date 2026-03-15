@@ -9,6 +9,7 @@ internal static class PresentationServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton<ShellNavigationNotifier>();
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<ChatModel>();

@@ -31,6 +31,13 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string AgentCatalogSectionAutomationId = "AgentCatalogSection";
     private const string AgentCatalogListAutomationId = "AgentCatalogList";
     private const string AgentCatalogItemAutomationId = "AgentCatalogItem";
+    private const string OpenCreateAgentButtonAutomationId = "OpenCreateAgentButton";
+    private const string BuildManuallyButtonAutomationId = "BuildManuallyButton";
+    private const string AgentBasicInfoSectionAutomationId = "AgentBasicInfoSection";
+    private const string AgentProviderClaudeCodeOptionAutomationId = "AgentProviderOption_ClaudeCode";
+    private const string AgentProviderCodexOptionAutomationId = "AgentProviderOption_Codex";
+    private const string AgentSelectedProviderTextAutomationId = "AgentSelectedProviderText";
+    private const string AgentModelGpt5OptionAutomationId = "AgentModelOption_gpt5";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
     private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
@@ -41,8 +48,11 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ChatTitleTextAutomationId = "ChatTitleText";
     private const string ChatMessageTextAutomationId = "ChatMessageText";
     private const string ChatRecentChatItemAutomationId = "ChatRecentChatItem";
+    private const string ToggleProviderButtonAutomationId = "ToggleProviderButton";
+    private const string SaveAgentButtonAutomationId = "SaveAgentButton";
     private const string DefaultSystemAgentName = "dotPilot System Agent";
     private const string DefaultSessionTitle = "Session with dotPilot System Agent";
+    private const string DefaultSystemAgentStartChatButtonAutomationId = "AgentCatalogStartChatButton_dotPilotSystemAgent";
     private const string UserPrompt = "hello from ui";
     private const string DebugResponsePrefix = "Debug provider received: hello from ui";
     private const string DebugToolFinishedText = "Debug workflow finished.";
@@ -112,6 +122,26 @@ public sealed class GivenChatSessionsShell : TestBase
     }
 
     [Test]
+    public async Task WhenStartingChatFromTheAgentCatalogThenTheChatScreenOpensForThatAgent()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForElement(AgentCatalogSectionAutomationId);
+        WaitForTextContains(AgentCatalogItemAutomationId, DefaultSystemAgentName, ScreenTransitionTimeout);
+
+        ClickActionAutomationElement(DefaultSystemAgentStartChatButtonAutomationId, expectElementToDisappear: true);
+
+        WaitForElement(ChatScreenAutomationId);
+        WaitForTextContains(ChatPageTitleAutomationId, "Chat", ScreenTransitionTimeout);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        TakeScreenshot("agent_catalog_start_chat_opens_chat");
+    }
+
+    [Test]
     public async Task WhenSelectingCodexFromProvidersThenDetailsUpdateAndAgentsNavigationStillWorks()
     {
         await Task.CompletedTask;
@@ -128,6 +158,55 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AgentBuilderScreenAutomationId);
 
         TakeScreenshot("settings_select_provider_then_agents_navigation");
+    }
+
+    [Test]
+    public async Task WhenSelectingClaudeCodeWhileAuthoringAnAgentThenTheProviderSummaryFollowsTheSelection()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(BuildManuallyButtonAutomationId);
+        ClickActionAutomationElement(BuildManuallyButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+        WaitForTextContains(AgentSelectedProviderTextAutomationId, "Codex", ScreenTransitionTimeout);
+
+        ClickActionAutomationElement(AgentProviderClaudeCodeOptionAutomationId);
+
+        WaitForTextContains(AgentSelectedProviderTextAutomationId, "Claude Code", ScreenTransitionTimeout);
+
+        TakeScreenshot("agent_builder_provider_selection_follows_combo");
+    }
+
+    [Test]
+    public async Task WhenSavingANewAgentThenANewChatSessionOpensForThatAgent()
+    {
+        await Task.CompletedTask;
+
+        EnsureProviderEnabled(CodexProviderEntryAutomationId);
+
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(BuildManuallyButtonAutomationId);
+        ClickActionAutomationElement(BuildManuallyButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+
+        ReplaceTextAutomationElement("AgentNameInput", "UI Codex Agent");
+        ClickActionAutomationElement(AgentProviderCodexOptionAutomationId);
+        ClickActionAutomationElement(AgentModelGpt5OptionAutomationId);
+        ReplaceTextAutomationElement("AgentDescriptionInput", "UI-created Codex agent.");
+        ReplaceTextAutomationElement("AgentSystemPromptInput", "Answer briefly.");
+
+        ClickActionAutomationElement(SaveAgentButtonAutomationId);
+
+        WaitForElement(ChatScreenAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, "Session with UI Codex Agent", ScreenTransitionTimeout);
+
+        TakeScreenshot("saving_new_agent_opens_chat");
     }
 
     [Test]
@@ -164,6 +243,39 @@ public sealed class GivenChatSessionsShell : TestBase
 
         WaitForElement(ChatScreenAutomationId, "Timed out returning to the chat screen.", ScreenTransitionTimeout);
         WaitForElement(ChatComposerInputAutomationId);
+    }
+
+    private void EnsureProviderEnabled(string providerEntryAutomationId)
+    {
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ProviderListAutomationId);
+        TapAutomationElement(providerEntryAutomationId);
+        WaitForElement(ToggleProviderButtonAutomationId);
+
+        var toggleText = ReadPrimaryText(ToggleProviderButtonAutomationId);
+        if (toggleText.Contains("Enable provider", StringComparison.Ordinal))
+        {
+            ClickActionAutomationElement(ToggleProviderButtonAutomationId);
+            WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
+        }
+    }
+
+    private string ReadPrimaryText(string automationId)
+    {
+        var texts = App.Query(automationId)
+            .Select(result => NormalizeText(result.Text))
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .ToArray();
+        if (texts.Length > 0)
+        {
+            return texts[0];
+        }
+
+        return TryReadBrowserInputValue(automationId, out var inputValue)
+            ? NormalizeText(inputValue)
+            : string.Empty;
     }
 
     private bool TryWaitForElement(string automationId, TimeSpan timeout)
@@ -261,6 +373,7 @@ public sealed class GivenChatSessionsShell : TestBase
             }
 
             WriteBrowserAutomationDiagnostics(automationId);
+            WriteBrowserSystemLogs($"wait-timeout:{automationId}");
             WriteBrowserDomSnapshot($"wait-timeout:{automationId}", automationId);
             throw new TimeoutException(timeoutMessage ?? $"Timed out waiting for automation id '{automationId}'.");
         }

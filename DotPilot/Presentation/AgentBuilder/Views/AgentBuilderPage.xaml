@@ -7,7 +7,8 @@
       FontFamily="{StaticResource AppBodyFontFamily}">
   <Page.Resources>
     <DataTemplate x:Key="AgentCatalogSurfaceTemplate">
-      <controls:AgentCatalogSection DataContext="{Binding DataContext, ElementName=RootPage}" />
+      <controls:AgentCatalogSection DataContext="{Binding DataContext, ElementName=RootPage}"
+                                    OpenCreateAgentCommand="{Binding DataContext.OpenCreateAgentCommand, ElementName=RootPage}" />
     </DataTemplate>
 
     <DataTemplate x:Key="AgentPromptSurfaceTemplate">
