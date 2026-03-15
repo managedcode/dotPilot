@@ -1,4 +1,5 @@
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,17 +8,23 @@ namespace DotPilot.Tests.Features.AgentSessions;
 public sealed class AgentSessionServiceTests
 {
     [Test]
-    public async Task GetWorkspaceAsyncReturnsProviderCatalogAndNoSessionsForNewStore()
+    public async Task GetWorkspaceAsyncSeedsDefaultSystemAgentForANewStore()
     {
         await using var fixture = CreateFixture();
 
         var workspace = await fixture.Service.GetWorkspaceAsync(CancellationToken.None);
 
         workspace.Sessions.Should().BeEmpty();
-        workspace.Agents.Should().BeEmpty();
+        workspace.Agents.Should().ContainSingle(agent =>
+            agent.Name == AgentSessionDefaults.SystemAgentName &&
+            agent.ProviderKind == AgentProviderKind.Debug &&
+            agent.ModelName == AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug));
         workspace.Providers.Should().HaveCount(4);
         workspace.Providers.Should().ContainSingle(provider => provider.Kind == AgentProviderKind.Debug);
-        workspace.Providers.Should().OnlyContain(provider => !provider.IsEnabled);
+        workspace.Providers.Should().ContainSingle(provider =>
+            provider.Kind == AgentProviderKind.Debug &&
+            provider.IsEnabled &&
+            provider.CanCreateAgents);
     }
 
     [Test]
@@ -100,6 +107,36 @@ public sealed class AgentSessionServiceTests
             entry.Text.Contains("Debug workflow finished", StringComparison.Ordinal));
     }
 
+    [Test]
+    public async Task SendMessageAsyncStreamsDebugEntriesWhenTransientRuntimeConversationIsPreferred()
+    {
+        await using var fixture = CreateFixture(new AgentSessionStorageOptions
+        {
+            UseInMemoryDatabase = true,
+            InMemoryDatabaseName = Guid.NewGuid().ToString("N"),
+            PreferTransientRuntimeConversation = true,
+        });
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Transient Agent");
+        var session = await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Transient session", agent.Id),
+            CancellationToken.None);
+
+        List<SessionStreamEntry> streamedEntries = [];
+        await foreach (var entry in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "hello from transient tests"),
+                           CancellationToken.None))
+        {
+            streamedEntries.Add(entry);
+        }
+
+        streamedEntries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.AssistantMessage &&
+            entry.Text.Contains("Debug provider received: hello from transient tests", StringComparison.Ordinal));
+        streamedEntries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.ToolCompleted &&
+            entry.Text.Contains("Debug workflow finished", StringComparison.Ordinal));
+    }
+
     private static async Task<AgentProfileSummary> EnableDebugAndCreateAgentAsync(
         IAgentSessionService service,
         string name)
@@ -119,11 +156,11 @@ public sealed class AgentSessionServiceTests
             CancellationToken.None);
     }
 
-    private static TestFixture CreateFixture()
+    private static TestFixture CreateFixture(AgentSessionStorageOptions? options = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
-        services.AddAgentSessions(new AgentSessionStorageOptions
+        services.AddAgentSessions(options ?? new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,
             InMemoryDatabaseName = Guid.NewGuid().ToString("N"),

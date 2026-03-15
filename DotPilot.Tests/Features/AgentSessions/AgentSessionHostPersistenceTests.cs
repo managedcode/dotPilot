@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Host.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

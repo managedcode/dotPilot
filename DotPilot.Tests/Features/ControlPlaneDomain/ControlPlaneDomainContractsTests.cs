@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DotPilot.Core.Features.ControlPlaneDomain;
 
 namespace DotPilot.Tests.Features.ControlPlaneDomain;
 

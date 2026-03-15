@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -45,6 +46,15 @@ public sealed class AgentSessionLoggingTests
         messages.Should().Contain(message => message.Contains("Created agent profile.", StringComparison.Ordinal));
         messages.Should().Contain(message => message.Contains("Created session.", StringComparison.Ordinal));
         messages.Should().Contain(message => message.Contains("Starting session send.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Configured agent run middleware.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Configured run-scoped chat logging.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Prepared correlated agent run.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Agent run started.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Agent run completed.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Chat client request started.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Chat client request completed.", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("RunId=", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("Logged Agent", StringComparison.Ordinal));
         messages.Should().Contain(message => message.Contains("Completed session send.", StringComparison.Ordinal));
         messages.Should().Contain(message => message.Contains("Provider probe completed.", StringComparison.Ordinal));
     }

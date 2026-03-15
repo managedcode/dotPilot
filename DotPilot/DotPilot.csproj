@@ -79,7 +79,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Remove="Models\AppConfig.cs" />
         <Compile Remove="Models\Entity.cs" />
         <Compile Remove="Services\Endpoints\DebugHandler.cs" />
     </ItemGroup>

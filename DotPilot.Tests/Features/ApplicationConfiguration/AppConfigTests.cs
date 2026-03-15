@@ -1,4 +1,4 @@
-namespace DotPilot.Tests.Features.ApplicationShell;
+namespace DotPilot.Tests.Features.ApplicationConfiguration;
 
 public class AppConfigTests
 {
@@ -10,7 +10,7 @@ public class AppConfigTests
     [Test]
     public void AppInfoCreation()
     {
-        var appInfo = new AppConfig { Environment = "Test" };
+        var appInfo = new DotPilot.AppConfig { Environment = "Test" };
 
         appInfo.Should().NotBeNull();
         appInfo.Environment.Should().Be("Test");

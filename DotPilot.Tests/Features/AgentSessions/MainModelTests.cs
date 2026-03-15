@@ -1,4 +1,5 @@
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Presentation;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,20 @@ namespace DotPilot.Tests.Features.AgentSessions;
 
 public sealed class MainModelTests
 {
+    [Test]
+    public async Task StartNewSessionUsesSeededDefaultSystemAgentWhenNoCustomAgentExists()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var model = ActivatorUtilities.CreateInstance<MainModel>(fixture.Provider);
+
+        await model.StartNewSession(CancellationToken.None);
+
+        var activeSession = await model.ActiveSession;
+        activeSession.Should().NotBeNull();
+        activeSession!.Title.Should().Be($"Session with {AgentSessionDefaults.SystemAgentName}");
+        activeSession.StatusSummary.Should().Contain("Debug Provider");
+    }
+
     [Test]
     public async Task SendMessageStreamsDebugTranscriptForAnActiveSession()
     {
@@ -36,6 +51,29 @@ public sealed class MainModelTests
         activeSession.StatusSummary.Should().Be("Debug Agent · Debug Provider");
     }
 
+    [Test]
+    public async Task StartNewSessionUsesNewestCustomAgentWhenCustomNameSortsAfterSystemAgent()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Repository Reviewer Agent",
+                AgentRoleKind.Reviewer,
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Review repository changes and explain the diff.",
+                ["Git", "Files"]),
+            CancellationToken.None);
+        var model = ActivatorUtilities.CreateInstance<MainModel>(fixture.Provider);
+
+        await model.StartNewSession(CancellationToken.None);
+
+        var activeSession = await model.ActiveSession;
+        activeSession.Should().NotBeNull();
+        activeSession!.Title.Should().Be("Session with Repository Reviewer Agent");
+        activeSession.StatusSummary.Should().Be("Repository Reviewer Agent · Debug Provider");
+    }
+
     private static async Task<TestFixture> CreateFixtureAsync()
     {
         var services = new ServiceCollection();
@@ -48,9 +86,6 @@ public sealed class MainModelTests
 
         var provider = services.BuildServiceProvider();
         var workspaceState = provider.GetRequiredService<IAgentWorkspaceState>();
-        await workspaceState.UpdateProviderAsync(
-            new UpdateProviderPreferenceCommand(AgentProviderKind.Debug, true),
-            CancellationToken.None);
         return new TestFixture(provider, workspaceState);
     }
 

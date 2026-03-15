@@ -16,21 +16,37 @@ public sealed class SettingsModelTests
         var providers = await model.Providers;
         providers.Should().ContainSingle(provider => provider.Kind == AgentProviderKind.Debug);
         (await model.SelectedProviderTitle).Should().Be("Debug Provider");
-        (await model.ToggleActionLabel).Should().Be("Enable provider");
+        (await model.ToggleActionLabel).Should().Be("Disable provider");
         (await model.CanToggleSelectedProvider).Should().BeTrue();
 
         await model.ToggleSelectedProvider(CancellationToken.None);
 
         (await model.SelectedProviderTitle).Should().Be("Debug Provider");
-        (await model.ToggleActionLabel).Should().Be("Disable provider");
+        (await model.ToggleActionLabel).Should().Be("Enable provider");
         (await model.SelectedProvider).Should().NotBeNull();
-        (await model.SelectedProvider)!.IsEnabled.Should().BeTrue();
+        (await model.SelectedProvider)!.IsEnabled.Should().BeFalse();
 
         var workspace = await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None);
         workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
-            provider.IsEnabled &&
-            provider.CanCreateAgents);
+            !provider.IsEnabled &&
+            !provider.CanCreateAgents);
+    }
+
+    [Test]
+    public async Task SelectProviderUpdatesProjectionToChosenProvider()
+    {
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.Codex);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        (await model.SelectedProviderTitle).Should().Be(selectedProvider.DisplayName);
+        (await model.SelectedProvider).Should().NotBeNull();
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Codex);
     }
 
     private static TestFixture CreateFixture()

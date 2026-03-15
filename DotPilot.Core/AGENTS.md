@@ -6,18 +6,18 @@ Stack: `.NET 10`, class library, feature-aligned contracts for control-plane dom
 ## Purpose
 
 - This project owns non-UI contracts, typed identifiers, and feature slices that must stay independent from the Uno presentation host.
-- It provides the stable public shapes for runtime, orchestration, providers, and shell configuration so UI and future runtime implementations can evolve without circular coupling.
+- It provides the stable public shapes for runtime, orchestration, providers, and Orleans-facing contracts so UI and future runtime implementations can evolve without circular coupling.
 
 ## Entry Points
 
 - `DotPilot.Core.csproj`
-- `Features/ApplicationShell/AppConfig.cs`
 - `Features/ControlPlaneDomain/*`
 - `Features/AgentSessions/*`
 
 ## Boundaries
 
 - Keep this project free of `Uno Platform`, XAML, brushes, and page/view-model concerns.
+- Keep app-shell, app-host, and application-configuration types out of this project; those belong in `DotPilot`.
 - Organize code by vertical feature slice, not by shared horizontal folders such as generic `Services` or `Helpers`.
 - Prefer stable contracts, typed identifiers, and public interfaces here; concrete runtime integrations can live in separate libraries.
 - Keep the active public surface centered on providers, agent profiles, sessions, transcript events, and Orleans grain contracts.

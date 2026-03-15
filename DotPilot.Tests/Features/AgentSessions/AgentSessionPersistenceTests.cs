@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using DotPilot.Core.Features.AgentSessions;
+using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

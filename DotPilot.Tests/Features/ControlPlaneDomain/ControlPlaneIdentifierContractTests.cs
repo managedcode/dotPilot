@@ -1,3 +1,5 @@
+using DotPilot.Core.Features.ControlPlaneDomain;
+
 namespace DotPilot.Tests.Features.ControlPlaneDomain;
 
 public sealed class ControlPlaneIdentifierContractTests
