@@ -27,7 +27,7 @@ public partial record SettingsModel
         null,
         false,
         false,
-        string.Empty,
+        [],
         [],
         string.Empty,
         false);
@@ -89,9 +89,9 @@ public partial record SettingsModel
 
     public IState<string> SelectedProviderCommandName => State.Value(this, static () => string.Empty);
 
-    public IState<string> SelectedProviderInstallCommand => State.Value(this, static () => string.Empty);
+    public IState<ImmutableArray<ProviderDetailItem>> SelectedProviderDetails => State.Value(this, static () => ImmutableArray<ProviderDetailItem>.Empty);
 
-    public IState<bool> HasSelectedProviderInstallCommand => State.Value(this, static () => false);
+    public IState<bool> HasSelectedProviderDetails => State.Value(this, static () => false);
 
     public IState<ImmutableArray<ProviderActionItem>> SelectedProviderActions => State.Value(this, static () => ImmutableArray<ProviderActionItem>.Empty);
 
@@ -151,7 +151,6 @@ public partial record SettingsModel
 
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
         }
@@ -191,7 +190,6 @@ public partial record SettingsModel
 
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
             workspaceProjectionNotifier.Publish();
@@ -288,8 +286,11 @@ public partial record SettingsModel
             SettingsModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: (await SelectedProvider) ?? EmptySelectedProvider);
             var selectedProvider = await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             return MapProviderStatusItems(workspace.Providers, selectedProvider);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return ImmutableArray<ProviderStatusItem>.Empty;
         }
         catch (Exception exception)
         {
@@ -353,6 +354,9 @@ public partial record SettingsModel
         var actions = IsEmptySelectedProvider(selectedProvider)
             ? ImmutableArray<ProviderActionItem>.Empty
             : selectedProvider.Actions.ToImmutableArray();
+        var details = IsEmptySelectedProvider(selectedProvider)
+            ? ImmutableArray<ProviderDetailItem>.Empty
+            : selectedProvider.Details.ToImmutableArray();
 
         await SelectedProviderTitle.SetAsync(
             IsEmptySelectedProvider(selectedProvider) ? SelectProviderTitleValue : selectedProvider.DisplayName,
@@ -363,13 +367,8 @@ public partial record SettingsModel
         await SelectedProviderCommandName.SetAsync(
             IsEmptySelectedProvider(selectedProvider) ? string.Empty : selectedProvider.CommandName,
             cancellationToken);
-        await SelectedProviderInstallCommand.SetAsync(
-            IsEmptySelectedProvider(selectedProvider) ? string.Empty : selectedProvider.InstallCommand,
-            cancellationToken);
-        await HasSelectedProviderInstallCommand.UpdateAsync(
-            _ => !IsEmptySelectedProvider(selectedProvider) &&
-                !string.IsNullOrWhiteSpace(selectedProvider.InstallCommand),
-            cancellationToken);
+        await SelectedProviderDetails.UpdateAsync(_ => details, cancellationToken);
+        await HasSelectedProviderDetails.UpdateAsync(_ => details.Length > 0, cancellationToken);
         await SelectedProviderActions.UpdateAsync(_ => actions, cancellationToken);
         await HasSelectedProviderActions.UpdateAsync(_ => actions.Length > 0, cancellationToken);
         await ToggleActionLabel.SetAsync(
@@ -480,9 +479,10 @@ public partial record SettingsModel
             string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal) &&
             string.Equals(left.CommandName, right.CommandName, StringComparison.Ordinal) &&
             string.Equals(left.StatusSummary, right.StatusSummary, StringComparison.Ordinal) &&
-            string.Equals(left.InstallCommand, right.InstallCommand, StringComparison.Ordinal) &&
             left.IsEnabled == right.IsEnabled &&
-            left.CanCreateAgents == right.CanCreateAgents;
+            left.CanCreateAgents == right.CanCreateAgents &&
+            HaveSameDetails(left.Details, right.Details) &&
+            HaveSameActions(left.Actions, right.Actions);
     }
 
     private static ImmutableArray<ProviderStatusItem> MapProviderStatusItems(
@@ -506,7 +506,9 @@ public partial record SettingsModel
             provider.InstalledVersion,
             provider.IsEnabled,
             provider.CanCreateAgents,
-            provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
+            provider.Details
+                .Select(detail => new ProviderDetailItem(detail.Label, detail.Value))
+                .ToArray(),
             provider.Actions
                 .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
                 .ToArray(),
@@ -514,5 +516,48 @@ public partial record SettingsModel
             selectedProvider is not null &&
             !IsEmptySelectedProvider(selectedProvider) &&
             selectedProvider.Kind == provider.Kind);
+    }
+
+    private static bool HaveSameDetails(
+        IReadOnlyList<ProviderDetailItem> left,
+        IReadOnlyList<ProviderDetailItem> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index].Label, right[index].Label, StringComparison.Ordinal) ||
+                !string.Equals(left[index].Value, right[index].Value, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool HaveSameActions(
+        IReadOnlyList<ProviderActionItem> left,
+        IReadOnlyList<ProviderActionItem> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index].Label, right[index].Label, StringComparison.Ordinal) ||
+                !string.Equals(left[index].Summary, right[index].Summary, StringComparison.Ordinal) ||
+                !string.Equals(left[index].Command, right[index].Command, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

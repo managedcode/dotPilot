@@ -1,4 +1,5 @@
 using DotPilot.Core.ChatSessions;
+using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.AgentBuilder;
@@ -6,9 +7,16 @@ namespace DotPilot.Tests.AgentBuilder;
 public sealed class AgentBuilderModelTests
 {
     [Test]
-    public async Task GenerateDraftAndSaveAgentUsesSuggestedDebugModelWhenModelOverrideIsBlank()
+    public async Task GenerateDraftAndSaveAgentUsesEnabledProviderModelWhenModelOverrideIsBlank()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+
         await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);
@@ -16,10 +24,10 @@ public sealed class AgentBuilderModelTests
         await model.GenerateAgentDraft(CancellationToken.None);
 
         var builder = (await model.Builder)!;
-        builder.ProviderDisplayName.Should().Be("Debug Provider");
-        builder.SuggestedModelName.Should().Be("debug-echo");
+        builder.ProviderDisplayName.Should().Be("Codex");
+        builder.SuggestedModelName.Should().Be("gpt-5.4");
         builder.CanCreateAgent.Should().BeTrue();
-        (await model.ModelName).Should().Be("debug-echo");
+        (await model.ModelName).Should().Be("gpt-5.4");
         (await model.AgentName).Should().Be("Repository Reviewer Agent");
 
         await model.SaveAgent(CancellationToken.None);
@@ -27,10 +35,10 @@ public sealed class AgentBuilderModelTests
         var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Agents.Should().Contain(agent =>
             agent.Name == "Repository Reviewer Agent" &&
-            agent.ProviderKind == AgentProviderKind.Debug &&
-            agent.ModelName == "debug-echo");
-        (await model.OperationMessage).Should().Be("Saved Repository Reviewer Agent using Debug Provider.");
-        (await model.Builder)!.StatusMessage.Should().Be("Built in and ready for deterministic local testing.");
+            agent.ProviderKind == AgentProviderKind.Codex &&
+            agent.ModelName == "gpt-5.4");
+        (await model.OperationMessage).Should().Be("Saved Repository Reviewer Agent using Codex.");
+        (await model.Builder)!.StatusMessage.Should().Contain("ready for local desktop execution");
     }
 
     [Test]
@@ -45,6 +53,7 @@ public sealed class AgentBuilderModelTests
                 "GitHub Copilot",
                 "copilot",
                 "GitHub Copilot CLI is available on PATH.",
+                "gpt-5",
                 "0.0.421",
                 false),
             CancellationToken.None);
@@ -61,9 +70,16 @@ public sealed class AgentBuilderModelTests
     }
 
     [Test]
-    public async Task BuildManuallyOpensEditorWithDefaultDraft()
+    public async Task BuildManuallyUsesEnabledProviderDefaults()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+
         await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);
@@ -72,37 +88,65 @@ public sealed class AgentBuilderModelTests
         var surface = await model.Surface;
         surface!.ShowEditor.Should().BeTrue();
         (await model.AgentName).Should().Be("New agent");
-        (await model.Builder)!.SuggestedModelName.Should().Be("debug-echo");
+        (await model.Builder)!.ProviderDisplayName.Should().Be("Codex");
+        (await model.Builder)!.SuggestedModelName.Should().Be("gpt-5.4");
         (await model.OperationMessage).Should().Be("Manual draft ready. Adjust the profile before saving.");
     }
 
     [Test]
-    public async Task HandleSelectedProviderChangedKeepsRunnableModelWhenProviderCannotCreateAgents()
+    public async Task BuildManuallyWithoutEnabledRealProviderFallsBackToTheFirstProviderChoice()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        await using var fixture = await CreateFixtureAsync();
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.OpenCreateAgent(CancellationToken.None);
+        await model.BuildManually(CancellationToken.None);
+
+        var builder = (await model.Builder)!;
+        builder.ProviderDisplayName.Should().Be("Codex");
+        builder.SuggestedModelName.Should().Be("gpt-5");
+        builder.ModelHelperText.Should().Be("Use the suggested model or enter a provider-specific override. Suggested: gpt-5.");
+        builder.CanCreateAgent.Should().BeFalse();
+        (await model.ModelName).Should().Be("gpt-5");
+    }
+
+    [Test]
+    public async Task HandleSelectedProviderChangedUpdatesModelSuggestionToTheChosenProvider()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
         await using var fixture = await CreateFixtureAsync();
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.BuildManually(CancellationToken.None);
-        (await model.ModelName).Should().Be("debug-echo");
+        (await model.ModelName).Should().Be("gpt-5");
 
         await model.HandleSelectedProviderChanged(
             new AgentProviderOption(
                 AgentProviderKind.Codex,
                 "Codex",
                 "codex",
-                "Codex CLI is detected, but live desktop execution is not available in this app yet.",
+                "Codex CLI is ready for local desktop execution.",
+                "gpt-5.4",
                 "1.0.0",
-                false),
+                true),
             CancellationToken.None);
 
-        (await model.ModelName).Should().Be("debug-echo");
+        (await model.ModelName).Should().Be("gpt-5.4");
         (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Codex);
     }
 
     [Test]
     public async Task StartChatForAgentCreatesAndSelectsSessionForChosenCatalogAgent()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+
         await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.OpenCreateAgent(CancellationToken.None);

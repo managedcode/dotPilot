@@ -1,4 +1,5 @@
 using System.Globalization;
+using DotPilot.Core.Providers;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.AgentBuilder;
@@ -51,13 +52,13 @@ public sealed class AgentPromptDraftGenerator(
 
     public async ValueTask<AgentPromptDraft> CreateManualDraftAsync(CancellationToken cancellationToken)
     {
-        var providerKind = await ResolvePreferredProviderAsync(ManualPrompt, cancellationToken);
+        var provider = await ResolvePreferredProviderAsync(ManualPrompt, cancellationToken);
         var draft = new AgentPromptDraft(
             ManualPrompt,
             ManualAgentName,
             ManualDescription,
-            providerKind,
-            AgentSessionDefaults.GetDefaultModel(providerKind),
+            provider.Kind,
+            provider.SuggestedModelName,
             CreateSystemPrompt(ManualAgentName, ManualDescription));
 
         AgentPromptDraftGeneratorLog.ManualDraftCreated(logger, draft.ProviderKind, draft.ModelName);
@@ -67,15 +68,15 @@ public sealed class AgentPromptDraftGenerator(
     public async ValueTask<AgentPromptDraft> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         var normalizedPrompt = NormalizePrompt(prompt);
-        var providerKind = await ResolvePreferredProviderAsync(normalizedPrompt, cancellationToken);
+        var provider = await ResolvePreferredProviderAsync(normalizedPrompt, cancellationToken);
         var description = CreateDescription(normalizedPrompt);
         var name = CreateName(normalizedPrompt);
         var draft = new AgentPromptDraft(
             normalizedPrompt,
             name,
             description,
-            providerKind,
-            AgentSessionDefaults.GetDefaultModel(providerKind),
+            provider.Kind,
+            provider.SuggestedModelName,
             CreateSystemPrompt(name, description));
 
         AgentPromptDraftGeneratorLog.GeneratedDraft(
@@ -86,23 +87,35 @@ public sealed class AgentPromptDraftGenerator(
         return draft;
     }
 
-    private async ValueTask<AgentProviderKind> ResolvePreferredProviderAsync(string prompt, CancellationToken cancellationToken)
+    private async ValueTask<ProviderStatusDescriptor> ResolvePreferredProviderAsync(string prompt, CancellationToken cancellationToken)
     {
         var providers = await providerStatusReader.ReadAsync(cancellationToken);
         var creatableProviders = providers
             .Where(static provider => provider.CanCreateAgents)
-            .Select(static provider => provider.Kind)
-            .ToHashSet();
+            .ToDictionary(static provider => provider.Kind);
 
         foreach (var candidate in ResolveProviderPreferences(prompt))
         {
-            if (creatableProviders.Contains(candidate))
+            if (creatableProviders.TryGetValue(candidate, out var provider))
             {
-                return candidate;
+                return provider;
             }
         }
 
-        return AgentProviderKind.Debug;
+        return providers.FirstOrDefault(static provider => provider.Kind == AgentProviderKind.Debug)
+            ?? new ProviderStatusDescriptor(
+                AgentSessionDeterministicIdentity.CreateProviderId("debug"),
+                AgentProviderKind.Debug,
+                "Debug Provider",
+                "debug",
+                AgentProviderStatus.Disabled,
+                "Provider is disabled for local agent creation.",
+                AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug),
+                AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug),
+                false,
+                false,
+                [],
+                []);
     }
 
     private static IEnumerable<AgentProviderKind> ResolveProviderPreferences(string prompt)

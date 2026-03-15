@@ -41,6 +41,8 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
   - operational/system folders such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`
 - keep this structure SOLID at the folder and project level too: cohesive feature slices stay together, but once a slice becomes too large or too independent, it should graduate into its own project instead of turning `DotPilot.Core` into mud
 - Keep provider-independent testing seams real and deterministic so CI can validate core flows without external CLIs.
+- Keep provider readiness probing explicit and coalesced: ordinary workspace reads may share one in-flight CLI probe, but normal navigation must not fan out into repeated PATH/version probing loops.
+- Treat superseded async loads as cancellation, not failure; Core services should not emit error-level noise for expected state invalidation or navigation churn.
 
 ## Local Commands
 

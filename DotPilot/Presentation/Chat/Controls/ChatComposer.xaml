@@ -24,6 +24,8 @@
           <TextBox x:Name="ComposerInput"
                    AutomationProperties.AutomationId="ChatComposerInput"
                    KeyDown="OnComposerInputKeyDown"
+                   KeyUp="OnComposerInputKeyUp"
+                   LostFocus="OnComposerInputLostFocus"
                    PlaceholderText="{Binding ComposerPlaceholder}"
                    Style="{StaticResource ChatComposerTextBoxStyle}"
                    Text="{Binding ComposerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

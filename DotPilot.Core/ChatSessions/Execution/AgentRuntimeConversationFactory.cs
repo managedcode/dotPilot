@@ -11,6 +11,7 @@ namespace DotPilot.Core.ChatSessions;
 internal sealed class AgentRuntimeConversationFactory(
     AgentSessionStorageOptions storageOptions,
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
+    LocalCodexThreadStateStore codexThreadStateStore,
     LocalAgentSessionStateStore sessionStateStore,
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
@@ -51,7 +52,7 @@ internal sealed class AgentRuntimeConversationFactory(
         var historyProvider = new FolderChatHistoryProvider(
             serviceProvider.GetRequiredService<LocalAgentChatHistoryStore>());
         var descriptor = CreateExecutionDescriptor(agentRecord);
-        var agent = CreateAgent(agentRecord, descriptor, historyProvider);
+        var agent = CreateAgent(agentRecord, descriptor, historyProvider, sessionId);
         if (useTransientConversation)
         {
             var transientSession = await CreateNewSessionAsync(agent, sessionId, cancellationToken);
@@ -112,7 +113,8 @@ internal sealed class AgentRuntimeConversationFactory(
     private AIAgent CreateAgent(
         AgentProfileRecord agentRecord,
         AgentExecutionDescriptor descriptor,
-        FolderChatHistoryProvider historyProvider)
+        FolderChatHistoryProvider historyProvider,
+        SessionId sessionId)
     {
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
         var options = new ChatClientAgentOptions
@@ -135,7 +137,12 @@ internal sealed class AgentRuntimeConversationFactory(
             agentRecord.Name,
             descriptor.ProviderKind);
 
-        var agent = CreateChatClient(descriptor.ProviderKind, descriptor.ProviderDisplayName, agentRecord.Name)
+        var agent = CreateChatClient(
+                descriptor.ProviderKind,
+                descriptor.ProviderDisplayName,
+                agentRecord.Name,
+                sessionId,
+                agentRecord.ModelName)
             .AsAIAgent(options, loggerFactory, serviceProvider);
 
         return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
@@ -159,11 +166,23 @@ internal sealed class AgentRuntimeConversationFactory(
     private IChatClient CreateChatClient(
         AgentProviderKind providerKind,
         string providerDisplayName,
-        string agentName)
+        string agentName,
+        SessionId sessionId,
+        string modelName)
     {
         if (providerKind == AgentProviderKind.Debug)
         {
             return new DebugChatClient(agentName, timeProvider);
+        }
+
+        if (providerKind == AgentProviderKind.Codex)
+        {
+            return new CodexChatClient(
+                sessionId,
+                agentName,
+                modelName,
+                codexThreadStateStore,
+                timeProvider);
         }
 
         throw new InvalidOperationException(

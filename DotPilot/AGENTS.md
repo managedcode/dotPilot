@@ -31,6 +31,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Build the visible product around a desktop chat shell: session list, active transcript, terminal-like activity pane, agent/profile controls, and provider settings are the primary surfaces.
 - Keep agent creation prompt-first in the UI: the default `New agent` experience should start from a natural-language description that generates a draft agent, while manual field-by-field configuration stays a secondary fallback path.
 - Keep a visible default-agent path in the shell: the app should surface a usable system/default agent by default and must not make the operator build everything manually before they can start a session.
+- Keep debug fallback out of the operator-facing authoring surface: `New agent` must only present real provider/model choices, and when no real provider is enabled or installed the screen should direct the operator to `Providers` instead of selecting debug defaults.
 - Treat agent creation as profile authoring, not role assignment: do not expose role pickers or role-derived copy in the operator flow because an agent is created from its prompt, instructions, provider, model, and system prompt.
 - Do not fabricate tool lists, skill lists, role taxonomies, or capability chips in the operator flow when the app does not have a real backing registry or runtime implementation for them; if a capability is not real, leave it out of the UI and saved draft.
 - Do not present a live provider like Codex in the desktop shell as selected or runnable when the local runtime still cannot execute through its installed CLI; the visible session path must match the actual provider that will answer.
@@ -55,6 +56,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Reuse shared resources and small XAML components instead of duplicating large visual sections across pages.
 - Treat desktop window sizing and positioning as an app-startup responsibility in `App.xaml.cs`.
 - For local UI debugging on this machine, run the real desktop head and prefer local `Uno` app tooling or MCP inspection over `browserwasm` reproduction unless the task is specifically about `DotPilot.UITests`.
+- Do not let ordinary view-model binding or section switching trigger duplicate provider CLI probes or log expected async cancellation as failures; the shell should stay quiet and reactive during normal navigation.
 - Prefer `Microsoft Agent Framework` for orchestration, sessions, workflows, HITL, MCP-aware runtime features, and OpenTelemetry-based observability hooks.
 - Keep the prompt-to-agent interpreter outside the page layer: the Uno shell should collect the user prompt and render the generated draft, while the runtime or a dedicated system-agent orchestration service decides agent name, description, tools, providers, and policy-compliant defaults.
 - Persist durable chat/session/operator state outside the UI layer, using `EF Core` with `SQLite` for the local desktop store when data must survive restarts.

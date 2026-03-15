@@ -231,19 +231,30 @@
 
                   <Rectangle Style="{StaticResource SectionDividerStyle}" />
 
-                  <Border Style="{StaticResource SettingsOptionCardStyle}"
-                          Visibility="{Binding HasSelectedProviderInstallCommand}">
-                    <StackPanel Spacing="8">
-                      <TextBlock Style="{StaticResource ChatComposerLabelTextStyle}"
-                                 Text="Install command" />
-                      <TextBlock AutomationProperties.AutomationId="SelectedProviderInstallCommand"
-                                 FontSize="12"
-                                 FontFamily="{StaticResource AppAccentFontFamily}"
-                                 Foreground="{StaticResource AppSecondaryTextBrush}"
-                                 Text="{Binding SelectedProviderInstallCommand}"
-                                 TextWrapping="WrapWholeWords" />
-                    </StackPanel>
-                  </Border>
+                  <StackPanel Spacing="10"
+                              Visibility="{Binding HasSelectedProviderDetails}">
+                    <TextBlock Style="{StaticResource ChatComposerLabelTextStyle}"
+                               Text="Runtime details" />
+                    <ItemsControl ItemsSource="{Binding SelectedProviderDetails}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="presentation:ProviderDetailItem">
+                          <Border Style="{StaticResource SettingsOptionCardStyle}"
+                                  Margin="0,0,0,10">
+                            <StackPanel Spacing="8">
+                              <TextBlock FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Text="{x:Bind Label}" />
+                              <TextBlock FontSize="12"
+                                         FontFamily="{StaticResource AppAccentFontFamily}"
+                                         Foreground="{StaticResource AppSecondaryTextBrush}"
+                                         Text="{x:Bind Value}"
+                                         TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
 
                   <StackPanel Spacing="10"
                               Visibility="{Binding HasSelectedProviderActions}">

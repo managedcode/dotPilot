@@ -111,6 +111,16 @@ internal static partial class AgentSessionServiceLog
         string modelName);
 
     [LoggerMessage(
+        EventId = 1219,
+        Level = LogLevel.Information,
+        Message = "Normalized legacy agent profile. AgentId={AgentId} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void LegacyAgentProfileNormalized(
+        ILogger logger,
+        Guid agentId,
+        AgentProviderKind providerKind,
+        string modelName);
+
+    [LoggerMessage(
         EventId = 1202,
         Level = LogLevel.Information,
         Message = "Loaded workspace snapshot. Sessions={SessionCount} Agents={AgentCount} Providers={ProviderCount}.")]

@@ -22,8 +22,6 @@ internal sealed class AgentSessionService(
     private const string ToolAuthor = "Tool";
     private const string StatusAuthor = "System";
     private const string DisabledProviderSendText = "The provider for this agent is disabled. Re-enable it in settings before sending.";
-    private const string DebugToolStartText = "Preparing local debug workflow.";
-    private const string DebugToolDoneText = "Debug workflow finished.";
     private const string ToolAccentLabel = "tool";
     private const string StatusAccentLabel = "status";
     private const string ErrorAccentLabel = "error";
@@ -33,6 +31,18 @@ internal sealed class AgentSessionService(
     private bool _initialized;
 
     public async ValueTask<Result<AgentWorkspaceSnapshot>> GetWorkspaceAsync(CancellationToken cancellationToken)
+    {
+        return await LoadWorkspaceAsync(forceRefreshProviders: false, cancellationToken);
+    }
+
+    public async ValueTask<Result<AgentWorkspaceSnapshot>> RefreshWorkspaceAsync(CancellationToken cancellationToken)
+    {
+        return await LoadWorkspaceAsync(forceRefreshProviders: true, cancellationToken);
+    }
+
+    private async ValueTask<Result<AgentWorkspaceSnapshot>> LoadWorkspaceAsync(
+        bool forceRefreshProviders,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -55,7 +65,7 @@ internal sealed class AgentSessionService(
             var sessionItems = sessions
                 .Select(record => MapSessionListItem(record, agentsById, entries))
                 .ToArray();
-            var providers = await providerStatusReader.ReadAsync(cancellationToken);
+            var providers = await GetProviderStatusesAsync(forceRefreshProviders, cancellationToken);
 
             AgentSessionServiceLog.WorkspaceLoaded(
                 logger,
@@ -135,7 +145,7 @@ internal sealed class AgentSessionService(
         try
         {
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var providers = await providerStatusReader.ReadAsync(cancellationToken);
+            var providers = await GetProviderStatusesAsync(forceRefresh: false, cancellationToken);
             var provider = providers.First(status => status.Kind == command.ProviderKind);
             if (!provider.CanCreateAgents)
             {
@@ -248,7 +258,8 @@ internal sealed class AgentSessionService(
             record.UpdatedAt = timeProvider.GetUtcNow();
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            var providers = await providerStatusReader.ReadAsync(cancellationToken);
+            InvalidateProviderStatusSnapshot();
+            var providers = await GetProviderStatusesAsync(forceRefresh: true, cancellationToken);
             var provider = providers.First(status => status.Kind == command.ProviderKind);
 
             AgentSessionServiceLog.ProviderPreferenceUpdated(logger, command.ProviderKind, command.IsEnabled);
@@ -413,7 +424,7 @@ internal sealed class AgentSessionService(
             Result<ProviderStatusDescriptor> providerStatusResult;
             try
             {
-                var providerStatuses = await providerStatusReader.ReadAsync(cancellationToken);
+                var providerStatuses = await GetProviderStatusesAsync(forceRefresh: false, cancellationToken);
                 providerStatusResult = Result<ProviderStatusDescriptor>.Succeed(
                     providerStatuses.First(status => status.Kind == providerProfile.Kind));
             }
@@ -445,6 +456,23 @@ internal sealed class AgentSessionService(
                 await dbContext.SaveChangesAsync(cancellationToken);
 
                 yield return Result<SessionStreamEntry>.Succeed(MapEntry(disabledEntry));
+                yield break;
+            }
+
+            if (!providerStatus.CanCreateAgents)
+            {
+                var unavailableEntry = CreateEntryRecord(
+                    command.SessionId,
+                    SessionStreamEntryKind.Error,
+                    StatusAuthor,
+                    providerStatus.StatusSummary,
+                    timeProvider.GetUtcNow(),
+                    accentLabel: ErrorAccentLabel);
+                dbContext.SessionEntries.Add(unavailableEntry);
+                session.UpdatedAt = unavailableEntry.Timestamp;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                yield return Result<SessionStreamEntry>.Succeed(MapEntry(unavailableEntry));
                 yield break;
             }
 
@@ -492,7 +520,7 @@ internal sealed class AgentSessionService(
                 command.SessionId,
                 SessionStreamEntryKind.ToolStarted,
                 ToolAuthor,
-                DebugToolStartText,
+                CreateToolStartText(providerProfile),
                 timeProvider.GetUtcNow(),
                 agentProfileId: new AgentProfileId(agent.Id),
                 accentLabel: ToolAccentLabel);
@@ -651,7 +679,7 @@ internal sealed class AgentSessionService(
                     command.SessionId,
                     SessionStreamEntryKind.ToolCompleted,
                     ToolAuthor,
-                    DebugToolDoneText,
+                    CreateToolDoneText(providerProfile),
                     timeProvider.GetUtcNow(),
                     agentProfileId: new AgentProfileId(agent.Id),
                     accentLabel: ToolAccentLabel);
@@ -729,15 +757,19 @@ internal sealed class AgentSessionService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await NormalizeLegacyAgentProfilesAsync(dbContext, cancellationToken);
+
         var hasAgents = await dbContext.AgentProfiles.AnyAsync(cancellationToken);
         if (hasAgents)
         {
             return;
         }
 
-        var providerSnapshot = await providerStatusReader.ReadAsync(cancellationToken);
+        var providerSnapshot = await GetProviderStatusesAsync(forceRefresh: true, cancellationToken);
         var providerKind = providerSnapshot
-            .Where(static provider => provider.CanCreateAgents)
+            .Where(provider =>
+                provider.CanCreateAgents &&
+                AgentSessionProviderCatalog.Get(provider.Kind).SupportsLiveExecution)
             .Select(static provider => provider.Kind)
             .FirstOrDefault(AgentProviderKind.Debug);
         var record = new AgentProfileRecord
@@ -753,6 +785,43 @@ internal sealed class AgentSessionService(
         dbContext.AgentProfiles.Add(record);
         await dbContext.SaveChangesAsync(cancellationToken);
         AgentSessionServiceLog.DefaultAgentSeeded(logger, record.Id, providerKind, record.ModelName);
+    }
+
+    private async ValueTask<IReadOnlyList<ProviderStatusDescriptor>> GetProviderStatusesAsync(
+        bool forceRefresh,
+        CancellationToken cancellationToken)
+    {
+        _ = forceRefresh;
+        return await providerStatusReader.ReadAsync(cancellationToken);
+    }
+
+    private static void InvalidateProviderStatusSnapshot()
+    {
+    }
+
+    private async Task NormalizeLegacyAgentProfilesAsync(
+        LocalAgentSessionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var legacyDebugModel = AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug);
+        var legacyAgents = await dbContext.AgentProfiles
+            .Where(record =>
+                record.ProviderKind != (int)AgentProviderKind.Debug &&
+                record.ModelName == legacyDebugModel)
+            .ToListAsync(cancellationToken);
+        if (legacyAgents.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var agent in legacyAgents)
+        {
+            var providerKind = (AgentProviderKind)agent.ProviderKind;
+            agent.ModelName = AgentSessionDefaults.GetDefaultModel(providerKind);
+            AgentSessionServiceLog.LegacyAgentProfileNormalized(logger, agent.Id, providerKind, agent.ModelName);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static SessionEntryRecord CreateEntryRecord(
@@ -775,6 +844,24 @@ internal sealed class AgentSessionService(
             Timestamp = timestamp,
             AccentLabel = accentLabel,
         };
+    }
+
+    private static string CreateToolStartText(AgentSessionProviderProfile providerProfile)
+    {
+        return providerProfile.Kind == AgentProviderKind.Debug
+            ? "Preparing local debug workflow."
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"Launching {providerProfile.DisplayName} in the local playground.");
+    }
+
+    private static string CreateToolDoneText(AgentSessionProviderProfile providerProfile)
+    {
+        return providerProfile.Kind == AgentProviderKind.Debug
+            ? "Debug workflow finished."
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{providerProfile.DisplayName} turn finished.");
     }
 
     private static SessionStreamEntry MapEntry(SessionEntryRecord record)

@@ -7,6 +7,10 @@ public sealed record ProviderActionDescriptor(
     string Summary,
     string Command);
 
+public sealed record ProviderDetailDescriptor(
+    string Label,
+    string Value);
+
 public sealed record ProviderStatusDescriptor(
     ProviderId Id,
     AgentProviderKind Kind,
@@ -14,9 +18,11 @@ public sealed record ProviderStatusDescriptor(
     string CommandName,
     AgentProviderStatus Status,
     string StatusSummary,
+    string SuggestedModelName,
     string? InstalledVersion,
     bool IsEnabled,
     bool CanCreateAgents,
+    IReadOnlyList<ProviderDetailDescriptor> Details,
     IReadOnlyList<ProviderActionDescriptor> Actions);
 
 public sealed record AgentProfileSummary(

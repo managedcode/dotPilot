@@ -1,6 +1,7 @@
 using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
+using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 
@@ -136,8 +137,9 @@ public sealed class AgentSessionServiceTests
     }
 
     [Test]
-    public async Task LegacyUnsupportedProviderSessionReturnsExplicitErrorWithoutRuntimePlaceholderClient()
+    public async Task SendMessageAsyncReturnsProviderReadinessErrorWhenCodexCliIsMissing()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
         await using var fixture = CreateFixture();
         (await fixture.Service.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
@@ -163,14 +165,41 @@ public sealed class AgentSessionServiceTests
         streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.UserMessage);
         streamedEntries.Should().Contain(entry =>
             entry.Kind == SessionStreamEntryKind.Error &&
-            entry.Text.Contains("Codex live CLI execution is not wired yet in this slice.", StringComparison.Ordinal));
+            entry.Text.Contains("Codex CLI is not installed.", StringComparison.Ordinal));
         streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolStarted);
         streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolCompleted);
         streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.AssistantMessage);
 
         reloaded.Entries.Should().Contain(entry =>
             entry.Kind == SessionStreamEntryKind.Error &&
-            entry.Text.Contains("Codex live CLI execution is not wired yet in this slice.", StringComparison.Ordinal));
+            entry.Text.Contains("Codex CLI is not installed.", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task GetWorkspaceAsyncNormalizesLegacyDebugModelAssignedToANonDebugProvider()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        await using var fixture = CreateFixture();
+        var legacyAgentId = Guid.CreateVersion7();
+        await SeedLegacyAgentAsync(
+            fixture.Provider,
+            legacyAgentId,
+            AgentProviderKind.Codex,
+            "Debug Agent",
+            "debug-echo");
+        (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+
+        workspace.Agents.Should().ContainSingle(agent =>
+            agent.Id == new AgentProfileId(legacyAgentId) &&
+            agent.ProviderKind == AgentProviderKind.Codex &&
+            !string.Equals(
+                agent.ModelName,
+                AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug),
+                StringComparison.Ordinal));
     }
 
     private static async Task<AgentProfileSummary> EnableDebugAndCreateAgentAsync(
@@ -205,7 +234,12 @@ public sealed class AgentSessionServiceTests
         return new TestFixture(provider, service);
     }
 
-    private static async Task SeedLegacyAgentAsync(ServiceProvider provider, Guid agentId)
+    private static async Task SeedLegacyAgentAsync(
+        ServiceProvider provider,
+        Guid agentId,
+        AgentProviderKind providerKind = AgentProviderKind.Codex,
+        string agentName = "Legacy Codex Agent",
+        string modelName = "gpt-5")
     {
         ArgumentNullException.ThrowIfNull(provider);
 
@@ -225,9 +259,9 @@ public sealed class AgentSessionServiceTests
         var record = Activator.CreateInstance(agentProfileRecordType)
             ?? throw new InvalidOperationException("AgentProfileRecord could not be created.");
         SetProperty(record, "Id", agentId);
-        SetProperty(record, "Name", "Legacy Codex Agent");
-        SetProperty(record, "ProviderKind", (int)AgentProviderKind.Codex);
-        SetProperty(record, "ModelName", "gpt-5");
+        SetProperty(record, "Name", agentName);
+        SetProperty(record, "ProviderKind", (int)providerKind);
+        SetProperty(record, "ModelName", modelName);
         SetProperty(record, "SystemPrompt", "Use Codex when available.");
         SetProperty(record, "CreatedAt", DateTimeOffset.UtcNow);
 

@@ -52,10 +52,15 @@ public sealed partial record ProviderStatusItem(
     string? InstalledVersion,
     bool IsEnabled,
     bool CanCreateAgents,
-    string InstallCommand,
+    IReadOnlyList<ProviderDetailItem> Details,
     IReadOnlyList<ProviderActionItem> Actions,
     string AutomationId,
     bool IsSelected);
+
+[Bindable]
+public sealed partial record ProviderDetailItem(
+    string Label,
+    string Value);
 
 [Bindable]
 public sealed partial record ProviderActionItem(

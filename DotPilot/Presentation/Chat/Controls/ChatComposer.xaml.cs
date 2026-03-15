@@ -1,13 +1,12 @@
-using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
-using Windows.UI.Core;
 
 namespace DotPilot.Presentation.Controls;
 
 public sealed partial class ChatComposer : UserControl
 {
     private const string NewLineValue = "\n";
+    private readonly ChatComposerModifierState modifierState = new();
     public static readonly DependencyProperty SendBehaviorProperty =
         DependencyProperty.Register(
             nameof(SendBehavior),
@@ -33,10 +32,11 @@ public sealed partial class ChatComposer : UserControl
             return;
         }
 
+        modifierState.RegisterKeyDown(e.Key);
         var action = ChatComposerKeyboardPolicy.Resolve(
             behavior: SendBehavior,
             isEnterKey: e.Key is VirtualKey.Enter,
-            hasModifier: HasModifierKeyPressed());
+            hasModifier: modifierState.HasPressedModifier);
         if (action is ChatComposerKeyboardAction.SendMessage)
         {
             ExecuteSubmitAction(textBox);
@@ -51,6 +51,16 @@ public sealed partial class ChatComposer : UserControl
 
         InsertNewLine(textBox);
         e.Handled = true;
+    }
+
+    private void OnComposerInputKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        modifierState.RegisterKeyUp(e.Key);
+    }
+
+    private void OnComposerInputLostFocus(object sender, RoutedEventArgs e)
+    {
+        modifierState.Reset();
     }
 
     private void OnSendButtonClick(object sender, RoutedEventArgs e)
@@ -105,20 +115,6 @@ public sealed partial class ChatComposer : UserControl
         bindingExpression?.UpdateSource();
     }
 
-    private static bool HasModifierKeyPressed()
-    {
-        return IsKeyPressed(VirtualKey.Shift) ||
-            IsKeyPressed(VirtualKey.Menu) ||
-            IsKeyPressed(VirtualKey.Control) ||
-            IsKeyPressed(VirtualKey.LeftWindows) ||
-            IsKeyPressed(VirtualKey.RightWindows);
-    }
-
-    private static bool IsKeyPressed(VirtualKey key)
-    {
-        return InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
-    }
-
     private static void InsertNewLine(TextBox textBox)
     {
         ArgumentNullException.ThrowIfNull(textBox);
@@ -133,5 +129,6 @@ public sealed partial class ChatComposer : UserControl
         textBox.Text = updatedText;
         textBox.SelectionStart = insertionIndex + NewLineValue.Length;
         textBox.SelectionLength = 0;
+        SynchronizeComposerText(textBox);
     }
 }

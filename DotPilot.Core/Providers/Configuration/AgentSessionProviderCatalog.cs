@@ -36,7 +36,7 @@ internal static class AgentSessionProviderCatalog
         return
         [
             new(AgentProviderKind.Debug, DebugDisplayName, DebugCommandName, DebugModelName, DebugInstallCommand, true, true),
-            new(AgentProviderKind.Codex, CodexDisplayName, CodexCommandName, CodexModelName, CodexInstallCommand, false, false),
+            new(AgentProviderKind.Codex, CodexDisplayName, CodexCommandName, CodexModelName, CodexInstallCommand, false, true),
             new(AgentProviderKind.ClaudeCode, ClaudeDisplayName, ClaudeCommandName, ClaudeModelName, ClaudeInstallCommand, false, false),
             new(AgentProviderKind.GitHubCopilot, CopilotDisplayName, CopilotCommandName, CopilotModelName, CopilotInstallCommand, false, false),
         ];

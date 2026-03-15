@@ -75,11 +75,8 @@
           <TextBlock AutomationProperties.AutomationId="AgentSuggestedModelText"
                      FontSize="11.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     TextWrapping="WrapWholeWords">
-            <Run Text="Use the suggested model or enter a provider-specific override. Suggested: " />
-            <Run Text="{Binding Builder.SuggestedModelName}" />
-            <Run Text="." />
-          </TextBlock>
+                     Text="{Binding Builder.ModelHelperText}"
+                     TextWrapping="WrapWholeWords" />
         </StackPanel>
 
         <StackPanel Grid.Row="2"
@@ -89,8 +86,9 @@
           <TextBlock FontSize="12"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="Runtime selection" />
-          <TextBlock FontSize="13"
+                     Text="Provider status" />
+          <TextBlock AutomationProperties.AutomationId="AgentSelectedProviderText"
+                     FontSize="13"
                      FontWeight="SemiBold"
                      Text="{Binding Builder.ProviderDisplayName}" />
           <TextBlock FontSize="11.5"

@@ -11,9 +11,14 @@ public partial record AgentBuilderModel(
     AgentPromptDraftGenerator draftGenerator,
     ILogger<AgentBuilderModel> logger)
 {
-    private const string EmptyProviderDisplayName = "No provider selected";
-    private const string EmptyProviderStatusSummary = "Provider readiness is still loading.";
-    private const string EmptyProviderCommandName = "No command available";
+    private const string EmptyProviderDisplayName = "Select a provider";
+    private const string EmptyProviderStatusSummary =
+        "Enable Codex, Claude Code, or GitHub Copilot in Providers before saving the profile.";
+    private const string EmptyProviderCommandName = "";
+    private const string EmptyModelHelperText =
+        "Select an enabled provider to load its recommended model.";
+    private const string SuggestedModelHelperFormat =
+        "Use the suggested model or enter a provider-specific override. Suggested: {0}.";
     private const string DraftGenerationProgressMessage = "Generating agent draft...";
     private const string AgentCreationProgressMessage = "Saving local agent profile...";
     private const string PromptGenerationValidationMessage = "Describe the agent you want before generating a draft.";
@@ -37,8 +42,10 @@ public partial record AgentBuilderModel(
         System.Text.CompositeFormat.Parse(GeneratedDraftMessageFormat);
     private static readonly System.Text.CompositeFormat StartedChatCompositeFormat =
         System.Text.CompositeFormat.Parse(StartedChatMessageFormat);
+    private static readonly System.Text.CompositeFormat SuggestedModelHelperCompositeFormat =
+        System.Text.CompositeFormat.Parse(SuggestedModelHelperFormat);
     private static readonly AgentProviderOption EmptySelectedProvider =
-        new(AgentProviderKind.Debug, string.Empty, string.Empty, string.Empty, null, false);
+        new(AgentProviderKind.Debug, string.Empty, string.Empty, string.Empty, string.Empty, null, false);
     private static readonly AgentBuilderSurface CatalogSurface =
         new(AgentBuilderSurfaceKind.Catalog, CatalogTitle, CatalogSubtitle, false, CreateActionLabel);
     private static readonly AgentBuilderSurface PromptSurface =
@@ -165,11 +172,6 @@ public partial record AgentBuilderModel(
         var nextSuggestedModel = ResolveSuggestedModelName(provider);
 
         await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
-        if (!provider.CanCreateAgents)
-        {
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(currentModelName) ||
             string.Equals(currentModelName, previousSuggestedModel, StringComparison.Ordinal))
         {
@@ -348,6 +350,7 @@ public partial record AgentBuilderModel(
 
             var providers = workspace.Providers
                 .Select(MapProviderOption)
+                .Where(static provider => provider.Kind != AgentProviderKind.Debug)
                 .ToImmutableArray();
 
             await EnsureSelectedProviderAsync(providers, cancellationToken);
@@ -383,6 +386,12 @@ public partial record AgentBuilderModel(
         var providerVersionLabel = string.IsNullOrWhiteSpace(selectedProvider.InstalledVersion)
             ? string.Empty
             : VersionPrefix + selectedProvider.InstalledVersion;
+        var modelHelperText = string.IsNullOrWhiteSpace(suggestedModelName)
+            ? EmptyModelHelperText
+            : string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                SuggestedModelHelperCompositeFormat,
+                suggestedModelName);
 
         return new AgentBuilderView(
             IsEmptySelectedProvider(selectedProvider) ? EmptyProviderDisplayName : selectedProvider.DisplayName,
@@ -391,6 +400,7 @@ public partial record AgentBuilderModel(
             providerVersionLabel,
             !string.IsNullOrWhiteSpace(providerVersionLabel),
             suggestedModelName,
+            modelHelperText,
             ResolveStatusMessage(selectedProvider),
             await CanSaveAgent);
     }
@@ -408,8 +418,13 @@ public partial record AgentBuilderModel(
             provider = FindFirstCreatableProvider(providers);
         }
 
+        if (IsEmptySelectedProvider(provider) && providers.Count > 0)
+        {
+            provider = providers[0];
+        }
+
         await HandleSelectedProviderChanged(provider, cancellationToken);
-        await ModelName.SetAsync(draft.ModelName, cancellationToken);
+        await ModelName.SetAsync(ResolveDraftModelName(draft, provider), cancellationToken);
     }
 
     private async ValueTask EnsureSelectedProviderAsync(
@@ -491,6 +506,7 @@ public partial record AgentBuilderModel(
             provider.DisplayName,
             provider.CommandName,
             provider.StatusSummary,
+            provider.SuggestedModelName,
             provider.InstalledVersion,
             provider.CanCreateAgents);
     }
@@ -531,8 +547,26 @@ public partial record AgentBuilderModel(
     private static string ResolveSuggestedModelName(AgentProviderOption provider)
     {
         return IsEmptySelectedProvider(provider)
-            ? AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug)
-            : AgentSessionDefaults.GetDefaultModel(provider.Kind);
+            ? string.Empty
+            : provider.SuggestedModelName;
+    }
+
+    private static string ResolveDraftModelName(AgentPromptDraft draft, AgentProviderOption provider)
+    {
+        var suggestedModelName = ResolveSuggestedModelName(provider);
+        if (IsEmptySelectedProvider(provider))
+        {
+            return string.Empty;
+        }
+
+        if (provider.Kind != draft.ProviderKind)
+        {
+            return suggestedModelName;
+        }
+
+        return string.IsNullOrWhiteSpace(draft.ModelName)
+            ? suggestedModelName
+            : draft.ModelName;
     }
 
     private static bool IsEmptySelectedProvider(AgentProviderOption? provider)

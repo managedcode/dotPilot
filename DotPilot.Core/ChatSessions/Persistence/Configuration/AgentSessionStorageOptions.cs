@@ -13,4 +13,6 @@ public sealed class AgentSessionStorageOptions
     public string? RuntimeSessionDirectoryPath { get; init; }
 
     public string? ChatHistoryDirectoryPath { get; init; }
+
+    public string? PlaygroundDirectoryPath { get; init; }
 }
