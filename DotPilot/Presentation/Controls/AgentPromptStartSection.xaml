@@ -22,7 +22,7 @@
         <TextBlock MaxWidth="560"
                    FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Describe the job once. dotPilot drafts the profile, provider, model, and capabilities for review."
+                   Text="Describe the job once. dotPilot drafts the profile, provider, model, tools, and skills for review."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 
@@ -51,8 +51,7 @@
         <Button x:Name="GenerateAgentButton"
                 AutomationProperties.AutomationId="GenerateAgentButton"
                 Click="OnGenerateAgentButtonClick"
-                Command="{Binding GenerateAgentDraftCommand}"
-                CommandParameter="{Binding Text, ElementName=PromptInput}"
+                Tag="{Binding GenerateAgentDraftCommand}"
                 Style="{StaticResource AccentActionButtonStyle}">
           <TextBlock Text="Generate agent" />
         </Button>

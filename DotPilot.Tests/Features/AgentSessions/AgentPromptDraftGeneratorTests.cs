@@ -1,5 +1,4 @@
 using DotPilot.Core.Features.AgentSessions;
-using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,12 +16,15 @@ public sealed class AgentPromptDraftGeneratorTests
             CancellationToken.None);
 
         draft.Name.Should().Be("Repository Reviewer Checks Agent");
-        draft.Role.Should().Be(AgentRoleKind.Reviewer);
         draft.ProviderKind.Should().Be(AgentProviderKind.Debug);
         draft.ModelName.Should().Be("debug-echo");
-        draft.Capabilities.Should().Contain(AgentSessionDefaults.GitCapability);
-        draft.Capabilities.Should().Contain(AgentSessionDefaults.FilesCapability);
+        draft.Tools.Should().Contain(AgentSessionDefaults.GitCapability);
+        draft.Tools.Should().Contain(AgentSessionDefaults.FilesCapability);
+        draft.Skills.Should().Contain(AgentSessionDefaults.RepositoryReviewSkill);
+        draft.Skills.Should().Contain(AgentSessionDefaults.ChangeExplanationSkill);
         draft.SystemPrompt.Should().Contain("Mission:");
+        draft.SystemPrompt.Should().Contain("Primary tools:");
+        draft.SystemPrompt.Should().NotContain("Role:");
     }
 
     [Test]
@@ -33,10 +35,10 @@ public sealed class AgentPromptDraftGeneratorTests
         var draft = await fixture.Generator.CreateManualDraftAsync(CancellationToken.None);
 
         draft.Name.Should().Be("New agent");
-        draft.Role.Should().Be(AgentRoleKind.Operator);
         draft.ProviderKind.Should().Be(AgentProviderKind.Debug);
         draft.ModelName.Should().Be("debug-echo");
-        draft.Capabilities.Should().Contain(AgentSessionDefaults.ShellCapability);
+        draft.Tools.Should().Contain(AgentSessionDefaults.ShellCapability);
+        draft.Skills.Should().Contain(AgentSessionDefaults.TaskPlanningSkill);
     }
 
     private static TestFixture CreateFixture()

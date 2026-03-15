@@ -22,3 +22,5 @@ public sealed record UpdateProviderPreferenceCommand(
     AgentProviderKind ProviderKind,
     bool IsEnabled);
 
+public sealed record UpdateComposerSendBehaviorCommand(
+    ComposerSendBehavior Behavior);

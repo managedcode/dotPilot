@@ -70,7 +70,8 @@
         <Button x:Name="SaveAgentActionButton"
                 Grid.Column="1"
                 AutomationProperties.AutomationId="SaveAgentButton"
-                Command="{Binding SaveAgentCommand}"
+                Click="OnSaveAgentButtonClick"
+                Tag="{Binding SaveAgentCommand}"
                 Style="{StaticResource AccentActionButtonStyle}">
           <TextBlock Text="Save agent" />
         </Button>

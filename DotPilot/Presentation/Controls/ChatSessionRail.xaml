@@ -3,15 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:presentation="using:DotPilot.Presentation"
              AutomationProperties.AutomationId="ChatSessionRail">
-  <Border Style="{StaticResource GlassPanelStyle}"
-          Padding="18">
+  <Border Style="{StaticResource ChatSurfacePanelStyle}">
     <StackPanel Spacing="16">
       <StackPanel Spacing="4">
-        <TextBlock FontSize="20"
-                   FontWeight="SemiBold"
+        <TextBlock Style="{StaticResource ChatSectionTitleTextStyle}"
                    Text="Sessions" />
-        <TextBlock FontSize="12"
-                   Foreground="{StaticResource AppMutedTextBrush}"
+        <TextBlock Style="{StaticResource ChatSectionCaptionTextStyle}"
                    Text="Saved and active local sessions." />
       </StackPanel>
 

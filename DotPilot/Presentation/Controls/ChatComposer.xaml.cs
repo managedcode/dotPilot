@@ -1,3 +1,4 @@
+using DotPilot.Core.Features.AgentSessions;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
@@ -8,10 +9,22 @@ namespace DotPilot.Presentation.Controls;
 public sealed partial class ChatComposer : UserControl
 {
     private const string NewLineValue = "\n";
+    public static readonly DependencyProperty SendBehaviorProperty =
+        DependencyProperty.Register(
+            nameof(SendBehavior),
+            typeof(ComposerSendBehavior),
+            typeof(ChatComposer),
+            new PropertyMetadata(ComposerSendBehavior.EnterSends));
 
     public ChatComposer()
     {
         InitializeComponent();
+    }
+
+    public ComposerSendBehavior SendBehavior
+    {
+        get => (ComposerSendBehavior)GetValue(SendBehaviorProperty);
+        set => SetValue(SendBehaviorProperty, value);
     }
 
     private void OnComposerInputKeyDown(object sender, KeyRoutedEventArgs e)
@@ -22,9 +35,9 @@ public sealed partial class ChatComposer : UserControl
         }
 
         var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: SendBehavior,
             isEnterKey: e.Key is VirtualKey.Enter,
-            isShiftPressed: IsKeyPressed(VirtualKey.Shift),
-            isAltPressed: IsKeyPressed(VirtualKey.Menu));
+            hasModifier: HasModifierKeyPressed());
         if (action is ChatComposerKeyboardAction.SendMessage)
         {
             ExecuteSubmitAction(textBox);
@@ -91,6 +104,15 @@ public sealed partial class ChatComposer : UserControl
 
         var bindingExpression = textBox.GetBindingExpression(TextBox.TextProperty);
         bindingExpression?.UpdateSource();
+    }
+
+    private static bool HasModifierKeyPressed()
+    {
+        return IsKeyPressed(VirtualKey.Shift) ||
+            IsKeyPressed(VirtualKey.Menu) ||
+            IsKeyPressed(VirtualKey.Control) ||
+            IsKeyPressed(VirtualKey.LeftWindows) ||
+            IsKeyPressed(VirtualKey.RightWindows);
     }
 
     private static bool IsKeyPressed(VirtualKey key)

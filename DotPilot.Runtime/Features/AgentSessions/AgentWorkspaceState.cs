@@ -162,6 +162,37 @@ internal sealed class AgentWorkspaceState(
         return provider;
     }
 
+    public async ValueTask<OperatorPreferencesSnapshot> UpdateComposerSendBehaviorAsync(
+        UpdateComposerSendBehaviorCommand command,
+        CancellationToken cancellationToken)
+    {
+        var preferences = await agentSessionService.UpdateComposerSendBehaviorAsync(command, cancellationToken);
+
+        await _cacheGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_workspace is not null)
+            {
+                _workspace = _workspace with
+                {
+                    Preferences = preferences,
+                };
+            }
+        }
+        finally
+        {
+            _cacheGate.Release();
+        }
+
+        AgentWorkspaceStateLog.WorkspaceRefreshed(
+            logger,
+            _workspace?.Sessions.Count ?? 0,
+            _workspace?.Agents.Count ?? 0,
+            _workspace?.Providers.Count ?? 0);
+
+        return preferences;
+    }
+
     public async IAsyncEnumerable<SessionStreamEntry> SendMessageAsync(
         SendSessionMessageCommand command,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)

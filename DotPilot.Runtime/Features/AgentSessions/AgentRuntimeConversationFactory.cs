@@ -16,9 +16,9 @@ internal sealed class AgentRuntimeConversationFactory(
     TimeProvider timeProvider,
     ILogger<AgentRuntimeConversationFactory> logger)
 {
-    private const string NotYetImplementedFormat = "{0} live CLI execution is not wired yet in this slice.";
-    private static readonly System.Text.CompositeFormat NotYetImplementedCompositeFormat =
-        System.Text.CompositeFormat.Parse(NotYetImplementedFormat);
+    private const string LiveExecutionUnavailableFormat = "Live desktop execution for {0} is not available in this build.";
+    private static readonly System.Text.CompositeFormat LiveExecutionUnavailableCompositeFormat =
+        System.Text.CompositeFormat.Parse(LiveExecutionUnavailableFormat);
 
     public async ValueTask InitializeAsync(
         AgentProfileRecord agentRecord,
@@ -139,7 +139,7 @@ internal sealed class AgentRuntimeConversationFactory(
             agentRecord.Name,
             descriptor.ProviderKind);
 
-        var agent = CreateChatClient(descriptor.ProviderKind, descriptor.ProviderDisplayName, agentRecord.Name)
+        var agent = CreateChatClient(agentRecord, descriptor.ProviderDisplayName)
             .AsAIAgent(options, loggerFactory, serviceProvider);
 
         return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
@@ -156,18 +156,41 @@ internal sealed class AgentRuntimeConversationFactory(
             agentRecord.ModelName);
     }
 
-    private IChatClient CreateChatClient(
-        AgentProviderKind providerKind,
-        string providerDisplayName,
-        string agentName)
+    private IChatClient CreateChatClient(AgentProfileRecord agentRecord, string providerDisplayName)
     {
-        return providerKind == AgentProviderKind.Debug
-            ? new DebugChatClient(agentName, timeProvider)
-            : new UnavailableChatClient(
+        ArgumentNullException.ThrowIfNull(agentRecord);
+
+        var providerKind = (AgentProviderKind)agentRecord.ProviderKind;
+        return providerKind switch
+        {
+            AgentProviderKind.Debug => new DebugChatClient(agentRecord.Name, timeProvider),
+            AgentProviderKind.Codex => CreateCodexChatClient(agentRecord),
+            _ => new UnavailableChatClient(
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    NotYetImplementedCompositeFormat,
-                    providerDisplayName));
+                    LiveExecutionUnavailableCompositeFormat,
+                    providerDisplayName)),
+        };
+    }
+
+    private CodexChatClient CreateCodexChatClient(AgentProfileRecord agentRecord)
+    {
+        var providerProfile = AgentSessionProviderCatalog.Get(AgentProviderKind.Codex);
+        return new CodexChatClient(
+            agentRecord.Name,
+            agentRecord.ModelName,
+            DeserializeCapabilities(agentRecord.CapabilitiesJson),
+            AgentSessionCommandProbe.ResolveExecutablePath(providerProfile.CommandName),
+            Environment.CurrentDirectory,
+            timeProvider,
+            serviceProvider.GetRequiredService<ILogger<CodexChatClient>>());
+    }
+
+    private static string[] DeserializeCapabilities(string capabilitiesJson)
+    {
+        return System.Text.Json.JsonSerializer.Deserialize(
+            capabilitiesJson,
+            AgentSessionJsonSerializerContext.Default.StringArray) ?? [];
     }
 }
 

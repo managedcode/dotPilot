@@ -17,10 +17,10 @@
         <TextBlock AutomationProperties.AutomationId="ProvidersPageTitle"
                    FontSize="24"
                    FontWeight="SemiBold"
-                   Text="Providers" />
+                   Text="{Binding PageTitle}" />
         <TextBlock FontSize="12.5"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Enable local providers before creating agents."
+                   Text="{Binding PageSubtitle}"
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
     </Grid>

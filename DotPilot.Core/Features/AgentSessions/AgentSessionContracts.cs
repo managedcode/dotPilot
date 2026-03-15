@@ -59,5 +59,5 @@ public sealed record AgentWorkspaceSnapshot(
     IReadOnlyList<SessionListItem> Sessions,
     IReadOnlyList<AgentProfileSummary> Agents,
     IReadOnlyList<ProviderStatusDescriptor> Providers,
+    OperatorPreferencesSnapshot Preferences,
     SessionId? SelectedSessionId);
-

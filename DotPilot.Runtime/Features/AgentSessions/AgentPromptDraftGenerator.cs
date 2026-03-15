@@ -1,7 +1,5 @@
 using System.Globalization;
-using System.Text;
 using DotPilot.Core.Features.AgentSessions;
-using DotPilot.Core.Features.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Runtime.Features.AgentSessions;
@@ -10,11 +8,11 @@ public sealed record AgentPromptDraft(
     string Prompt,
     string Name,
     string Description,
-    AgentRoleKind Role,
     AgentProviderKind ProviderKind,
     string ModelName,
     string SystemPrompt,
-    IReadOnlyList<string> Capabilities);
+    IReadOnlyList<string> Tools,
+    IReadOnlyList<string> Skills);
 
 public sealed class AgentPromptDraftGenerator(
     IAgentProviderStatusCache providerStatusCache,
@@ -65,17 +63,17 @@ public sealed class AgentPromptDraftGenerator(
     public async ValueTask<AgentPromptDraft> CreateManualDraftAsync(CancellationToken cancellationToken)
     {
         var providerKind = await ResolvePreferredProviderAsync(ManualPrompt, cancellationToken);
-        var role = AgentRoleKind.Operator;
-        var capabilities = ResolveCapabilities(ManualPrompt);
+        var tools = ResolveTools(ManualPrompt);
+        var skills = ResolveSkills(ManualPrompt);
         var draft = new AgentPromptDraft(
             ManualPrompt,
             ManualAgentName,
             ManualDescription,
-            role,
             providerKind,
             AgentSessionDefaults.GetDefaultModel(providerKind),
-            CreateSystemPrompt(ManualAgentName, ManualDescription, role, capabilities),
-            capabilities);
+            CreateSystemPrompt(ManualAgentName, ManualDescription, tools, skills),
+            tools,
+            skills);
 
         AgentPromptDraftGeneratorLog.ManualDraftCreated(logger, draft.ProviderKind, draft.ModelName);
         return draft;
@@ -85,26 +83,27 @@ public sealed class AgentPromptDraftGenerator(
     {
         var normalizedPrompt = NormalizePrompt(prompt);
         var providerKind = await ResolvePreferredProviderAsync(normalizedPrompt, cancellationToken);
-        var role = ResolveRole(normalizedPrompt);
-        var capabilities = ResolveCapabilities(normalizedPrompt);
+        var tools = ResolveTools(normalizedPrompt);
+        var skills = ResolveSkills(normalizedPrompt);
         var description = CreateDescription(normalizedPrompt);
-        var name = CreateName(normalizedPrompt, role);
+        var name = CreateName(normalizedPrompt);
         var draft = new AgentPromptDraft(
             normalizedPrompt,
             name,
             description,
-            role,
             providerKind,
             AgentSessionDefaults.GetDefaultModel(providerKind),
-            CreateSystemPrompt(name, description, role, capabilities),
-            capabilities);
+            CreateSystemPrompt(name, description, tools, skills),
+            tools,
+            skills);
 
         AgentPromptDraftGeneratorLog.GeneratedDraft(
             logger,
             draft.Name,
             draft.ProviderKind,
             draft.ModelName,
-            draft.Capabilities.Count);
+            draft.Tools.Count,
+            draft.Skills.Count);
         return draft;
     }
 
@@ -153,62 +152,77 @@ public sealed class AgentPromptDraftGenerator(
         yield return AgentProviderKind.Debug;
     }
 
-    private static AgentRoleKind ResolveRole(string prompt)
+    private static string[] ResolveTools(string prompt)
     {
-        if (ContainsAny(prompt, "review", "audit"))
-        {
-            return AgentRoleKind.Reviewer;
-        }
-
-        if (ContainsAny(prompt, "research", "search", "knowledge"))
-        {
-            return AgentRoleKind.Research;
-        }
-
-        if (ContainsAny(prompt, "code", "repository", "repo", "commit", "refactor"))
-        {
-            return AgentRoleKind.Coding;
-        }
-
-        return AgentRoleKind.Operator;
-    }
-
-    private static string[] ResolveCapabilities(string prompt)
-    {
-        HashSet<string> capabilities =
+        HashSet<string> tools =
         [
             AgentSessionDefaults.FilesCapability,
         ];
 
         if (ContainsAny(prompt, "shell", "terminal", "command", "cli", "script"))
         {
-            capabilities.Add(AgentSessionDefaults.ShellCapability);
+            tools.Add(AgentSessionDefaults.ShellCapability);
         }
 
         if (ContainsAny(prompt, "git", "repository", "repo", "commit", "pull request", "branch", "diff"))
         {
-            capabilities.Add(AgentSessionDefaults.GitCapability);
-            capabilities.Add(AgentSessionDefaults.FilesCapability);
+            tools.Add(AgentSessionDefaults.GitCapability);
+            tools.Add(AgentSessionDefaults.FilesCapability);
         }
 
         if (ContainsAny(prompt, "research", "search", "browse", "web", "internet", "documentation", "docs"))
         {
-            capabilities.Add(AgentSessionDefaults.WebCapability);
+            tools.Add(AgentSessionDefaults.WebCapability);
         }
 
         if (ContainsAny(prompt, "code", "refactor", "implement"))
         {
-            capabilities.Add(AgentSessionDefaults.ShellCapability);
-            capabilities.Add(AgentSessionDefaults.GitCapability);
+            tools.Add(AgentSessionDefaults.ShellCapability);
+            tools.Add(AgentSessionDefaults.GitCapability);
         }
 
-        if (capabilities.Count == 1)
+        if (tools.Count == 1)
         {
-            capabilities.Add(AgentSessionDefaults.ShellCapability);
+            tools.Add(AgentSessionDefaults.ShellCapability);
         }
 
-        return capabilities
-            .OrderBy(static capability => capability, StringComparer.Ordinal)
+        return tools
+            .OrderBy(static tool => tool, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string[] ResolveSkills(string prompt)
+    {
+        HashSet<string> skills =
+        [
+            AgentSessionDefaults.TaskPlanningSkill,
+            AgentSessionDefaults.OperatorUpdatesSkill,
+        ];
+
+        if (ContainsAny(prompt, "review", "audit", "pull request", "diff"))
+        {
+            skills.Add(AgentSessionDefaults.RepositoryReviewSkill);
+            skills.Add(AgentSessionDefaults.ChangeExplanationSkill);
+        }
+
+        if (ContainsAny(prompt, "code", "refactor", "implement", "fix"))
+        {
+            skills.Add(AgentSessionDefaults.CodeEditingSkill);
+        }
+
+        if (ContainsAny(prompt, "docs", "documentation", "search", "research", "knowledge"))
+        {
+            skills.Add(AgentSessionDefaults.DocumentationResearchSkill);
+            skills.Add(AgentSessionDefaults.ResearchSynthesisSkill);
+        }
+
+        if (ContainsAny(prompt, "explain", "summary", "summarize"))
+        {
+            skills.Add(AgentSessionDefaults.ChangeExplanationSkill);
+        }
+
+        return skills
+            .OrderBy(static skill => skill, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -238,7 +252,7 @@ public sealed class AgentPromptDraftGenerator(
         return normalized;
     }
 
-    private static string CreateName(string prompt, AgentRoleKind role)
+    private static string CreateName(string prompt)
     {
         var normalized = prompt.Trim();
         foreach (var prefix in PromptPrefixes)
@@ -259,13 +273,7 @@ public sealed class AgentPromptDraftGenerator(
 
         if (nameWords.Length == 0)
         {
-            return role switch
-            {
-                AgentRoleKind.Coding => "Coding Agent",
-                AgentRoleKind.Research => "Research Agent",
-                AgentRoleKind.Reviewer => "Review Agent",
-                _ => ManualAgentName,
-            };
+            return ManualAgentName;
         }
 
         var baseName = string.Join(" ", nameWords);
@@ -277,17 +285,10 @@ public sealed class AgentPromptDraftGenerator(
     private static string CreateSystemPrompt(
         string name,
         string description,
-        AgentRoleKind role,
-        IReadOnlyList<string> capabilities)
+        IReadOnlyList<string> tools,
+        IReadOnlyList<string> skills)
     {
-        var capabilityText = string.Join(", ", capabilities);
-        StringBuilder builder = new();
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"You are {name}."));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Role: {role}."));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Mission: {description}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Available capabilities: {capabilityText}."));
-        builder.Append("Be explicit about actions, keep the operator informed, and stay within the assigned capabilities.");
-        return builder.ToString().Trim();
+        return AgentSessionDefaults.CreateStructuredSystemPrompt(name, description, tools, skills);
     }
 
     private static bool ContainsAny(string value, params string[] candidates)
@@ -312,11 +313,12 @@ internal static partial class AgentPromptDraftGeneratorLog
     [LoggerMessage(
         EventId = 1401,
         Level = LogLevel.Information,
-        Message = "Generated prompt-based agent draft. Name={AgentName} Provider={ProviderKind} Model={ModelName} Capabilities={CapabilityCount}.")]
+        Message = "Generated prompt-based agent draft. Name={AgentName} Provider={ProviderKind} Model={ModelName} Tools={ToolCount} Skills={SkillCount}.")]
     public static partial void GeneratedDraft(
         ILogger logger,
         string agentName,
         AgentProviderKind providerKind,
         string modelName,
-        int capabilityCount);
+        int toolCount,
+        int skillCount);
 }

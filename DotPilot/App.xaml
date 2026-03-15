@@ -20,6 +20,8 @@
           </utum:MaterialToolkitTheme.FontOverrideDictionary> -->
         </utum:MaterialToolkitTheme>
         <ResourceDictionary Source="ms-appx:///Styles/AppDesign.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/ChatWorkspace.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/SettingsWorkspace.xaml" />
       </ResourceDictionary.MergedDictionaries>
 
       <!-- Add resources here -->

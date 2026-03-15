@@ -8,9 +8,7 @@ using Microsoft.UI.Xaml.Data;
 namespace DotPilot.Presentation;
 
 [Bindable]
-public partial record MainModel(
-    IAgentWorkspaceState workspaceState,
-    ILogger<MainModel> logger)
+public partial record MainModel
 {
     private const string EmptyTitleValue = "No active session";
     private const string EmptyStatusValue = "A default system agent is ready. Start a session or create another agent.";
@@ -26,16 +24,32 @@ public partial record MainModel(
         LocalMemberSummary,
         "L",
         DesignBrushPalette.UserAvatarBrush);
+    private readonly IAgentWorkspaceState workspaceState;
+    private readonly ILogger<MainModel> logger;
     private AsyncCommand? _startNewSessionCommand;
     private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
     private readonly Signal _sessionRefresh = new();
+
+    public MainModel(
+        IAgentWorkspaceState workspaceState,
+        WorkspaceProjectionNotifier workspaceProjectionNotifier,
+        ILogger<MainModel> logger)
+    {
+        this.workspaceState = workspaceState;
+        this.logger = logger;
+        workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
+    }
 
     public string ComposerPlaceholder => DefaultComposerPlaceholder;
 
     public IState<string> ComposerText => State.Value(this, static () => string.Empty);
 
     public IState<string> FeedbackMessage => State.Value(this, static () => string.Empty);
+
+    public IState<ComposerSendBehavior> ComposerSendBehavior => State.Async(this, LoadComposerSendBehaviorAsync, _workspaceRefresh);
+
+    public IState<string> ComposerSendHint => State.Async(this, LoadComposerSendHintAsync, _workspaceRefresh);
 
     public IState<SessionSidebarItem> SelectedChat => State.Value(this, static () => EmptySelectedChat);
 
@@ -109,6 +123,12 @@ public partial record MainModel(
     public ValueTask SubmitMessage(CancellationToken cancellationToken)
     {
         return SendMessageCore(messageOverride: null, cancellationToken);
+    }
+
+    private void OnWorkspaceProjectionChanged(object? sender, EventArgs e)
+    {
+        _workspaceRefresh.Raise();
+        _sessionRefresh.Raise();
     }
 
     private async ValueTask SendMessageCore(string? messageOverride, CancellationToken cancellationToken)
@@ -230,6 +250,17 @@ public partial record MainModel(
         return workspace.Agents.Count > 0;
     }
 
+    private async ValueTask<ComposerSendBehavior> LoadComposerSendBehaviorAsync(CancellationToken cancellationToken)
+    {
+        var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        return workspace.Preferences.ComposerSendBehavior;
+    }
+
+    private async ValueTask<string> LoadComposerSendHintAsync(CancellationToken cancellationToken)
+    {
+        return ChatComposerSendBehaviorText.GetHint(await LoadComposerSendBehaviorAsync(cancellationToken));
+    }
+
     private async ValueTask<bool> LoadCanSendAsync(CancellationToken cancellationToken)
     {
         var composerText = (await ComposerText) ?? string.Empty;
@@ -306,9 +337,7 @@ public partial record MainModel(
             agent.Name,
             $"{agent.ProviderDisplayName} · {agent.ModelName}",
             GetInitial(agent.Name),
-            ResolveAgentBrush(agent.ProviderKind),
-            agent.Role.ToString(),
-            DesignBrushPalette.BadgeSurfaceBrush);
+            ResolveAgentBrush(agent.ProviderKind));
     }
 
     private static ChatTimelineItem MapTimelineItem(SessionStreamEntry entry)

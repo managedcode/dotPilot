@@ -201,6 +201,14 @@ internal static partial class AgentSessionServiceLog
         bool isEnabled);
 
     [LoggerMessage(
+        EventId = 1219,
+        Level = LogLevel.Information,
+        Message = "Updated composer send behavior preference. Behavior={Behavior}.")]
+    public static partial void ComposerSendBehaviorUpdated(
+        ILogger logger,
+        ComposerSendBehavior behavior);
+
+    [LoggerMessage(
         EventId = 1212,
         Level = LogLevel.Information,
         Message = "Starting session send. SessionId={SessionId} AgentId={AgentId} Provider={ProviderKind}.")]

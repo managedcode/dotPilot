@@ -9,6 +9,7 @@
     <ItemGroup>
         <PackageReference Include="GitHub.Copilot.SDK" />
         <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK" />
+        <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AI" />
         <PackageReference Include="ManagedCode.CodexSharpSDK" />
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" />

@@ -1,3 +1,4 @@
+using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Presentation;
 
 namespace DotPilot.Tests.Features.AgentSessions;
@@ -8,42 +9,53 @@ public sealed class ChatComposerKeyboardPolicyTests
     public void ResolveReturnsSendMessageForPlainEnter()
     {
         var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterSends,
             isEnterKey: true,
-            isShiftPressed: false,
-            isAltPressed: false);
+            hasModifier: false);
 
         action.Should().Be(ChatComposerKeyboardAction.SendMessage);
     }
 
     [Test]
-    public void ResolveReturnsInsertNewLineForShiftEnter()
+    public void ResolveReturnsInsertNewLineForModifiedEnterWhenEnterSends()
     {
         var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterSends,
             isEnterKey: true,
-            isShiftPressed: true,
-            isAltPressed: false);
+            hasModifier: true);
 
         action.Should().Be(ChatComposerKeyboardAction.InsertNewLine);
     }
 
     [Test]
-    public void ResolveReturnsInsertNewLineForAltEnter()
+    public void ResolveReturnsInsertNewLineForPlainEnterWhenEnterAddsNewLine()
     {
         var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterInsertsNewLine,
             isEnterKey: true,
-            isShiftPressed: false,
-            isAltPressed: true);
+            hasModifier: false);
 
         action.Should().Be(ChatComposerKeyboardAction.InsertNewLine);
+    }
+
+    [Test]
+    public void ResolveReturnsSendMessageForModifiedEnterWhenEnterAddsNewLine()
+    {
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterInsertsNewLine,
+            isEnterKey: true,
+            hasModifier: true);
+
+        action.Should().Be(ChatComposerKeyboardAction.SendMessage);
     }
 
     [Test]
     public void ResolveReturnsNoneWhenKeyIsNotEnter()
     {
         var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterSends,
             isEnterKey: false,
-            isShiftPressed: true,
-            isAltPressed: true);
+            hasModifier: true);
 
         action.Should().Be(ChatComposerKeyboardAction.None);
     }

@@ -9,46 +9,90 @@
       <StackPanel Spacing="6">
         <TextBlock FontSize="18"
                    FontWeight="SemiBold"
-                   Text="Capabilities" />
+                   Text="Tools and skills" />
         <TextBlock FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Enable only the capabilities the workflow actually needs."
+                   Text="Keep the runtime scope explicit: enable the tools the agent can use and the skills it should lean on."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 
-      <ItemsControl AutomationProperties.AutomationId="SkillsList"
-                    ItemsSource="{Binding Capabilities}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="presentation:CapabilityOption">
-            <Border Style="{StaticResource BuilderSummaryCardStyle}"
-                    Margin="0,0,0,10">
-              <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel
-                            Spacing="4">
-                  <TextBlock FontSize="13"
-                             FontWeight="SemiBold"
-                             Text="{x:Bind Name}" />
-                  <TextBlock FontSize="11.5"
-                             Foreground="{StaticResource AppMutedTextBrush}"
-                             Text="{x:Bind Description}"
-                             TextWrapping="WrapWholeWords" />
-                </StackPanel>
+      <StackPanel Spacing="10">
+        <TextBlock FontSize="12"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppSecondaryTextBrush}"
+                   Text="Tools" />
+        <ItemsControl AutomationProperties.AutomationId="AgentToolsList"
+                      ItemsSource="{Binding Tools}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="presentation:SelectionOption">
+              <Border Style="{StaticResource BuilderSummaryCardStyle}"
+                      Margin="0,0,0,10">
+                <Grid ColumnSpacing="12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Spacing="4">
+                    <TextBlock FontSize="13"
+                               FontWeight="SemiBold"
+                               Text="{x:Bind Label}" />
+                    <TextBlock FontSize="11.5"
+                               Foreground="{StaticResource AppMutedTextBrush}"
+                               Text="{x:Bind Description}"
+                               TextWrapping="WrapWholeWords" />
+                  </StackPanel>
 
-                <ToggleSwitch Grid.Column="1"
-                              HorizontalAlignment="Right"
-                              OffContent=""
-                              OnContent=""
-                              VerticalAlignment="Top"
-                              IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
-              </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+                  <ToggleSwitch Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                OffContent=""
+                                OnContent=""
+                                VerticalAlignment="Top"
+                                IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="10">
+        <TextBlock FontSize="12"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppSecondaryTextBrush}"
+                   Text="Skills" />
+        <ItemsControl AutomationProperties.AutomationId="AgentSkillList"
+                      ItemsSource="{Binding Skills}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="presentation:SelectionOption">
+              <Border Style="{StaticResource BuilderSummaryCardStyle}"
+                      Margin="0,0,0,10">
+                <Grid ColumnSpacing="12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Spacing="4">
+                    <TextBlock FontSize="13"
+                               FontWeight="SemiBold"
+                               Text="{x:Bind Label}" />
+                    <TextBlock FontSize="11.5"
+                               Foreground="{StaticResource AppMutedTextBrush}"
+                               Text="{x:Bind Description}"
+                               TextWrapping="WrapWholeWords" />
+                  </StackPanel>
+
+                  <ToggleSwitch Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                OffContent=""
+                                OnContent=""
+                                VerticalAlignment="Top"
+                                IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
     </StackPanel>
   </Border>
 </UserControl>

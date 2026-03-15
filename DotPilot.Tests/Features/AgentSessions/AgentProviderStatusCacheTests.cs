@@ -40,7 +40,7 @@ public sealed class AgentProviderStatusCacheTests
     }
 
     [Test]
-    public async Task EnabledExternalProviderRemainsUnavailableUntilLiveRuntimeIsWired()
+    public async Task EnabledCodexProviderCanCreateProfilesWhenLiveRuntimeIsAvailable()
     {
         using var commandScope = CommandProbeScope.Create();
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
@@ -51,10 +51,28 @@ public sealed class AgentProviderStatusCacheTests
             CancellationToken.None);
 
         provider.IsEnabled.Should().BeTrue();
-        provider.CanCreateAgents.Should().BeFalse();
-        provider.Status.Should().Be(AgentProviderStatus.Error);
-        provider.StatusSummary.Should().Contain("not wired yet");
+        provider.CanCreateAgents.Should().BeTrue();
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("Codex CLI is available on PATH.");
         provider.InstalledVersion.Should().Be("1.0.0");
+    }
+
+    [Test]
+    public async Task EnabledExternalProviderWithoutLiveRuntimeCannotCreateProfiles()
+    {
+        using var commandScope = CommandProbeScope.Create();
+        commandScope.WriteVersionCommand("copilot", "copilot version 0.0.421");
+
+        await using var fixture = CreateFixture();
+        var provider = await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.GitHubCopilot, true),
+            CancellationToken.None);
+
+        provider.IsEnabled.Should().BeTrue();
+        provider.CanCreateAgents.Should().BeFalse();
+        provider.Status.Should().Be(AgentProviderStatus.Unsupported);
+        provider.StatusSummary.Should().Contain("live desktop execution is not available");
+        provider.InstalledVersion.Should().Be("0.0.421");
     }
 
     private static TestFixture CreateFixture()

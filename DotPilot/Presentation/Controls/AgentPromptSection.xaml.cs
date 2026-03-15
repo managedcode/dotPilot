@@ -6,4 +6,9 @@ public sealed partial class AgentPromptSection : UserControl
     {
         InitializeComponent();
     }
+
+    private void OnSaveAgentButtonClick(object sender, RoutedEventArgs e)
+    {
+        BoundCommandBridge.Execute(SaveAgentActionButton.Tag as ICommand);
+    }
 }

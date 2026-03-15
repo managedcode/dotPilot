@@ -9,14 +9,14 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Contracts boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns the durable non-UI contracts for provider readiness, agent profiles, session lists, transcript entries, commands, and Orleans grain interfaces.
-- **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, `EF Core` + `SQLite` projection persistence, local folder-backed `AgentSession` storage, local folder-backed chat-history persistence through `ChatHistoryProvider`, and the `IAgentSessionService` implementation.
+- **Runtime boundary:** [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider catalogs, CLI readiness checks, deterministic debug-provider behavior, Codex CLI-backed live session execution, `EF Core` + `SQLite` projection persistence, local folder-backed `AgentSession` storage, local folder-backed chat-history persistence through `ChatHistoryProvider`, and the `IAgentSessionService` implementation.
 - **Embedded host boundary:** [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host and the grains that represent session and agent-profile state. The product stays local-first with `UseLocalhostClustering`, in-memory reminders, and local folder-backed Orleans grain storage through `ManagedCode.Storage`.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
 
 ## Scoping
 
 - **In scope for the active rewrite:** chat-first session UX, provider readiness/settings, agent creation, Orleans-backed session and agent state, local persistence via `SQLite`, local folder-backed `AgentSession` and chat-history storage, deterministic debug provider, transcript/tool streaming, and optional repo/git utilities inside a session.
-- **In scope for later slices:** multi-agent sessions, richer workflow composition, provider-specific live execution, session export/replay, and deeper git/worktree utilities.
+- **In scope for later slices:** multi-agent sessions, richer workflow composition, live execution for providers beyond Codex, session export/replay, and deeper git/worktree utilities.
 - **Out of scope in the current repository slice:** remote workers, remote Orleans clustering, cloud persistence, multi-user identity, and external durable stores.
 
 ## Diagrams

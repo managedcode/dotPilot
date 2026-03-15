@@ -4,6 +4,13 @@ using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;
 
+public enum AgentBuilderSurfaceKind
+{
+    Catalog,
+    PromptComposer,
+    Editor,
+}
+
 [Bindable]
 public sealed partial record AgentProviderOption(
     AgentProviderKind Kind,
@@ -14,14 +21,17 @@ public sealed partial record AgentProviderOption(
     bool CanCreateAgents);
 
 [Bindable]
-public sealed class CapabilityOption(
-    string name,
+public sealed class SelectionOption(
+    string key,
+    string label,
     string description,
     bool isEnabled) : ObservableObject
 {
     private bool _isEnabled = isEnabled;
 
-    public string Name { get; } = name;
+    public string Key { get; } = key;
+
+    public string Label { get; } = label;
 
     public string Description { get; } = description;
 
@@ -31,11 +41,6 @@ public sealed class CapabilityOption(
         set => SetProperty(ref _isEnabled, value);
     }
 }
-
-[Bindable]
-public sealed partial record RoleOption(
-    string Label,
-    AgentRoleKind Role);
 
 [Bindable]
 public sealed partial record AgentCatalogItem(
@@ -50,10 +55,15 @@ public sealed partial record AgentCatalogItem(
 
 [Bindable]
 public sealed partial record AgentBuilderSurface(
+    AgentBuilderSurfaceKind Kind,
     string Title,
     string Subtitle,
-    bool ShowCatalog,
-    bool ShowPromptComposer,
-    bool ShowEditor,
     bool ShowBackButton,
-    string PrimaryActionLabel);
+    string PrimaryActionLabel)
+{
+    public bool ShowCatalog => Kind == AgentBuilderSurfaceKind.Catalog;
+
+    public bool ShowPromptComposer => Kind == AgentBuilderSurfaceKind.PromptComposer;
+
+    public bool ShowEditor => Kind == AgentBuilderSurfaceKind.Editor;
+}

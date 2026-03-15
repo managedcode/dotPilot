@@ -3,14 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root"
              AutomationProperties.AutomationId="ChatComposer">
-  <StackPanel Spacing="10">
+  <StackPanel Spacing="12">
     <TextBlock AutomationProperties.AutomationId="ChatComposerStatus"
                Foreground="{StaticResource AppMutedTextBrush}"
                Text="{Binding FeedbackMessage}"
                TextWrapping="WrapWholeWords" />
 
-    <Border Style="{StaticResource GlassPanelStyle}"
-            Padding="14">
+    <Border Style="{StaticResource ChatComposerCardStyle}">
       <Grid AutomationProperties.AutomationId="ChatComposerBar"
             RowSpacing="12">
         <Grid.RowDefinitions>
@@ -18,25 +17,17 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBox x:Name="ComposerInput"
-                 Grid.Row="0"
-                 AutomationProperties.AutomationId="ChatComposerInput"
-                 AcceptsReturn="True"
-                 Background="Transparent"
-                 BorderBrush="Transparent"
-                 BorderThickness="0"
-                 FontSize="14"
-                 Foreground="{StaticResource AppPrimaryTextBrush}"
-                 KeyDown="OnComposerInputKeyDown"
-                 MaxHeight="168"
-                 MinHeight="72"
-                 PlaceholderText="{Binding ComposerPlaceholder}"
-                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                 SelectionHighlightColor="{StaticResource AppAccentBrush}"
-                 Text="{Binding ComposerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 TextWrapping="Wrap"
-                 VerticalAlignment="Stretch"
-                 VerticalContentAlignment="Top" />
+        <StackPanel Grid.Row="0"
+                    Spacing="8">
+          <TextBlock Style="{StaticResource ChatComposerLabelTextStyle}"
+                     Text="Message" />
+          <TextBox x:Name="ComposerInput"
+                   AutomationProperties.AutomationId="ChatComposerInput"
+                   KeyDown="OnComposerInputKeyDown"
+                   PlaceholderText="{Binding ComposerPlaceholder}"
+                   Style="{StaticResource ChatComposerTextBoxStyle}"
+                   Text="{Binding ComposerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
 
         <Grid Grid.Row="1"
               ColumnSpacing="12">
@@ -46,16 +37,17 @@
             <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
 
-          <TextBlock AutomationProperties.AutomationId="ChatComposerHint"
-                     VerticalAlignment="Center"
-                     FontSize="12"
-                     Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="Enter sends. Shift or Alt with Enter adds a new line."
-                     TextWrapping="WrapWholeWords" />
+          <StackPanel VerticalAlignment="Center"
+                      Spacing="2">
+            <TextBlock Style="{StaticResource ChatComposerLabelTextStyle}"
+                       Text="Send behavior" />
+            <TextBlock AutomationProperties.AutomationId="ChatComposerHint"
+                       Style="{StaticResource ChatComposerHintTextStyle}"
+                       Text="{Binding ComposerSendHint}" />
+          </StackPanel>
 
           <Button Grid.Column="1"
                   AutomationProperties.AutomationId="ChatStartSessionButton"
-                  Background="{StaticResource AppSoftSurfaceBrush}"
                   Command="{Binding StartNewSessionCommand}"
                   Style="{StaticResource SecondaryActionButtonStyle}">
             <TextBlock FontSize="12"

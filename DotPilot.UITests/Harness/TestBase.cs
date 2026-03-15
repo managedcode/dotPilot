@@ -483,12 +483,32 @@ public class TestBase
         {
             TryScrollBrowserAutomationElementIntoView(automationId);
 
-            if (TryActivateBrowserAutomationElement(automationId))
+            try
+            {
+                App.Tap(automationId);
+                HarnessLog.Write($"Uno.UITest action tap outcome for '{automationId}': tapped");
+                return;
+            }
+            catch (Exception exception)
+            {
+                HarnessLog.Write($"Uno.UITest action tap failed for '{automationId}': {exception.Message}");
+            }
+
+            if (TryPerformBrowserClickAction(automationId))
+            {
+                return;
+            }
+
+            if (TryClickBrowserAutomationElement(automationId))
             {
                 return;
             }
 
             if (TryClickBrowserAutomationElementAtCenter(automationId))
+            {
+                return;
+            }
+            if (TryActivateBrowserAutomationElement(automationId))
             {
                 return;
             }
@@ -507,27 +527,6 @@ public class TestBase
             catch (Exception exception)
             {
                 HarnessLog.Write($"Coordinate action tap failed for '{automationId}': {exception.Message}");
-            }
-
-            if (TryPerformBrowserClickAction(automationId))
-            {
-                return;
-            }
-
-            if (TryClickBrowserAutomationElement(automationId))
-            {
-                return;
-            }
-
-            try
-            {
-                App.Tap(automationId);
-                HarnessLog.Write($"Uno.UITest action tap outcome for '{automationId}': tapped");
-                return;
-            }
-            catch (Exception exception)
-            {
-                HarnessLog.Write($"Uno.UITest action tap failed for '{automationId}': {exception.Message}");
             }
         }
 
@@ -611,20 +610,64 @@ public class TestBase
                                 element.focus({ preventScroll: true });
                             }
 
-                            return element;
+                            return automationId;
                         })();
-                        """)) is not IWebElement resolvedElement)
+                        """)) is null)
             {
                 return false;
             }
 
-            resolvedElement.SendKeys(Keys.Enter);
+            static string ReadActiveAutomationId(IJavaScriptExecutor executor)
+            {
+                return Convert.ToString(
+                           executor.ExecuteScript(
+                               """
+                               const active = document.activeElement;
+                               return active?.getAttribute('xamlautomationid')
+                                   ?? active?.getAttribute('aria-label')
+                                   ?? '';
+                               """),
+                           System.Globalization.CultureInfo.InvariantCulture)
+                       ?? string.Empty;
+            }
+
+            var activeAutomationId = ReadActiveAutomationId(javaScriptExecutor);
+            for (var index = 0; index < 6 && !string.Equals(activeAutomationId, automationId, StringComparison.Ordinal); index++)
+            {
+                var activeElement = driver.SwitchTo().ActiveElement();
+                activeElement.SendKeys(Keys.Tab);
+                activeAutomationId = ReadActiveAutomationId(javaScriptExecutor);
+            }
+
+            var focusedElement = driver.SwitchTo().ActiveElement();
+            focusedElement.SendKeys(Keys.Space);
+            HarnessLog.Write(
+                $"Browser keyboard activation outcome for '{automationId}': space via active '{ReadActiveAutomationId(javaScriptExecutor)}'");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser keyboard activation failed for '{automationId}' with space: {exception.Message}");
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver)
+            {
+                return false;
+            }
+
+            var activeElement = driver.SwitchTo().ActiveElement();
+            activeElement.SendKeys(Keys.Enter);
             HarnessLog.Write($"Browser keyboard activation outcome for '{automationId}': enter");
             return true;
         }
         catch (Exception exception)
         {
-            HarnessLog.Write($"Browser keyboard activation failed for '{automationId}': {exception.Message}");
+            HarnessLog.Write($"Browser keyboard activation failed for '{automationId}' with enter: {exception.Message}");
             return false;
         }
     }
@@ -809,7 +852,13 @@ public class TestBase
                             const rect = host.getBoundingClientRect();
                             const clientX = rect.left + (rect.width / 2);
                             const clientY = rect.top + (rect.height / 2);
-                            const target = document.elementFromPoint(clientX, clientY) ?? host;
+                            const pointTarget = document.elementFromPoint(clientX, clientY) ?? host;
+                            const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href], .uno-button, .uno-buttonbase';
+                            const target = pointTarget?.closest?.(clickableSelector)
+                                ?? (host.matches(clickableSelector)
+                                    ? host
+                                    : host.closest(clickableSelector) ?? host.querySelector(clickableSelector))
+                                ?? host;
                             const eventBase = {
                                 bubbles: true,
                                 cancelable: true,
@@ -827,14 +876,15 @@ public class TestBase
                             target.dispatchEvent(new PointerEvent('pointerup', { ...eventBase, button: 0, buttons: 0, pressure: 0 }));
                             target.dispatchEvent(new MouseEvent('mouseup', { ...eventBase, button: 0, buttons: 0 }));
                             target.dispatchEvent(new MouseEvent('click', { ...eventBase, button: 0, buttons: 0 }));
-                            return `${target.tagName}:${target.getAttribute('xamlautomationid') ?? ''}:${target.getAttribute('aria-label') ?? ''}`;
+                            return `clicked:${target.tagName}:${target.getAttribute('xamlautomationid') ?? ''}:${target.getAttribute('aria-label') ?? ''}`;
                         })();
                         """),
                     Array.Empty<object>(),
                 ]);
 
             HarnessLog.Write($"Browser center-point click outcome for '{automationId}': {outcome}");
-            return outcome is not null;
+            return Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture)
+                ?.StartsWith("clicked:", StringComparison.Ordinal) is true;
         }
         catch (Exception exception)
         {
@@ -861,52 +911,103 @@ public class TestBase
                 return false;
             }
 
-            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
-            if (javaScriptExecutor.ExecuteScript(
-                    string.Concat(
+            var selector = string.Concat(
+                "[xamlautomationid=\"",
+                automationId,
+                "\"], [aria-label=\"",
+                automationId,
+                "\"]");
+            var matches = driver.FindElements(By.CssSelector(selector));
+            var resolvedElement = matches.FirstOrDefault(element =>
+            {
+                try
+                {
+                    if (!element.Displayed)
+                    {
+                        return false;
+                    }
+
+                    var inViewport = javaScriptExecutor.ExecuteScript(
                         """
-                        return (() => {
-                            const automationId = '
+                        const element = arguments[0];
+                        if (!element) {
+                            return false;
+                        }
+
+                        const rect = element.getBoundingClientRect();
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight;
                         """,
-                        escapedAutomationId,
-                        """
-                        ';
-                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
-                            const matches = Array.from(document.querySelectorAll(selector));
-                            const visibleMatches = matches.filter(element => {
-                                const rect = element.getBoundingClientRect();
-                                return rect.width > 0 &&
-                                    rect.height > 0 &&
-                                    rect.right > 0 &&
-                                    rect.bottom > 0 &&
-                                    rect.left < window.innerWidth &&
-                                    rect.top < window.innerHeight;
-                            });
-                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
-                                ?? visibleMatches[0]
-                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
-                                ?? matches[0];
-                            if (!host) {
-                                return null;
-                            }
+                        element);
 
-                            const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href]';
-                            const element = host.matches(clickableSelector)
-                                ? host
-                                : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+                    return inViewport is true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }) ?? matches.FirstOrDefault();
 
-                            element.scrollIntoView({ block: 'center', inline: 'center' });
-                            return element;
-                        })();
-                        """)) is not IWebElement resolvedElement)
+            if (resolvedElement is null)
             {
                 return false;
             }
 
-            new Actions(driver)
-                .MoveToElement(resolvedElement)
-                .Click()
-                .Perform();
+            javaScriptExecutor.ExecuteScript(
+                """
+                const element = arguments[0];
+                if (!element) {
+                    return;
+                }
+
+                element.scrollIntoView({ block: 'center', inline: 'center' });
+                """,
+                resolvedElement);
+
+            try
+            {
+                if (javaScriptExecutor.ExecuteScript(
+                        """
+                        const element = arguments[0];
+                        if (!element) {
+                            return null;
+                        }
+
+                        const rect = element.getBoundingClientRect();
+                        return [
+                            Math.round(rect.left + (rect.width / 2)),
+                            Math.round(rect.top + (rect.height / 2))
+                        ];
+                        """,
+                        resolvedElement) is System.Collections.ObjectModel.ReadOnlyCollection<object> pointerTarget &&
+                    pointerTarget.Count == 2 &&
+                    driver is IActionExecutor actionExecutor)
+                {
+                    var pointerX = Convert.ToInt32(pointerTarget[0], System.Globalization.CultureInfo.InvariantCulture);
+                    var pointerY = Convert.ToInt32(pointerTarget[1], System.Globalization.CultureInfo.InvariantCulture);
+                    var pointer = new PointerInputDevice(PointerKind.Mouse);
+                    var clickSequence = new ActionSequence(pointer);
+                    clickSequence.AddAction(pointer.CreatePointerMove(CoordinateOrigin.Viewport, pointerX, pointerY, TimeSpan.Zero));
+                    clickSequence.AddAction(pointer.CreatePointerDown(MouseButton.Left));
+                    clickSequence.AddAction(pointer.CreatePointerUp(MouseButton.Left));
+                    actionExecutor.PerformActions([clickSequence]);
+                }
+                else
+                {
+                    resolvedElement.Click();
+                }
+            }
+            catch
+            {
+                new Actions(driver)
+                    .MoveToElement(resolvedElement)
+                    .Click()
+                    .Perform();
+            }
 
             HarnessLog.Write($"Browser native click outcome for '{automationId}': clicked");
             return true;
@@ -1782,6 +1883,172 @@ public class TestBase
         catch (Exception exception)
         {
             HarnessLog.Write($"Browser automation diagnostics failed for '{automationId}': {exception.Message}");
+        }
+    }
+
+    protected bool BrowserHasAutomationElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var script = string.Concat(
+                """
+                return (() => {
+                    const automationId = '
+                """,
+                automationId.Replace("'", "\\'", StringComparison.Ordinal),
+                """
+                ';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    return matches.some(element => {
+                        const rect = element.getBoundingClientRect();
+                        const style = window.getComputedStyle(element);
+                        const isHidden = style.display === 'none' ||
+                            style.visibility === 'hidden' ||
+                            element.getAttribute('aria-hidden') === 'true';
+
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight &&
+                            !isHidden;
+                    });
+                })();
+                """);
+
+            return executeScriptMethod.Invoke(driver, [script, Array.Empty<object>()]) is true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser automation existence check failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    protected bool TryReadBrowserAutomationTexts(string automationId, out string[] texts)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        texts = [];
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var script = string.Concat(
+                """
+                return (() => {
+                    const automationId = '
+                """,
+                automationId.Replace("'", "\\'", StringComparison.Ordinal),
+                """
+                ';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    const visibleMatches = matches.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        const style = window.getComputedStyle(element);
+                        const isHidden = style.display === 'none' ||
+                            style.visibility === 'hidden' ||
+                            element.getAttribute('aria-hidden') === 'true';
+
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight &&
+                            !isHidden;
+                    });
+
+                    return visibleMatches
+                        .map(element => {
+                            const inlineText = (element.innerText ?? '').trim();
+                            if (inlineText) {
+                                return inlineText;
+                            }
+
+                            const nestedInput = element.matches('textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]')
+                                ? element
+                                : element.querySelector('textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]');
+                            if (!nestedInput) {
+                                return '';
+                            }
+
+                            return 'value' in nestedInput
+                                ? (nestedInput.value ?? '').trim()
+                                : (nestedInput.textContent ?? '').trim();
+                        })
+                        .filter(text => text);
+                })();
+                """);
+
+            if (executeScriptMethod.Invoke(driver, [script, Array.Empty<object>()]) is not System.Collections.ObjectModel.ReadOnlyCollection<object> browserTexts)
+            {
+                return false;
+            }
+
+            texts = browserTexts
+                .Select(text => Convert.ToString(text, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .ToArray();
+
+            return texts.Length > 0;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser automation text read failed for '{automationId}': {exception.Message}");
+            texts = [];
+            return false;
         }
     }
 

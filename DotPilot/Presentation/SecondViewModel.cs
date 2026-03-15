@@ -41,19 +41,19 @@ public partial record SecondModel(
         System.Text.CompositeFormat.Parse(StartedChatMessageFormat);
     private static readonly AgentProviderOption EmptySelectedProvider =
         new(AgentProviderKind.Debug, string.Empty, string.Empty, string.Empty, null, false);
-    private static readonly RoleOption DefaultRole = new("Assistant", AgentRoleKind.Operator);
     private static readonly AgentBuilderSurface CatalogSurface =
-        new(CatalogTitle, CatalogSubtitle, true, false, false, false, CreateActionLabel);
+        new(AgentBuilderSurfaceKind.Catalog, CatalogTitle, CatalogSubtitle, false, CreateActionLabel);
     private static readonly AgentBuilderSurface PromptSurface =
-        new(PromptTitle, PromptSubtitle, false, true, false, true, string.Empty);
+        new(AgentBuilderSurfaceKind.PromptComposer, PromptTitle, PromptSubtitle, true, string.Empty);
     private static readonly AgentBuilderSurface EditorSurface =
-        new(PromptTitle, EditorSubtitle, false, false, true, true, SaveActionLabel);
+        new(AgentBuilderSurfaceKind.Editor, PromptTitle, EditorSubtitle, true, SaveActionLabel);
     private AsyncCommand? _openCreateAgentCommand;
     private AsyncCommand? _returnToCatalogCommand;
     private AsyncCommand? _buildManuallyCommand;
     private AsyncCommand? _generateAgentDraftCommand;
     private AsyncCommand? _saveAgentCommand;
     private AsyncCommand? _startChatForAgentCommand;
+    private AsyncCommand? _providerSelectionChangedCommand;
     private readonly Signal _workspaceRefresh = new();
 
     public IState<AgentBuilderSurface> Surface => State.Value(this, static () => CatalogSurface);
@@ -76,23 +76,11 @@ public partial record SecondModel(
 
     public IState<AgentProviderOption> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
-    public IState<RoleOption> SelectedRole => State.Value(this, static () => DefaultRole);
+    public IImmutableList<SelectionOption> Tools { get; } =
+        CreateOptions(AgentSessionDefaults.AllTools, AgentSessionDefaults.GetToolDescription);
 
-    public IImmutableList<RoleOption> Roles { get; } =
-    [
-        DefaultRole,
-        new RoleOption("Coder", AgentRoleKind.Coding),
-        new RoleOption("Researcher", AgentRoleKind.Research),
-        new RoleOption("Reviewer", AgentRoleKind.Reviewer),
-    ];
-
-    public IImmutableList<CapabilityOption> Capabilities { get; } =
-    [
-        new CapabilityOption(AgentSessionDefaults.WebCapability, "Web research and browsing workflows.", true),
-        new CapabilityOption(AgentSessionDefaults.ShellCapability, "Terminal-style command execution.", true),
-        new CapabilityOption(AgentSessionDefaults.GitCapability, "Repository status, diff, and branch operations.", true),
-        new CapabilityOption(AgentSessionDefaults.FilesCapability, "Read and update local files.", true),
-    ];
+    public IImmutableList<SelectionOption> Skills { get; } =
+        CreateOptions(AgentSessionDefaults.AllSkills, AgentSessionDefaults.GetSkillDescription);
 
     public IState<bool> CanGenerateDraft => State.Async(this, LoadCanGenerateDraftAsync);
 
@@ -124,6 +112,10 @@ public partial record SecondModel(
         _startChatForAgentCommand ??= new AsyncCommand(
             parameter => StartChatForAgent(parameter as AgentCatalogItem, CancellationToken.None));
 
+    public ICommand ProviderSelectionChangedCommand =>
+        _providerSelectionChangedCommand ??= new AsyncCommand(
+            parameter => HandleSelectedProviderChanged(parameter as AgentProviderOption, CancellationToken.None));
+
     public async ValueTask OpenCreateAgent(CancellationToken cancellationToken)
     {
         await AgentRequest.SetAsync(string.Empty, cancellationToken);
@@ -131,7 +123,6 @@ public partial record SecondModel(
         await AgentDescription.SetAsync(string.Empty, cancellationToken);
         await ModelName.SetAsync(string.Empty, cancellationToken);
         await SystemPrompt.SetAsync(string.Empty, cancellationToken);
-        await SelectedRole.UpdateAsync(_ => DefaultRole, cancellationToken);
         await OperationMessage.SetAsync(string.Empty, cancellationToken);
         await Surface.UpdateAsync(_ => PromptSurface, cancellationToken);
     }
@@ -165,6 +156,21 @@ public partial record SecondModel(
     public ValueTask SubmitAgentDraft(CancellationToken cancellationToken)
     {
         return SubmitAgentDraftCore(promptOverride: null, cancellationToken);
+    }
+
+    public async ValueTask HandleSelectedProviderChanged(
+        AgentProviderOption? provider,
+        CancellationToken cancellationToken)
+    {
+        if (provider is null || IsEmptySelectedProvider(provider))
+        {
+            return;
+        }
+
+        var nextSuggestedModel = ResolveSuggestedModelName(provider);
+
+        await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
+        await ModelName.SetAsync(nextSuggestedModel, cancellationToken);
     }
 
     private async ValueTask SubmitAgentDraftCore(string? promptOverride, CancellationToken cancellationToken)
@@ -231,13 +237,13 @@ public partial record SecondModel(
             var created = await workspaceState.CreateAgentAsync(
                 new CreateAgentProfileCommand(
                     agentName,
-                    ((await SelectedRole) ?? DefaultRole).Role,
+                    AgentRoleKind.Operator,
                     selectedProvider.Kind,
                     modelName,
                     ((await SystemPrompt) ?? string.Empty).Trim(),
-                    Capabilities
-                        .Where(static option => option.IsEnabled)
-                        .Select(static option => option.Name)
+                    AgentSessionDefaults.EncodeSelections(
+                            GetSelectedValues(Tools),
+                            GetSelectedValues(Skills))
                         .ToArray()),
                 cancellationToken);
 
@@ -371,9 +377,7 @@ public partial record SecondModel(
     {
         await AgentName.SetAsync(draft.Name, cancellationToken);
         await AgentDescription.SetAsync(draft.Description, cancellationToken);
-        await ModelName.SetAsync(draft.ModelName, cancellationToken);
         await SystemPrompt.SetAsync(draft.SystemPrompt, cancellationToken);
-        await SelectedRole.UpdateAsync(_ => FindRole(draft.Role), cancellationToken);
 
         var providers = await Providers;
         var provider = FindProviderByKind(providers, draft.ProviderKind);
@@ -382,14 +386,10 @@ public partial record SecondModel(
             provider = FindFirstCreatableProvider(providers);
         }
 
-        await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
-
-        var selectedCapabilities = draft.Capabilities
-            .ToHashSet(StringComparer.Ordinal);
-        foreach (var capability in Capabilities)
-        {
-            capability.IsEnabled = selectedCapabilities.Contains(capability.Name);
-        }
+        await HandleSelectedProviderChanged(provider, cancellationToken);
+        await ModelName.SetAsync(draft.ModelName, cancellationToken);
+        ApplySelectionState(Tools, draft.Tools);
+        ApplySelectionState(Skills, draft.Skills);
     }
 
     private async ValueTask EnsureSelectedProviderAsync(
@@ -412,7 +412,7 @@ public partial record SecondModel(
 
         if (!Equals(selectedProvider, resolvedProvider))
         {
-            await SelectedProvider.UpdateAsync(_ => resolvedProvider, cancellationToken);
+            await HandleSelectedProviderChanged(resolvedProvider, cancellationToken);
         }
     }
 
@@ -428,13 +428,13 @@ public partial record SecondModel(
         var resolvedProvider = FindFirstCreatableProvider(providers);
         if (!IsEmptySelectedProvider(resolvedProvider))
         {
-            await SelectedProvider.UpdateAsync(_ => resolvedProvider, cancellationToken);
+            await HandleSelectedProviderChanged(resolvedProvider, cancellationToken);
             return resolvedProvider;
         }
 
         if (providers.Count > 0)
         {
-            await SelectedProvider.UpdateAsync(_ => providers[0], cancellationToken);
+            await HandleSelectedProviderChanged(providers[0], cancellationToken);
             return providers[0];
         }
 
@@ -461,7 +461,7 @@ public partial record SecondModel(
             AgentSessionDefaults.CreateAgentDescription(agent.SystemPrompt),
             agent.ProviderDisplayName,
             agent.ModelName,
-            agent.Capabilities,
+            AgentSessionDefaults.CreateVisibleTags(agent.Capabilities),
             AgentSessionDefaults.IsSystemAgent(agent.Name));
     }
 
@@ -502,26 +502,10 @@ public partial record SecondModel(
         return EmptySelectedProvider;
     }
 
-    private static RoleOption FindRole(AgentRoleKind role)
-    {
-        return role switch
-        {
-            AgentRoleKind.Coding => new RoleOption("Coder", AgentRoleKind.Coding),
-            AgentRoleKind.Research => new RoleOption("Researcher", AgentRoleKind.Research),
-            AgentRoleKind.Reviewer => new RoleOption("Reviewer", AgentRoleKind.Reviewer),
-            _ => DefaultRole,
-        };
-    }
-
     private static string ResolveStatusMessage(AgentProviderOption provider)
     {
-        if (IsEmptySelectedProvider(provider))
-        {
-            return EmptyProviderStatusSummary;
-        }
-
-        return provider.CanCreateAgents
-            ? $"Ready to save an agent with {provider.DisplayName}."
+        return IsEmptySelectedProvider(provider)
+            ? EmptyProviderStatusSummary
             : provider.StatusSummary;
     }
 
@@ -535,5 +519,33 @@ public partial record SecondModel(
     private static bool IsEmptySelectedProvider(AgentProviderOption? provider)
     {
         return provider is null || string.IsNullOrWhiteSpace(provider.DisplayName);
+    }
+
+    private static ImmutableArray<SelectionOption> CreateOptions(
+        IReadOnlyList<string> values,
+        Func<string, string> descriptionSelector)
+    {
+        return values
+            .Select(value => new SelectionOption(value, value, descriptionSelector(value), false))
+            .ToImmutableArray();
+    }
+
+    private static void ApplySelectionState(
+        IEnumerable<SelectionOption> options,
+        IReadOnlyList<string> selectedValues)
+    {
+        var selected = selectedValues.ToHashSet(StringComparer.Ordinal);
+        foreach (var option in options)
+        {
+            option.IsEnabled = selected.Contains(option.Key);
+        }
+    }
+
+    private static string[] GetSelectedValues(IEnumerable<SelectionOption> options)
+    {
+        return options
+            .Where(static option => option.IsEnabled)
+            .Select(static option => option.Key)
+            .ToArray();
     }
 }

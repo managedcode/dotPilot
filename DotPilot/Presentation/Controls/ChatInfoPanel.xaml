@@ -90,7 +90,7 @@
     </DataTemplate>
   </UserControl.Resources>
 
-  <Border Style="{StaticResource GlassPanelStyle}"
+  <Border Style="{StaticResource ChatSurfacePanelStyle}"
           Padding="0">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="18"
@@ -98,9 +98,7 @@
                   Spacing="14">
         <Grid AutomationProperties.AutomationId="ChatInfoPanelHeader"
               ColumnSpacing="12">
-          <TextBlock FontSize="15"
-                     FontWeight="Medium"
-                     Foreground="{StaticResource AppPrimaryTextBrush}"
+          <TextBlock Style="{StaticResource ChatSectionTitleTextStyle}"
                      Text="Session details" />
         </Grid>
 

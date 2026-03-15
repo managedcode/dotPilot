@@ -9,10 +9,15 @@ namespace DotPilot.Presentation;
 [Bindable]
 public partial record SettingsModel
 {
+    private const string ProvidersSectionKey = "Providers";
+    private const string MessagesSectionKey = "Messages";
     private const string ProviderEntryAutomationIdPrefix = "ProviderEntry_";
     private const string RefreshCompletedMessage = "Provider readiness refreshed.";
+    private const string ComposerBehaviorSavedMessage = "Message send behavior updated.";
     private const string SelectProviderTitleValue = "Select a provider";
     private const string SelectProviderSummaryValue = "Choose a provider to inspect readiness and install guidance.";
+    private const string SettingsTitleValue = "Settings";
+    private const string SettingsSubtitleValue = "Tune providers and message behavior for the local desktop operator.";
     private const string EnableProviderLabel = "Enable provider";
     private const string DisableProviderLabel = "Disable provider";
     private static readonly ProviderStatusItem EmptySelectedProvider = new(
@@ -29,26 +34,50 @@ public partial record SettingsModel
         false);
 
     private readonly IAgentWorkspaceState workspaceState;
+    private readonly WorkspaceProjectionNotifier workspaceProjectionNotifier;
     private readonly ILogger<SettingsModel> logger;
     private AsyncCommand? _refreshCommand;
     private AsyncCommand? _toggleSelectedProviderCommand;
     private AsyncCommand? _selectProviderCommand;
     private AsyncCommand? _executeProviderActionCommand;
+    private AsyncCommand? _selectSectionCommand;
+    private AsyncCommand? _selectComposerSendBehaviorCommand;
     private readonly Signal _workspaceRefresh = new();
 
     public SettingsModel(
         IAgentWorkspaceState workspaceState,
+        WorkspaceProjectionNotifier workspaceProjectionNotifier,
         ILogger<SettingsModel> logger)
     {
         this.workspaceState = workspaceState;
+        this.workspaceProjectionNotifier = workspaceProjectionNotifier;
         this.logger = logger;
+        workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
     }
 
-    public string PageTitle => "Providers";
+    public string PageTitle => SettingsTitleValue;
 
-    public string PageSubtitle => "Enable local providers before creating agents.";
+    public string PageSubtitle => SettingsSubtitleValue;
+
+    public string EnterSendsOptionTitle => ChatComposerSendBehaviorText.GetTitle(ComposerSendBehavior.EnterSends);
+
+    public string EnterSendsOptionSummary => ChatComposerSendBehaviorText.GetSummary(ComposerSendBehavior.EnterSends);
+
+    public string EnterInsertsNewLineOptionTitle => ChatComposerSendBehaviorText.GetTitle(ComposerSendBehavior.EnterInsertsNewLine);
+
+    public string EnterInsertsNewLineOptionSummary => ChatComposerSendBehaviorText.GetSummary(ComposerSendBehavior.EnterInsertsNewLine);
 
     public IListState<ProviderStatusItem> Providers => ListState.Async(this, LoadProvidersAsync, _workspaceRefresh);
+
+    public IState<SettingsSection> SelectedSection => State.Value(this, static () => SettingsSection.Providers);
+
+    public IState<bool> IsProvidersSectionSelected => State.Value(this, static () => true);
+
+    public IState<bool> IsMessagesSectionSelected => State.Value(this, static () => false);
+
+    public IState<bool> ShowProvidersSection => State.Value(this, static () => true);
+
+    public IState<bool> ShowMessagesSection => State.Value(this, static () => false);
 
     public IState<ProviderStatusItem> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
@@ -72,6 +101,16 @@ public partial record SettingsModel
 
     public IState<bool> CanToggleSelectedProvider => State.Value(this, static () => false);
 
+    public IState<ComposerSendBehavior> SelectedComposerSendBehavior => State.Value(this, static () => ComposerSendBehavior.EnterSends);
+
+    public IState<string> ComposerSendBehaviorHint => State.Value(
+        this,
+        static () => ChatComposerSendBehaviorText.GetHint(ComposerSendBehavior.EnterSends));
+
+    public IState<bool> IsEnterSendsSelected => State.Value(this, static () => true);
+
+    public IState<bool> IsEnterInsertsNewLineSelected => State.Value(this, static () => false);
+
     public ICommand RefreshCommand =>
         _refreshCommand ??= new AsyncCommand(
             () => Refresh(CancellationToken.None));
@@ -88,6 +127,14 @@ public partial record SettingsModel
         _executeProviderActionCommand ??= new AsyncCommand(
             parameter => ExecuteProviderAction(parameter as ProviderActionItem, CancellationToken.None));
 
+    public ICommand SelectSectionCommand =>
+        _selectSectionCommand ??= new AsyncCommand(
+            parameter => SelectSection(parameter as string, CancellationToken.None));
+
+    public ICommand SelectComposerSendBehaviorCommand =>
+        _selectComposerSendBehaviorCommand ??= new AsyncCommand(
+            parameter => SelectComposerSendBehavior(parameter as string, CancellationToken.None));
+
     public async ValueTask Refresh(CancellationToken cancellationToken)
     {
         try
@@ -96,6 +143,7 @@ public partial record SettingsModel
             var workspace = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
         }
@@ -123,8 +171,10 @@ public partial record SettingsModel
             var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
+            workspaceProjectionNotifier.Publish();
         }
         catch (Exception exception)
         {
@@ -142,6 +192,40 @@ public partial record SettingsModel
 
         await SetSelectedProviderAsync(provider, cancellationToken);
         _workspaceRefresh.Raise();
+    }
+
+    public async ValueTask SelectSection(string? sectionKey, CancellationToken cancellationToken)
+    {
+        if (!TryParseSection(sectionKey, out var section))
+        {
+            return;
+        }
+
+        await SetSelectedSectionAsync(section, cancellationToken);
+    }
+
+    public async ValueTask SelectComposerSendBehavior(string? behaviorKey, CancellationToken cancellationToken)
+    {
+        if (!TryParseComposerSendBehavior(behaviorKey, out var behavior))
+        {
+            return;
+        }
+
+        try
+        {
+            var preferences = await workspaceState.UpdateComposerSendBehaviorAsync(
+                new UpdateComposerSendBehaviorCommand(behavior),
+                cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(preferences, cancellationToken);
+            await StatusMessage.SetAsync(ComposerBehaviorSavedMessage, cancellationToken);
+            _workspaceRefresh.Raise();
+            workspaceProjectionNotifier.Publish();
+        }
+        catch (Exception exception)
+        {
+            SettingsViewModelLog.Failure(logger, exception);
+            await StatusMessage.SetAsync(exception.Message, cancellationToken);
+        }
     }
 
     public async ValueTask ExecuteProviderAction(ProviderActionItem? action, CancellationToken cancellationToken)
@@ -180,6 +264,7 @@ public partial record SettingsModel
             SettingsViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: (await SelectedProvider) ?? EmptySelectedProvider);
             var selectedProvider = await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
             return MapProviderStatusItems(workspace.Providers, selectedProvider);
         }
         catch (Exception exception)
@@ -269,6 +354,65 @@ public partial record SettingsModel
                 : EnableProviderLabel,
             cancellationToken);
         await CanToggleSelectedProvider.UpdateAsync(_ => !IsEmptySelectedProvider(selectedProvider), cancellationToken);
+    }
+
+    private void OnWorkspaceProjectionChanged(object? sender, EventArgs e)
+    {
+        _workspaceRefresh.Raise();
+    }
+
+    private async ValueTask SetSelectedSectionAsync(SettingsSection section, CancellationToken cancellationToken)
+    {
+        await SelectedSection.SetAsync(section, cancellationToken);
+        await IsProvidersSectionSelected.SetAsync(section is SettingsSection.Providers, cancellationToken);
+        await IsMessagesSectionSelected.SetAsync(section is SettingsSection.Messages, cancellationToken);
+        await ShowProvidersSection.SetAsync(section is SettingsSection.Providers, cancellationToken);
+        await ShowMessagesSection.SetAsync(section is SettingsSection.Messages, cancellationToken);
+    }
+
+    private async ValueTask SynchronizeComposerSendBehaviorAsync(
+        OperatorPreferencesSnapshot preferences,
+        CancellationToken cancellationToken)
+    {
+        await SelectedComposerSendBehavior.SetAsync(preferences.ComposerSendBehavior, cancellationToken);
+        await ComposerSendBehaviorHint.SetAsync(
+            ChatComposerSendBehaviorText.GetHint(preferences.ComposerSendBehavior),
+            cancellationToken);
+        await IsEnterSendsSelected.SetAsync(
+            preferences.ComposerSendBehavior is ComposerSendBehavior.EnterSends,
+            cancellationToken);
+        await IsEnterInsertsNewLineSelected.SetAsync(
+            preferences.ComposerSendBehavior is ComposerSendBehavior.EnterInsertsNewLine,
+            cancellationToken);
+    }
+
+    private static bool TryParseSection(string? sectionKey, out SettingsSection section)
+    {
+        if (string.Equals(sectionKey, ProvidersSectionKey, StringComparison.Ordinal))
+        {
+            section = SettingsSection.Providers;
+            return true;
+        }
+
+        if (string.Equals(sectionKey, MessagesSectionKey, StringComparison.Ordinal))
+        {
+            section = SettingsSection.Messages;
+            return true;
+        }
+
+        section = SettingsSection.Providers;
+        return false;
+    }
+
+    private static bool TryParseComposerSendBehavior(string? behaviorKey, out ComposerSendBehavior behavior)
+    {
+        if (Enum.TryParse(behaviorKey, ignoreCase: true, out behavior))
+        {
+            return true;
+        }
+
+        behavior = ComposerSendBehavior.EnterSends;
+        return false;
     }
 
     private static AgentProviderKind? FindEnabledProviderKind(IReadOnlyList<ProviderStatusDescriptor> providers)

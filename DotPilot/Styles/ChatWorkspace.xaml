@@ -1,0 +1,56 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style x:Key="ChatSurfacePanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
+    <Setter Property="Padding" Value="18" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+
+  <Style x:Key="ChatSectionTitleTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+  </Style>
+
+  <Style x:Key="ChatSectionCaptionTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Foreground" Value="{StaticResource AppMutedTextBrush}" />
+    <Setter Property="TextWrapping" Value="WrapWholeWords" />
+  </Style>
+
+  <Style x:Key="ChatComposerCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
+    <Setter Property="Padding" Value="18" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+
+  <Style x:Key="ChatComposerTextBoxStyle" TargetType="TextBox">
+    <Setter Property="AcceptsReturn" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+    <Setter Property="MaxHeight" Value="168" />
+    <Setter Property="MinHeight" Value="88" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="SelectionHighlightColor" Value="{StaticResource AppAccentBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+
+  <Style x:Key="ChatComposerLabelTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource AppSecondaryTextBrush}" />
+  </Style>
+
+  <Style x:Key="ChatComposerHintTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource AppMutedTextBrush}" />
+    <Setter Property="TextWrapping" Value="WrapWholeWords" />
+  </Style>
+
+</ResourceDictionary>

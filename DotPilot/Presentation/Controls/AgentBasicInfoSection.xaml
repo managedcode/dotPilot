@@ -19,8 +19,8 @@
       <Grid ColumnSpacing="16"
             RowSpacing="16">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="1.2*" MinWidth="260" />
-          <ColumnDefinition Width="*" MinWidth="220" />
+          <ColumnDefinition Width="1.15*" MinWidth="260" />
+          <ColumnDefinition Width="*" MinWidth="240" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -46,38 +46,26 @@
           <TextBlock FontSize="12"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="Role" />
-          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
-            <ComboBox AutomationProperties.AutomationId="AgentRoleCombo"
-                      Style="{StaticResource BuilderComboBoxStyle}"
-                      DisplayMemberPath="Label"
-                      ItemsSource="{Binding Roles}"
-                      SelectedItem="{Binding SelectedRole, Mode=TwoWay}" />
-          </Border>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1"
-                    Spacing="8">
-          <TextBlock FontSize="12"
-                     FontWeight="Medium"
-                     Foreground="{StaticResource AppSecondaryTextBrush}"
                      Text="Provider" />
           <Border Style="{StaticResource BuilderInputSurfaceStyle}">
-            <ComboBox AutomationProperties.AutomationId="AgentProviderCombo"
+            <ComboBox x:Name="ProviderCombo"
+                      AutomationProperties.AutomationId="AgentProviderCombo"
+                      SelectionChanged="OnProviderSelectionChanged"
                       Style="{StaticResource BuilderComboBoxStyle}"
                       DisplayMemberPath="DisplayName"
                       ItemsSource="{Binding Providers}"
+                      Tag="{Binding ProviderSelectionChangedCommand}"
                       SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
           </Border>
         </StackPanel>
 
         <StackPanel Grid.Row="1"
-                    Grid.Column="1"
+                    Grid.ColumnSpan="2"
                     Spacing="8">
           <TextBlock FontSize="12"
                      FontWeight="Medium"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="Model override" />
+                     Text="Model" />
           <Border Style="{StaticResource BuilderInputSurfaceStyle}">
             <TextBox AutomationProperties.AutomationId="AgentModelInput"
                      Style="{StaticResource BuilderTextBoxStyle}"
@@ -88,7 +76,7 @@
                      FontSize="11.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
                      TextWrapping="WrapWholeWords">
-            <Run Text="Leave blank to use " />
+            <Run Text="Use the suggested model or enter a provider-specific override. Suggested: " />
             <Run Text="{Binding Builder.SuggestedModelName}" />
             <Run Text="." />
           </TextBlock>

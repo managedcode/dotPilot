@@ -32,7 +32,7 @@ public sealed class SecondModelTests
             agent.ProviderKind == AgentProviderKind.Debug &&
             agent.ModelName == "debug-echo");
         (await model.OperationMessage).Should().Be("Saved Repository Reviewer Agent using Debug Provider.");
-        (await model.Builder)!.StatusMessage.Should().Be("Ready to save an agent with Debug Provider.");
+        (await model.Builder)!.StatusMessage.Should().Be("Built in and ready for deterministic local testing.");
     }
 
     [Test]
@@ -76,6 +76,29 @@ public sealed class SecondModelTests
         (await model.AgentName).Should().Be("New agent");
         (await model.Builder)!.SuggestedModelName.Should().Be("debug-echo");
         (await model.OperationMessage).Should().Be("Manual draft ready. Adjust the profile before saving.");
+    }
+
+    [Test]
+    public async Task HandleSelectedProviderChangedUpdatesModelWhenCurrentValueMatchesPreviousSuggestion()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        (await model.ModelName).Should().Be("debug-echo");
+
+        await model.HandleSelectedProviderChanged(
+            new AgentProviderOption(
+                AgentProviderKind.Codex,
+                "Codex",
+                "codex",
+                "Codex CLI is available on PATH.",
+                "1.0.0",
+                true),
+            CancellationToken.None);
+
+        (await model.ModelName).Should().Be("gpt-5");
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Codex);
     }
 
     [Test]

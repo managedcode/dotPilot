@@ -1,17 +1,29 @@
+using DotPilot.Core.Features.AgentSessions;
+
 namespace DotPilot.Presentation;
 
 public static class ChatComposerKeyboardPolicy
 {
-    public static ChatComposerKeyboardAction Resolve(bool isEnterKey, bool isShiftPressed, bool isAltPressed)
+    public static ChatComposerKeyboardAction Resolve(
+        ComposerSendBehavior behavior,
+        bool isEnterKey,
+        bool hasModifier)
     {
         if (!isEnterKey)
         {
             return ChatComposerKeyboardAction.None;
         }
 
-        return isShiftPressed || isAltPressed
-            ? ChatComposerKeyboardAction.InsertNewLine
-            : ChatComposerKeyboardAction.SendMessage;
+        return behavior switch
+        {
+            ComposerSendBehavior.EnterSends => hasModifier
+                ? ChatComposerKeyboardAction.InsertNewLine
+                : ChatComposerKeyboardAction.SendMessage,
+            ComposerSendBehavior.EnterInsertsNewLine => hasModifier
+                ? ChatComposerKeyboardAction.SendMessage
+                : ChatComposerKeyboardAction.InsertNewLine,
+            _ => ChatComposerKeyboardAction.SendMessage,
+        };
     }
 }
 

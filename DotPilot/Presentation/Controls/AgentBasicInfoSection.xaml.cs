@@ -6,4 +6,9 @@ public sealed partial class AgentBasicInfoSection : UserControl
     {
         InitializeComponent();
     }
+
+    private void OnProviderSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        BoundCommandBridge.Execute(ProviderCombo.Tag as ICommand, ProviderCombo.SelectedItem);
+    }
 }

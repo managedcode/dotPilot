@@ -30,6 +30,9 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Build the visible product around a desktop chat shell: session list, active transcript, terminal-like activity pane, agent/profile controls, and provider settings are the primary surfaces.
 - Keep agent creation prompt-first in the UI: the default `New agent` experience should start from a natural-language description that generates a draft agent, while manual field-by-field configuration stays a secondary fallback path.
 - Keep a visible default-agent path in the shell: the app should surface a usable system/default agent by default and must not make the operator build everything manually before they can start a session.
+- Treat agent creation as profile authoring, not role assignment: do not expose role pickers or role-derived copy in the operator flow because an agent is created from its prompt, instructions, provider, tools, and skills.
+- Keep the operator-facing draft free of placeholder/debug presentation: show real provider/model defaults plus tool and skill choices, and reserve deterministic debug fallbacks for true no-provider fallback paths only.
+- Do not present a live provider like Codex in the desktop shell as selected or runnable when the local runtime still cannot execute through its installed CLI; the visible session path must match the actual provider that will answer.
 - Do not use workbench, issue-center, domain-browser, or other backlog-driven IA labels as the product shell.
 - Do not preserve legacy prototype pages or controls once the replacement chat/session surface is underway; remove obsolete UI paths instead of carrying both shells.
 - Keep one consistent desktop app chrome across all primary routes: the left rail, branding, and operator footer should stay structurally stable while the main content region changes.
@@ -37,6 +40,8 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Keep shell geometry and control sizing stable across route changes; the left rail, nav rows, footer profile block, and main page header rhythm must not jump or reflow between `Chat`, `Agents`, and `Providers`.
 - Avoid duplicated side-panel content and oversized decorative copy; prefer compact navigation, clear current-task headers, and content-first layouts.
 - Avoid placeholder-looking XAML chrome such as ASCII pseudo-icons, duplicate provider lists, inflated pill buttons, or decorative labels that repeat the same state in multiple panes.
+- Do not let the desktop shell collapse into an unstructured visual mash: keep reusable styles, brushes, templates, and spacing rules in dedicated XAML resources or focused controls instead of burying ad hoc visual decisions inline across pages.
+- The chat composer must expose an operator setting for send behavior with exactly two modes: `Enter` sends while `Enter` with modifiers inserts a new line, or `Enter` inserts a new line while `Enter` with modifiers sends; do not hardcode only one behavior.
 - Prefer declarative `Uno.Extensions.Navigation` in XAML via `uen:Navigation.Request` over page code-behind navigation calls.
 - Keep business logic, persistence, networking workflows, and non-UI orchestration out of page code-behind.
 - Do not cast `DataContext` to concrete screen models or call their methods from control/page code-behind; if a framework event needs bridging, expose a bindable command or presentation-safe abstraction instead of coupling the view to a specific view-model type.

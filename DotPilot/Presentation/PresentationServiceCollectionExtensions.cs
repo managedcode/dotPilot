@@ -8,6 +8,7 @@ internal static class PresentationServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainModel>();
         services.AddSingleton<MainViewModel>();

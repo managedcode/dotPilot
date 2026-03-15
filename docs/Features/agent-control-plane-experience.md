@@ -98,11 +98,11 @@ sequenceDiagram
 
 ### Agent Profiles
 
-- The operator creates an agent profile by selecting:
+- The operator creates an agent profile from a natural-language draft and then reviews:
   - provider
-  - role
   - model
-  - capabilities
+  - tools
+  - skills
   - system prompt
 - Agent profiles are durable and survive restarts.
 - The current shipped flow creates one provider-backed primary agent per session, while the architecture keeps room for later multi-agent expansion.
@@ -147,9 +147,11 @@ sequenceDiagram
 
 - If the app restarts, previously persisted sessions and transcript history must still load from the local store.
 
-### Live Provider Not Yet Wired
+### Live Provider Availability
 
-- If a provider is configured but live execution is not implemented yet, the session flow must surface that state as an explicit transcript error entry.
+- Only providers with a wired live runtime path may allow agent creation in the desktop flow.
+- `Codex` uses the local `codex` CLI for live session execution when its CLI is installed and enabled.
+- Providers that are installed but not yet wired for live desktop execution must stay visible in settings with clear status text, but they must not be offered as creatable/runnable agent defaults.
 
 ## Verification Strategy
 

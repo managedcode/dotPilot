@@ -1,5 +1,6 @@
 using DotPilot.UITests.Harness;
 using OpenQA.Selenium;
+using UITestPlatform = Uno.UITest.Helpers.Queries.Platform;
 
 namespace DotPilot.UITests.Features.AgentSessions;
 
@@ -26,25 +27,31 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ProviderListAutomationId = "ProviderList";
     private const string SelectedProviderTitleAutomationId = "SelectedProviderTitle";
     private const string ToggleProviderButtonAutomationId = "ToggleProviderButton";
+    private const string SettingsSectionMessagesButtonAutomationId = "SettingsSectionMessagesButton";
     private const string CodexProviderEntryAutomationId = "ProviderEntry_Codex";
     private const string AgentCatalogSectionAutomationId = "AgentCatalogSection";
     private const string AgentCatalogListAutomationId = "AgentCatalogList";
     private const string AgentCatalogItemAutomationId = "AgentCatalogItem";
     private const string AgentCatalogStatusMessageAutomationId = "AgentCatalogStatusMessage";
     private const string OpenCreateAgentButtonAutomationId = "OpenCreateAgentButton";
-    private const string AgentPromptStartSectionAutomationId = "AgentPromptStartSection";
     private const string AgentPromptInputAutomationId = "AgentPromptInput";
     private const string GenerateAgentButtonAutomationId = "GenerateAgentButton";
     private const string AgentBackButtonAutomationId = "AgentBackButton";
-    private const string AgentBasicInfoSectionAutomationId = "AgentBasicInfoSection";
+    private const string AgentNameInputAutomationId = "AgentNameInput";
     private const string AgentModelInputAutomationId = "AgentModelInput";
-    private const string AgentPromptSectionAutomationId = "AgentPromptSection";
-    private const string AgentSkillsSectionAutomationId = "AgentSkillsSection";
+    private const string AgentDescriptionInputAutomationId = "AgentDescriptionInput";
+    private const string AgentSystemPromptInputAutomationId = "AgentSystemPromptInput";
+    private const string AgentToolsListAutomationId = "AgentToolsList";
+    private const string AgentSkillListAutomationId = "AgentSkillList";
+    private const string AgentRoleComboAutomationId = "AgentRoleCombo";
     private const string SaveAgentButtonAutomationId = "SaveAgentButton";
     private const string AgentEditorStatusMessageAutomationId = "AgentEditorStatusMessage";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
     private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
+    private const string ComposerBehaviorSectionAutomationId = "ComposerBehaviorSection";
+    private const string ComposerBehaviorCurrentHintAutomationId = "ComposerBehaviorCurrentHint";
+    private const string ComposerBehaviorEnterInsertsNewLineButtonAutomationId = "ComposerBehaviorEnterInsertsNewLineButton";
     private const string ChatStartNewButtonAutomationId = "ChatStartNewButton";
     private const string ChatTitleTextAutomationId = "ChatTitleText";
     private const string ChatMessageTextAutomationId = "ChatMessageText";
@@ -77,7 +84,7 @@ public sealed class GivenChatSessionsShell : TestBase
 
         TapAutomationElement(ProvidersNavButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
-        WaitForTextContains(ProvidersPageTitleAutomationId, "Providers", ScreenTransitionTimeout);
+        WaitForTextContains(ProvidersPageTitleAutomationId, "Settings", ScreenTransitionTimeout);
         AssertSingleShellChrome();
 
         TapAutomationElement(ChatNavButtonAutomationId);
@@ -122,8 +129,7 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AgentCatalogListAutomationId);
         WaitForTextContains(AgentCatalogItemAutomationId, DefaultSystemAgentName, ScreenTransitionTimeout);
 
-        TapAutomationElement(OpenCreateAgentButtonAutomationId);
-        WaitForElement(AgentPromptStartSectionAutomationId);
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId);
         WaitForElement(AgentPromptInputAutomationId);
         WaitForElement(GenerateAgentButtonAutomationId);
         WaitForElement(AgentBackButtonAutomationId);
@@ -139,18 +145,20 @@ public sealed class GivenChatSessionsShell : TestBase
         EnsureOnChatScreen();
         TapAutomationElement(AgentsNavButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
-        TapAutomationElement(OpenCreateAgentButtonAutomationId);
-        WaitForElement(AgentPromptStartSectionAutomationId);
-
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId);
+        WaitForElement(AgentPromptInputAutomationId);
         ReplaceTextAutomationElement(AgentPromptInputAutomationId, RepositoryReviewerPrompt);
-        TapAutomationElement(GenerateAgentButtonAutomationId);
-        WaitForElement(AgentBasicInfoSectionAutomationId);
+        ClickActionAutomationElement(GenerateAgentButtonAutomationId);
         WaitForTextContains(AgentEditorStatusMessageAutomationId, "Generated draft", ScreenTransitionTimeout);
+        WaitForElement(AgentNameInputAutomationId);
         WaitForElement(AgentModelInputAutomationId);
-        WaitForElement(AgentPromptSectionAutomationId);
-        WaitForElement(AgentSkillsSectionAutomationId);
+        WaitForElement(AgentDescriptionInputAutomationId);
+        WaitForElement(AgentSystemPromptInputAutomationId);
+        WaitForElement(AgentToolsListAutomationId);
+        WaitForElement(AgentSkillListAutomationId);
+        Assert.That(App.Query(AgentRoleComboAutomationId), Is.Empty);
 
-        TapAutomationElement(SaveAgentButtonAutomationId);
+        ClickActionAutomationElement(SaveAgentButtonAutomationId);
         WaitForElement(AgentCatalogSectionAutomationId);
         WaitForTextContains(AgentCatalogStatusMessageAutomationId, SavedAgentMessage, ScreenTransitionTimeout);
         WaitForTextContains(AgentCatalogItemAutomationId, RepositoryReviewerName, ScreenTransitionTimeout);
@@ -166,13 +174,14 @@ public sealed class GivenChatSessionsShell : TestBase
         EnsureOnChatScreen();
         TapAutomationElement(ProvidersNavButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
+        WaitForTextContains(ProvidersPageTitleAutomationId, "Settings", ScreenTransitionTimeout);
         WaitForElement(ProviderListAutomationId);
         WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
         WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
 
-        TapAutomationElement(ToggleProviderButtonAutomationId);
+        ClickActionAutomationElement(ToggleProviderButtonAutomationId);
         WaitForTextContains(ToggleProviderButtonAutomationId, "Enable provider", ScreenTransitionTimeout);
-        TapAutomationElement(ToggleProviderButtonAutomationId);
+        ClickActionAutomationElement(ToggleProviderButtonAutomationId);
         WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
 
         TakeScreenshot("settings_toggle_debug_provider");
@@ -198,6 +207,36 @@ public sealed class GivenChatSessionsShell : TestBase
     }
 
     [Test]
+    public async Task WhenChangingMessageSendBehaviorThenChatHintReflectsTheSelection()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForTextContains(ProvidersPageTitleAutomationId, "Settings", ScreenTransitionTimeout);
+        ClickActionAutomationElement(SettingsSectionMessagesButtonAutomationId);
+        WaitForElement(ComposerBehaviorSectionAutomationId);
+        WaitForTextContains(ComposerBehaviorCurrentHintAutomationId, "Enter sends.", ScreenTransitionTimeout);
+
+        ClickActionAutomationElement(ComposerBehaviorEnterInsertsNewLineButtonAutomationId);
+        WaitForTextContains(ComposerBehaviorCurrentHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+
+        TapAutomationElement(ChatNavButtonAutomationId);
+        EnsureOnChatScreen();
+        WaitForTextContains(ChatComposerHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
+        WaitForTextContains(ChatComposerInputAutomationId, UserPrompt, ScreenTransitionTimeout);
+        ClickActionAutomationElement(ChatComposerSendButtonAutomationId);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
+
+        TakeScreenshot("chat_message_send_behavior");
+    }
+
+    [Test]
     public async Task WhenCreatingAnAgentAndStartingAChatThenTheTranscriptIsVisible()
     {
         await Task.CompletedTask;
@@ -205,13 +244,12 @@ public sealed class GivenChatSessionsShell : TestBase
         EnsureOnChatScreen();
         TapAutomationElement(AgentsNavButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
-        TapAutomationElement(OpenCreateAgentButtonAutomationId);
-        WaitForElement(AgentPromptStartSectionAutomationId);
-
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId);
+        WaitForElement(AgentPromptInputAutomationId);
         ReplaceTextAutomationElement(AgentPromptInputAutomationId, RepositoryReviewerPrompt);
-        TapAutomationElement(GenerateAgentButtonAutomationId);
-        WaitForElement(AgentBasicInfoSectionAutomationId);
-        TapAutomationElement(SaveAgentButtonAutomationId);
+        ClickActionAutomationElement(GenerateAgentButtonAutomationId);
+        WaitForElement(AgentNameInputAutomationId);
+        ClickActionAutomationElement(SaveAgentButtonAutomationId);
         WaitForTextContains(AgentCatalogStatusMessageAutomationId, SavedAgentMessage, ScreenTransitionTimeout);
         TapAutomationElement(AgentCatalogStartChatButtonAutomationId);
 
@@ -290,6 +328,12 @@ public sealed class GivenChatSessionsShell : TestBase
                 return;
             }
 
+            if (TryReadBrowserAutomationTexts(automationId, out var browserTexts) &&
+                browserTexts.Any(text => NormalizeText(text).Contains(expectedText, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
             Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
         }
 
@@ -300,6 +344,41 @@ public sealed class GivenChatSessionsShell : TestBase
 
     private IAppResult[] WaitForElement(string automationId, string? timeoutMessage = null, TimeSpan? timeout = null)
     {
+        if (Constants.CurrentPlatform == UITestPlatform.Browser)
+        {
+            var effectiveTimeout = timeout ?? ScreenTransitionTimeout;
+            var timeoutAt = DateTimeOffset.UtcNow.Add(effectiveTimeout);
+
+            while (DateTimeOffset.UtcNow < timeoutAt)
+            {
+                try
+                {
+                    var matches = App.Query(automationId);
+                    if (matches.Length > 0)
+                    {
+                        return matches;
+                    }
+                }
+                catch (StaleElementReferenceException)
+                {
+                }
+                catch (InvalidOperationException)
+                {
+                }
+
+                if (BrowserHasAutomationElement(automationId))
+                {
+                    return [];
+                }
+
+                Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
+            }
+
+            WriteBrowserAutomationDiagnostics(automationId);
+            WriteBrowserDomSnapshot($"wait-timeout:{automationId}", automationId);
+            throw new TimeoutException(timeoutMessage ?? $"Timed out waiting for automation id '{automationId}'.");
+        }
+
         return App.WaitForElement(
             automationId,
             timeoutMessage ?? $"Timed out waiting for automation id '{automationId}'.",
