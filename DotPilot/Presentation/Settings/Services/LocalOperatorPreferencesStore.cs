@@ -2,11 +2,10 @@ using System.Text.Json;
 
 namespace DotPilot.Presentation;
 
-public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore
+public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore, IDisposable
 {
     private const string PreferencesDirectoryName = "dotPilot";
     private const string PreferencesFileName = "operator-preferences.json";
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public async ValueTask<OperatorPreferencesSnapshot> GetAsync(CancellationToken cancellationToken)
@@ -51,7 +50,9 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore
         try
         {
             var json = await File.ReadAllTextAsync(filePath, cancellationToken);
-            var dto = JsonSerializer.Deserialize<OperatorPreferencesDto>(json, SerializerOptions);
+            var dto = JsonSerializer.Deserialize(
+                json,
+                OperatorPreferencesJsonSerializerContext.Default.OperatorPreferencesDto);
             return dto?.ToSnapshot() ?? CreateDefaultSnapshot();
         }
         catch
@@ -72,7 +73,9 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore
         }
 
         var dto = OperatorPreferencesDto.FromSnapshot(snapshot);
-        var json = JsonSerializer.Serialize(dto, SerializerOptions);
+        var json = JsonSerializer.Serialize(
+            dto,
+            OperatorPreferencesJsonSerializerContext.Default.OperatorPreferencesDto);
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
     }
 
@@ -90,18 +93,26 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore
         return new OperatorPreferencesSnapshot(ComposerSendBehavior.EnterSends);
     }
 
-    private sealed record OperatorPreferencesDto(string ComposerSendBehavior)
+    public void Dispose()
     {
-        public OperatorPreferencesSnapshot ToSnapshot()
-        {
-            return Enum.TryParse<ComposerSendBehavior>(ComposerSendBehavior, ignoreCase: true, out var behavior)
-                ? new OperatorPreferencesSnapshot(behavior)
-                : CreateDefaultSnapshot();
-        }
+        _gate.Dispose();
+    }
+}
 
-        public static OperatorPreferencesDto FromSnapshot(OperatorPreferencesSnapshot snapshot)
-        {
-            return new OperatorPreferencesDto(snapshot.ComposerSendBehavior.ToString());
-        }
+internal sealed record OperatorPreferencesDto(string ComposerSendBehavior)
+{
+    public OperatorPreferencesSnapshot ToSnapshot()
+    {
+        return Enum.TryParse<global::DotPilot.Presentation.ComposerSendBehavior>(
+                ComposerSendBehavior,
+                ignoreCase: true,
+                out var behavior)
+            ? new OperatorPreferencesSnapshot(behavior)
+            : new OperatorPreferencesSnapshot(global::DotPilot.Presentation.ComposerSendBehavior.EnterSends);
+    }
+
+    public static OperatorPreferencesDto FromSnapshot(OperatorPreferencesSnapshot snapshot)
+    {
+        return new OperatorPreferencesDto(snapshot.ComposerSendBehavior.ToString());
     }
 }

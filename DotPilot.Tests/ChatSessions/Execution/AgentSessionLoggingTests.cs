@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.ChatSessions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

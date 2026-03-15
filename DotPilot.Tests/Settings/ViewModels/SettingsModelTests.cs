@@ -1,4 +1,3 @@
-using DotPilot.Presentation;
 using DotPilot.Core.ChatSessions;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,5 +1,3 @@
-using DotPilot.Core.ControlPlaneDomain;
-using DotPilot.Presentation;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
 using Microsoft.Extensions.DependencyInjection;

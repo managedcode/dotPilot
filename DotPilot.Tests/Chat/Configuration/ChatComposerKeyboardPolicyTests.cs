@@ -1,5 +1,3 @@
-using DotPilot.Presentation;
-
 namespace DotPilot.Tests.Chat;
 
 public sealed class ChatComposerKeyboardPolicyTests

@@ -97,15 +97,6 @@ public partial class App : Application
                     )
                     // Enable localization (see appsettings.json for supported languages)
                     .UseLocalization()
-                    .UseHttp((context, services) =>
-                    {
-#if DEBUG
-                        // DelegatingHandler will be automatically injected
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<DelegatingHandler, DotPilot.Core.HttpDiagnostics.DebugHttpHandler>(services);
-#endif
-
-                    })
                     .ConfigureServices((context, services) =>
                     {
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
