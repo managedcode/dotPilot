@@ -7,19 +7,19 @@
   <UserControl.Resources>
     <DataTemplate x:Key="IncomingMessageTemplate"
                   x:DataType="presentation:ChatTimelineItem">
-      <Grid Margin="0,0,0,22"
-            MaxWidth="660"
+      <Grid Margin="0,0,0,20"
+            MaxWidth="720"
             AutomationProperties.AutomationId="ChatIncomingMessageItem">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Width="32"
-                Height="32"
+        <Border Width="34"
+                Height="34"
                 VerticalAlignment="Top"
                 Background="{x:Bind AvatarBrush}"
-                CornerRadius="16">
+                CornerRadius="17">
           <TextBlock HorizontalAlignment="Center"
                      VerticalAlignment="Center"
                      FontSize="12"
@@ -29,25 +29,22 @@
         </Border>
 
         <StackPanel Grid.Column="1"
-                    Margin="10,0,0,0"
-                    MaxWidth="600"
-                    Spacing="9">
+                    Margin="12,0,0,0"
+                    MaxWidth="620"
+                    Spacing="8">
           <StackPanel Orientation="Horizontal"
                       Spacing="8">
             <TextBlock FontSize="12"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource AppSecondaryTextBrush}"
                        Text="{x:Bind Author}" />
-            <TextBlock FontSize="10"
+            <TextBlock FontSize="10.5"
                        Foreground="{StaticResource AppMutedTextBrush}"
                        Text="{x:Bind Timestamp}" />
           </StackPanel>
 
-          <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                  BorderBrush="{StaticResource AppOutlineBrush}"
-                  BorderThickness="1"
-                  CornerRadius="18,18,18,6"
-                  Padding="16,14">
+          <Border Style="{StaticResource MetricCardStyle}"
+                  CornerRadius="14,14,14,8">
             <StackPanel Spacing="6">
               <TextBlock FontSize="11"
                          AutomationProperties.AutomationId="ChatMessageAccent"
@@ -67,7 +64,7 @@
 
     <DataTemplate x:Key="OutgoingMessageTemplate"
                   x:DataType="presentation:ChatTimelineItem">
-      <StackPanel Margin="0,0,0,22"
+      <StackPanel Margin="0,0,0,20"
                   HorizontalAlignment="Right"
                   MaxWidth="620"
                   Spacing="6"
@@ -75,7 +72,7 @@
         <StackPanel HorizontalAlignment="Right"
                     Orientation="Horizontal"
                     Spacing="8">
-          <TextBlock FontSize="10"
+          <TextBlock FontSize="10.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
                      Text="{x:Bind Timestamp}" />
           <TextBlock FontSize="12"
@@ -85,8 +82,8 @@
         </StackPanel>
 
         <Border Background="{StaticResource AppDarkSurfaceBrush}"
-                CornerRadius="28,28,8,28"
-                Padding="16">
+                CornerRadius="14,14,8,14"
+                Padding="15,12">
           <TextBlock FontSize="14"
                      AutomationProperties.AutomationId="ChatMessageText"
                      Foreground="White"
@@ -102,37 +99,35 @@
                                           OutgoingTemplate="{StaticResource OutgoingMessageTemplate}" />
   </UserControl.Resources>
 
-  <Grid>
+  <Grid RowSpacing="14">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid Margin="0,8,0,0"
-          AutomationProperties.AutomationId="ChatConversationHeader"
+    <Grid AutomationProperties.AutomationId="ChatConversationHeader"
           ColumnSpacing="12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
 
-      <Border Width="40"
-              Height="40"
+      <Border Width="42"
+              Height="42"
               Background="{StaticResource DesignAvatarBrush}"
-              CornerRadius="20">
+              CornerRadius="21">
         <TextBlock HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    FontSize="15"
                    FontWeight="Bold"
                    Foreground="White"
-                   Text="S" />
+                   Text="{Binding ActiveSession.Initial}" />
       </Border>
 
       <StackPanel Grid.Column="1"
                   Spacing="2">
         <TextBlock AutomationProperties.AutomationId="ChatTitleText"
-                   FontSize="16"
+                   FontSize="18"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource AppPrimaryTextBrush}"
                    Text="{Binding ActiveSession.Title}" />
@@ -142,60 +137,25 @@
                    Height="7"
                    Fill="{StaticResource AppSuccessBrush}" />
           <TextBlock AutomationProperties.AutomationId="ChatStatusText"
-                     FontSize="12"
+                     FontSize="12.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
                      Text="{Binding ActiveSession.StatusSummary}" />
         </StackPanel>
       </StackPanel>
-
-      <Button Grid.Column="2"
-              AutomationProperties.AutomationId="ChatRefreshButton"
-              Background="{StaticResource AppSoftSurfaceBrush}"
-              BorderBrush="{StaticResource AppOutlineBrush}"
-              BorderThickness="1"
-              Command="{Binding Refresh}"
-              CornerRadius="20"
-              Padding="14,10">
-        <StackPanel Orientation="Horizontal"
-                    Spacing="6">
-          <TextBlock FontSize="11"
-                     Text="o" />
-          <TextBlock FontSize="12"
-                     FontWeight="SemiBold"
-                     Text="Refresh" />
-        </StackPanel>
-      </Button>
     </Grid>
 
-    <ScrollViewer Grid.Row="1"
-                  Margin="0,24,0,0"
-                  VerticalScrollBarVisibility="Auto">
-      <StackPanel AutomationProperties.AutomationId="ChatMessagesRegion"
-                  Spacing="24">
-        <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                BorderBrush="{StaticResource AppOutlineBrush}"
-                BorderThickness="1"
-                CornerRadius="18"
-                Padding="16,14">
-          <StackPanel Spacing="6">
-            <TextBlock HorizontalAlignment="Center"
-                       CharacterSpacing="40"
-                       FontSize="12"
-                       FontWeight="Medium"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="SESSION" />
-            <TextBlock HorizontalAlignment="Center"
-                       FontSize="13"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="{Binding ActiveSession.StatusSummary}"
-                       TextWrapping="WrapWholeWords" />
-          </StackPanel>
-        </Border>
-
-        <ItemsControl AutomationProperties.AutomationId="ChatMessagesList"
-                      ItemTemplateSelector="{StaticResource ChatMessageTemplateSelector}"
-                      ItemsSource="{Binding ActiveSession.Messages}" />
-      </StackPanel>
-    </ScrollViewer>
+    <Border Grid.Row="1"
+            Style="{StaticResource GlassPanelStyle}"
+            Padding="0">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,20,22,22"
+                    AutomationProperties.AutomationId="ChatMessagesRegion"
+                    Spacing="18">
+          <ItemsControl AutomationProperties.AutomationId="ChatMessagesList"
+                        ItemTemplateSelector="{StaticResource ChatMessageTemplateSelector}"
+                        ItemsSource="{Binding ActiveSession.Messages}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
   </Grid>
 </UserControl>

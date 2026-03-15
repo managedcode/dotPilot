@@ -79,6 +79,12 @@ internal static partial class AgentRuntimeConversationFactoryLog
         Guid agentId,
         string agentName,
         AgentProviderKind providerKind);
+
+    [LoggerMessage(
+        EventId = 1105,
+        Level = LogLevel.Information,
+        Message = "Using transient runtime conversation path. SessionId={SessionId} AgentId={AgentId}.")]
+    public static partial void TransientRuntimeConversation(ILogger logger, SessionId sessionId, Guid agentId);
 }
 
 internal static partial class AgentSessionServiceLog
@@ -94,6 +100,22 @@ internal static partial class AgentSessionServiceLog
         Level = LogLevel.Information,
         Message = "Local agent session store initialized.")]
     public static partial void InitializationCompleted(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1217,
+        Level = LogLevel.Information,
+        Message = "Enabled default provider preference. Provider={ProviderKind}.")]
+    public static partial void DefaultProviderEnabled(ILogger logger, AgentProviderKind providerKind);
+
+    [LoggerMessage(
+        EventId = 1218,
+        Level = LogLevel.Information,
+        Message = "Seeded default system agent. AgentId={AgentId} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void DefaultAgentSeeded(
+        ILogger logger,
+        Guid agentId,
+        AgentProviderKind providerKind,
+        string modelName);
 
     [LoggerMessage(
         EventId = 1202,

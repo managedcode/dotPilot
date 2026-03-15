@@ -9,6 +9,7 @@ namespace DotPilot.Presentation;
 [Bindable]
 public partial record SettingsModel
 {
+    private const string ProviderEntryAutomationIdPrefix = "ProviderEntry_";
     private const string RefreshCompletedMessage = "Provider readiness refreshed.";
     private const string SelectProviderTitleValue = "Select a provider";
     private const string SelectProviderSummaryValue = "Choose a provider to inspect readiness and install guidance.";
@@ -23,10 +24,16 @@ public partial record SettingsModel
         false,
         false,
         string.Empty,
-        []);
+        [],
+        string.Empty,
+        false);
 
     private readonly IAgentWorkspaceState workspaceState;
     private readonly ILogger<SettingsModel> logger;
+    private AsyncCommand? _refreshCommand;
+    private AsyncCommand? _toggleSelectedProviderCommand;
+    private AsyncCommand? _selectProviderCommand;
+    private AsyncCommand? _executeProviderActionCommand;
     private readonly Signal _workspaceRefresh = new();
 
     public SettingsModel(
@@ -35,12 +42,11 @@ public partial record SettingsModel
     {
         this.workspaceState = workspaceState;
         this.logger = logger;
-        SelectedProvider.ForEach(SynchronizeSelectedProviderProjectionAsync);
     }
 
     public string PageTitle => "Providers";
 
-    public string PageSubtitle => "Enable the built-in debug client or connect local CLI providers before creating agents.";
+    public string PageSubtitle => "Enable local providers before creating agents.";
 
     public IListState<ProviderStatusItem> Providers => ListState.Async(this, LoadProvidersAsync, _workspaceRefresh);
 
@@ -50,7 +56,11 @@ public partial record SettingsModel
 
     public IState<string> SelectedProviderSummary => State.Value(this, static () => SelectProviderSummaryValue);
 
+    public IState<string> SelectedProviderCommandName => State.Value(this, static () => string.Empty);
+
     public IState<string> SelectedProviderInstallCommand => State.Value(this, static () => string.Empty);
+
+    public IState<bool> HasSelectedProviderInstallCommand => State.Value(this, static () => false);
 
     public IState<ImmutableArray<ProviderActionItem>> SelectedProviderActions => State.Value(this, static () => ImmutableArray<ProviderActionItem>.Empty);
 
@@ -62,15 +72,29 @@ public partial record SettingsModel
 
     public IState<bool> CanToggleSelectedProvider => State.Value(this, static () => false);
 
+    public ICommand RefreshCommand =>
+        _refreshCommand ??= new AsyncCommand(
+            () => Refresh(CancellationToken.None));
+
+    public ICommand ToggleSelectedProviderCommand =>
+        _toggleSelectedProviderCommand ??= new AsyncCommand(
+            () => ToggleSelectedProvider(CancellationToken.None));
+
+    public ICommand SelectProviderCommand =>
+        _selectProviderCommand ??= new AsyncCommand(
+            parameter => SelectProvider(parameter as ProviderStatusItem, CancellationToken.None));
+
+    public ICommand ExecuteProviderActionCommand =>
+        _executeProviderActionCommand ??= new AsyncCommand(
+            parameter => ExecuteProviderAction(parameter as ProviderActionItem, CancellationToken.None));
+
     public async ValueTask Refresh(CancellationToken cancellationToken)
     {
         try
         {
             SettingsViewModelLog.RefreshRequested(logger);
             var workspace = await workspaceState.RefreshWorkspaceAsync(cancellationToken);
-            var providers = workspace.Providers
-                .Select(MapProviderStatusItem)
-                .ToImmutableArray();
+            var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
@@ -97,9 +121,7 @@ public partial record SettingsModel
                 new UpdateProviderPreferenceCommand(currentSelectedProvider.Kind, !currentSelectedProvider.IsEnabled),
                 cancellationToken);
             var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
-            var providers = workspace.Providers
-                .Select(MapProviderStatusItem)
-                .ToImmutableArray();
+            var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
@@ -109,6 +131,17 @@ public partial record SettingsModel
             SettingsViewModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
         }
+    }
+
+    public async ValueTask SelectProvider(ProviderStatusItem? provider, CancellationToken cancellationToken)
+    {
+        if (provider is null || IsEmptySelectedProvider(provider))
+        {
+            return;
+        }
+
+        await SetSelectedProviderAsync(provider, cancellationToken);
+        _workspaceRefresh.Raise();
     }
 
     public async ValueTask ExecuteProviderAction(ProviderActionItem? action, CancellationToken cancellationToken)
@@ -145,11 +178,9 @@ public partial record SettingsModel
             SettingsViewModelLog.LoadingProviders(logger);
             var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
             SettingsViewModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
-            var providers = workspace.Providers
-                .Select(MapProviderStatusItem)
-                .ToImmutableArray();
-            await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            return providers;
+            var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: (await SelectedProvider) ?? EmptySelectedProvider);
+            var selectedProvider = await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
+            return MapProviderStatusItems(workspace.Providers, selectedProvider);
         }
         catch (Exception exception)
         {
@@ -159,13 +190,15 @@ public partial record SettingsModel
         }
     }
 
-    private async ValueTask EnsureSelectedProviderAsync(
+    private async ValueTask<ProviderStatusItem> EnsureSelectedProviderAsync(
         AgentWorkspaceSnapshot workspace,
         IImmutableList<ProviderStatusItem> providers,
         CancellationToken cancellationToken)
     {
         var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
-        var resolvedProvider = FindProviderByKind(providers, selectedProvider.Kind);
+        var resolvedProvider = IsEmptySelectedProvider(selectedProvider)
+            ? EmptySelectedProvider
+            : FindProviderByKind(providers, selectedProvider.Kind);
 
         if (IsEmptySelectedProvider(resolvedProvider))
         {
@@ -181,12 +214,26 @@ public partial record SettingsModel
             resolvedProvider = providers[0];
         }
 
-        if (!Equals(selectedProvider, resolvedProvider))
+        await SetSelectedProviderAsync(resolvedProvider, cancellationToken);
+        return resolvedProvider;
+    }
+
+    private async ValueTask SetSelectedProviderAsync(
+        ProviderStatusItem selectedProvider,
+        CancellationToken cancellationToken)
+    {
+        var currentProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        if (!AreSameProvider(currentProvider, selectedProvider))
         {
-            await SelectedProvider.UpdateAsync(_ => resolvedProvider, cancellationToken);
+            await SelectedProvider.UpdateAsync(_ => selectedProvider, cancellationToken);
         }
 
-        await SynchronizeSelectedProviderProjectionAsync(resolvedProvider, cancellationToken);
+        if (!IsEmptySelectedProvider(selectedProvider))
+        {
+            SettingsViewModelLog.ProviderSelected(logger, selectedProvider.Kind, selectedProvider.DisplayName);
+        }
+
+        await SynchronizeSelectedProviderProjectionAsync(selectedProvider, cancellationToken);
     }
 
     private async ValueTask SynchronizeSelectedProviderProjectionAsync(
@@ -204,8 +251,15 @@ public partial record SettingsModel
         await SelectedProviderSummary.SetAsync(
             IsEmptySelectedProvider(selectedProvider) ? SelectProviderSummaryValue : selectedProvider.StatusSummary,
             cancellationToken);
+        await SelectedProviderCommandName.SetAsync(
+            IsEmptySelectedProvider(selectedProvider) ? string.Empty : selectedProvider.CommandName,
+            cancellationToken);
         await SelectedProviderInstallCommand.SetAsync(
             IsEmptySelectedProvider(selectedProvider) ? string.Empty : selectedProvider.InstallCommand,
+            cancellationToken);
+        await HasSelectedProviderInstallCommand.UpdateAsync(
+            _ => !IsEmptySelectedProvider(selectedProvider) &&
+                !string.IsNullOrWhiteSpace(selectedProvider.InstallCommand),
             cancellationToken);
         await SelectedProviderActions.UpdateAsync(_ => actions, cancellationToken);
         await HasSelectedProviderActions.UpdateAsync(_ => actions.Length > 0, cancellationToken);
@@ -248,7 +302,29 @@ public partial record SettingsModel
         return string.IsNullOrWhiteSpace(provider.DisplayName);
     }
 
-    private static ProviderStatusItem MapProviderStatusItem(ProviderStatusDescriptor provider)
+    private static bool AreSameProvider(ProviderStatusItem left, ProviderStatusItem right)
+    {
+        return left.Kind == right.Kind &&
+            string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal) &&
+            string.Equals(left.CommandName, right.CommandName, StringComparison.Ordinal) &&
+            string.Equals(left.StatusSummary, right.StatusSummary, StringComparison.Ordinal) &&
+            string.Equals(left.InstallCommand, right.InstallCommand, StringComparison.Ordinal) &&
+            left.IsEnabled == right.IsEnabled &&
+            left.CanCreateAgents == right.CanCreateAgents;
+    }
+
+    private static ImmutableArray<ProviderStatusItem> MapProviderStatusItems(
+        IReadOnlyList<ProviderStatusDescriptor> providers,
+        ProviderStatusItem? selectedProvider)
+    {
+        return providers
+            .Select(provider => MapProviderStatusItem(provider, selectedProvider))
+            .ToImmutableArray();
+    }
+
+    private static ProviderStatusItem MapProviderStatusItem(
+        ProviderStatusDescriptor provider,
+        ProviderStatusItem? selectedProvider)
     {
         return new ProviderStatusItem(
             provider.Kind,
@@ -261,6 +337,10 @@ public partial record SettingsModel
             provider.Actions.Select(action => action.Command).FirstOrDefault(command => !string.IsNullOrWhiteSpace(command)) ?? string.Empty,
             provider.Actions
                 .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
-                .ToArray());
+                .ToArray(),
+            ProviderEntryAutomationIdPrefix + provider.Kind,
+            selectedProvider is not null &&
+            !IsEmptySelectedProvider(selectedProvider) &&
+            selectedProvider.Kind == provider.Kind);
     }
 }

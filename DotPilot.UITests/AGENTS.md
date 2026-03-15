@@ -26,6 +26,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - Use the official `Uno` MCP documentation as the source of truth for `Uno.UITest` browser behavior, and align selectors with the documented WebAssembly automation mapping before changing the harness.
 - Do not manually launch the app or a standalone `browserwasm` host while working on this project; browser-path reproduction and debugging must go through `dotnet test` and the real `DotPilot.UITests` harness only.
 - UI tests must cover each feature's interactive elements, expected behaviors, and full operator flows instead of only a top-level smoke path.
+- Agent UI coverage is mandatory: keep end-to-end tests for prompt-first agent creation, default-agent visibility, provider readiness or enable/disable interactions, and starting or resuming a chat with an agent.
 
 ## Local Commands
 

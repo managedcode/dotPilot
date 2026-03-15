@@ -2,40 +2,29 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:controls="using:DotPilot.Presentation.Controls"
-      xmlns:utu="using:Uno.Toolkit.UI"
-      Background="{StaticResource AppShellBackgroundBrush}"
+      Background="Transparent"
       FontFamily="{StaticResource AppBodyFontFamily}">
-  <Grid utu:SafeArea.Insets="VisibleBounds"
-        AutomationProperties.AutomationId="SettingsScreen">
-    <Canvas IsHitTestVisible="False">
-      <Ellipse Width="540"
-               Height="473"
-               Canvas.Left="-207"
-               Canvas.Top="482"
-               Fill="{StaticResource AnalyticsAvatarBrush}"
-               Opacity="0.18" />
-      <Ellipse Width="887"
-               Height="777"
-               Canvas.Left="1007"
-               Canvas.Top="-264"
-               Fill="{StaticResource UserAvatarBrush}"
-               Opacity="0.14" />
-    </Canvas>
+  <Grid AutomationProperties.AutomationId="SettingsScreen"
+        MaxWidth="1380"
+        RowSpacing="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
 
-    <Grid Margin="12"
-          ColumnSpacing="20">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="260" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-
-      <controls:SettingsSidebar />
-
-      <ScrollViewer Grid.Column="1"
-                    HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto">
-        <controls:SettingsShell />
-      </ScrollViewer>
+    <Grid AutomationProperties.AutomationId="SettingsScreenHeader">
+      <StackPanel Spacing="4">
+        <TextBlock AutomationProperties.AutomationId="ProvidersPageTitle"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Text="Providers" />
+        <TextBlock FontSize="12.5"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Enable local providers before creating agents."
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
     </Grid>
+
+    <controls:SettingsShell Grid.Row="1" />
   </Grid>
 </Page>

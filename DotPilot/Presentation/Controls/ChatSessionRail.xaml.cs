@@ -1,8 +1,8 @@
 namespace DotPilot.Presentation.Controls;
 
-public sealed partial class SettingsSidebar : UserControl
+public sealed partial class ChatSessionRail : UserControl
 {
-    public SettingsSidebar()
+    public ChatSessionRail()
     {
         InitializeComponent();
     }

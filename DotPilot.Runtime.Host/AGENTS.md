@@ -19,6 +19,7 @@ Stack: `.NET 10`, class library, embedded Orleans host and local runtime-host se
 - Keep it focused on local embedded host concerns: silo configuration, grain registration, and host lifecycle.
 - Use `UseLocalhostClustering` for the embedded desktop cluster, and move grain persistence to a local folder-backed store when the product needs restart-safe state on the operator machine.
 - Do not add remote clustering, external durable stores, or provider-specific orchestration here unless a later issue explicitly requires them.
+- Keep the embedded MCP server and shared MCP gateway local to the host/runtime boundary when app capabilities need to be agent-usable; host composition should register tool definitions and discovery plumbing centrally instead of scattering tool registration across UI code.
 
 ## Local Commands
 

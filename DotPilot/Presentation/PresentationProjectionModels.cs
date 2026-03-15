@@ -4,6 +4,7 @@ namespace DotPilot.Presentation;
 
 [Bindable]
 public sealed partial record ChatSessionView(
+    string Initial,
     string Title,
     string StatusSummary,
     IReadOnlyList<ChatTimelineItem> Messages,

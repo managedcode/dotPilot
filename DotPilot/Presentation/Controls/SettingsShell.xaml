@@ -4,209 +4,215 @@
              xmlns:presentation="using:DotPilot.Presentation"
              x:Name="Root"
              AutomationProperties.AutomationId="SettingsShell">
-  <Grid RowSpacing="16">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
-    </Grid.RowDefinitions>
+  <Grid ColumnSpacing="18">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="288" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
 
-    <Border Style="{StaticResource GlassPanelStyle}">
-      <StackPanel Spacing="8">
-        <TextBlock FontSize="24"
-                   FontWeight="SemiBold"
-                   Text="{Binding PageTitle}" />
-        <TextBlock FontSize="13"
-                   Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="{Binding PageSubtitle}"
-                   TextWrapping="WrapWholeWords" />
-      </StackPanel>
-    </Border>
+    <Border Style="{StaticResource GlassPanelStyle}"
+            Padding="0">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-    <Grid Grid.Row="1"
-          ColumnSpacing="20">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="320" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-
-      <Border Style="{StaticResource GlassPanelStyle}">
-        <StackPanel Spacing="14">
-          <TextBlock CharacterSpacing="80"
-                     FontSize="11"
-                     FontWeight="Medium"
+        <StackPanel Margin="18,18,18,14"
+                    Spacing="4">
+          <TextBlock FontSize="14"
+                     FontWeight="SemiBold"
+                     Text="Local providers" />
+          <TextBlock FontSize="11.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="PROVIDERS" />
-          <ListView AutomationProperties.AutomationId="ProviderList"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    BorderThickness="0"
-                    ItemsSource="{Binding Providers}"
-                    SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
-                    SelectionMode="Single">
-            <ListView.ItemTemplate>
-              <DataTemplate x:DataType="presentation:ProviderStatusItem">
-                <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                        BorderBrush="{StaticResource AppOutlineBrush}"
-                        BorderThickness="1"
-                        CornerRadius="16"
-                        Margin="0,0,0,10"
-                        Padding="12,10"
-                        AutomationProperties.AutomationId="ProviderEntryItem">
-                  <StackPanel Spacing="4">
-                    <TextBlock FontSize="13"
-                               FontWeight="SemiBold"
-                               Text="{x:Bind DisplayName}" />
-                    <TextBlock FontSize="11"
-                               Foreground="{StaticResource AppMutedTextBrush}"
-                               Text="{x:Bind StatusSummary}"
-                               TextWrapping="WrapWholeWords" />
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ListView.ItemTemplate>
-          </ListView>
+                     Text="Select a provider and inspect readiness."
+                     TextWrapping="WrapWholeWords" />
         </StackPanel>
-      </Border>
 
-      <Border Grid.Column="1"
-              Style="{StaticResource GlassPanelStyle}">
-        <StackPanel Spacing="16">
-          <Grid ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
-              <TextBlock AutomationProperties.AutomationId="SelectedProviderTitle"
-                         FontSize="20"
-                         FontWeight="SemiBold"
-                         Text="{Binding SelectedProviderTitle}" />
-              <TextBlock FontSize="12"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="{Binding SelectedProviderSummary}"
-                         TextWrapping="WrapWholeWords" />
-            </StackPanel>
-            <Border Grid.Column="1"
-                    Background="{StaticResource AppAccentBrush}"
-                    CornerRadius="100"
-                    Padding="12,6"
-                    VerticalAlignment="Top">
-              <TextBlock FontSize="11"
-                         Foreground="{StaticResource AppPrimaryTextBrush}"
-                         Text="{Binding ToggleActionLabel}" />
-            </Border>
-          </Grid>
-
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
-
-          <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                  BorderBrush="{StaticResource AppOutlineBrush}"
-                  BorderThickness="1"
-                  CornerRadius="16"
-                  Padding="14,12">
-            <StackPanel Spacing="10">
-              <TextBlock FontSize="12"
-                         FontWeight="Medium"
-                         Text="Suggested command" />
-              <TextBlock AutomationProperties.AutomationId="SelectedProviderInstallCommand"
-                         FontSize="12"
-                         FontFamily="{StaticResource AppAccentFontFamily}"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="{Binding SelectedProviderInstallCommand}"
-                         TextWrapping="WrapWholeWords" />
-            </StackPanel>
-          </Border>
-
-          <StackPanel Spacing="10"
-                      Visibility="{Binding HasSelectedProviderActions}">
-            <TextBlock FontSize="12"
-                       FontWeight="Medium"
-                       Text="Provider actions" />
-            <ItemsControl ItemsSource="{Binding SelectedProviderActions}">
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="18,0,18,18">
+            <ItemsControl AutomationProperties.AutomationId="ProviderList"
+                          ItemsSource="{Binding Providers}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="presentation:ProviderActionItem">
-                  <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                          BorderBrush="{StaticResource AppOutlineBrush}"
-                          BorderThickness="1"
-                          CornerRadius="16"
+                <DataTemplate x:DataType="presentation:ProviderStatusItem">
+                  <Button AutomationProperties.AutomationId="{x:Bind AutomationId}"
+                          Command="{Binding DataContext.SelectProviderCommand, ElementName=Root}"
+                          CommandParameter="{Binding}"
                           Margin="0,0,0,10"
-                          Padding="12,10">
-                    <Grid ColumnSpacing="12">
+                          Style="{StaticResource ListEntryButtonStyle}">
+                    <Grid ColumnSpacing="10">
                       <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                       </Grid.ColumnDefinitions>
-                      <StackPanel Spacing="4">
-                        <TextBlock FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Text="{x:Bind Label}" />
-                        <TextBlock FontSize="11"
-                                   Foreground="{StaticResource AppMutedTextBrush}"
-                                   Text="{x:Bind Summary}"
-                                   TextWrapping="WrapWholeWords" />
-                      </StackPanel>
-                      <Button Grid.Column="1"
-                              AutomationProperties.AutomationId="ProviderActionButton"
-                              Background="{StaticResource AppSoftSurfaceBrush}"
-                              BorderBrush="{StaticResource AppOutlineBrush}"
-                              BorderThickness="1"
-                              Command="{Binding DataContext.ExecuteProviderAction, ElementName=Root}"
-                              CommandParameter="{Binding}"
-                              CornerRadius="16"
-                              Padding="14,9"
-                              VerticalAlignment="Center">
-                        <TextBlock FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Text="Copy command" />
-                      </Button>
+
+                      <Border Width="4"
+                              CornerRadius="2"
+                              Background="{StaticResource AppPrimaryTextBrush}"
+                              Visibility="{x:Bind IsSelected}" />
+
+                      <Border Grid.Column="1"
+                              Style="{StaticResource MetricCardStyle}">
+                        <StackPanel Spacing="4">
+                          <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Text="{x:Bind DisplayName}" />
+
+                            <Border Grid.Column="1"
+                                    Style="{StaticResource StatusChipStyle}"
+                                    Visibility="{x:Bind IsSelected}">
+                              <TextBlock FontSize="10"
+                                         FontWeight="SemiBold"
+                                         Text="Selected" />
+                            </Border>
+                          </Grid>
+                          <TextBlock FontSize="11.5"
+                                     Foreground="{StaticResource AppMutedTextBrush}"
+                                     Text="{x:Bind StatusSummary}"
+                                     TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+                      </Border>
                     </Grid>
-                  </Border>
+                  </Button>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
 
-          <Grid ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+    <Border Grid.Column="1"
+            Style="{StaticResource GlassPanelStyle}"
+            Padding="0">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <Button AutomationProperties.AutomationId="ToggleProviderButton"
-                    Background="{StaticResource AppAccentBrush}"
-                    BorderBrush="Transparent"
-                    BorderThickness="0"
-                    Command="{Binding ToggleSelectedProvider}"
-                    IsEnabled="{Binding CanToggleSelectedProvider}"
-                    CornerRadius="18"
-                    Padding="16,10">
+        <Grid Margin="20,18,20,16">
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="12"
+                       FontWeight="Medium"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="Selected provider" />
+            <TextBlock AutomationProperties.AutomationId="SelectedProviderTitle"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Text="{Binding SelectedProviderTitle}" />
+            <TextBlock FontSize="12.5"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{Binding SelectedProviderSummary}"
+                       TextWrapping="WrapWholeWords" />
+            <TextBlock FontSize="11.5"
+                       Foreground="{StaticResource AppSecondaryTextBrush}"
+                       Text="{Binding SelectedProviderCommandName}" />
+          </StackPanel>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="20,0,20,20"
+                      Spacing="16">
+            <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+            <Border Style="{StaticResource MetricCardStyle}"
+                    Visibility="{Binding HasSelectedProviderInstallCommand}">
+              <StackPanel Spacing="8">
+                <TextBlock FontSize="12"
+                           FontWeight="Medium"
+                           Text="Install command" />
+                <TextBlock AutomationProperties.AutomationId="SelectedProviderInstallCommand"
+                           FontSize="12"
+                           FontFamily="{StaticResource AppAccentFontFamily}"
+                           Foreground="{StaticResource AppSecondaryTextBrush}"
+                           Text="{Binding SelectedProviderInstallCommand}"
+                           TextWrapping="WrapWholeWords" />
+              </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="10"
+                        Visibility="{Binding HasSelectedProviderActions}">
               <TextBlock FontSize="12"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource AppPrimaryTextBrush}"
-                         Text="{Binding ToggleActionLabel}" />
-            </Button>
+                         FontWeight="Medium"
+                         Text="Actions" />
+              <ItemsControl ItemsSource="{Binding SelectedProviderActions}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="presentation:ProviderActionItem">
+                    <Border Style="{StaticResource MetricCardStyle}"
+                            Margin="0,0,0,10">
+                      <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="1"
-                    AutomationProperties.AutomationId="RefreshProvidersButton"
-                    Background="{StaticResource AppSoftSurfaceBrush}"
-                    BorderBrush="{StaticResource AppOutlineBrush}"
-                    BorderThickness="1"
-                    Command="{Binding Refresh}"
-                    CornerRadius="18"
-                    Padding="16,10">
-              <TextBlock FontSize="12"
-                         FontWeight="SemiBold"
-                         Text="Refresh" />
-            </Button>
-          </Grid>
+                        <StackPanel Spacing="4">
+                          <TextBlock FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Text="{x:Bind Label}" />
+                          <TextBlock FontSize="11.5"
+                                     Foreground="{StaticResource AppMutedTextBrush}"
+                                     Text="{x:Bind Summary}"
+                                     TextWrapping="WrapWholeWords" />
+                        </StackPanel>
 
-          <TextBlock AutomationProperties.AutomationId="ProviderStatusMessage"
-                     FontSize="12"
-                     Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{Binding StatusMessage}"
-                     TextWrapping="WrapWholeWords" />
-        </StackPanel>
-      </Border>
-    </Grid>
+                        <Button Grid.Column="1"
+                                AutomationProperties.AutomationId="ProviderActionButton"
+                                Command="{Binding DataContext.ExecuteProviderActionCommand, ElementName=Root}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource InlineActionButtonStyle}"
+                                VerticalAlignment="Center">
+                          <TextBlock Text="Copy" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <Grid ColumnSpacing="12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <Button AutomationProperties.AutomationId="ToggleProviderButton"
+                      Command="{Binding ToggleSelectedProviderCommand}"
+                      IsEnabled="{Binding CanToggleSelectedProvider}"
+                      Style="{StaticResource AccentActionButtonStyle}">
+                <TextBlock Text="{Binding ToggleActionLabel}" />
+              </Button>
+
+              <Button Grid.Column="1"
+                      AutomationProperties.AutomationId="RefreshProvidersButton"
+                      Command="{Binding RefreshCommand}"
+                      Style="{StaticResource SecondaryActionButtonStyle}">
+                <TextBlock Text="Refresh status" />
+              </Button>
+            </Grid>
+
+            <Border Style="{StaticResource MetricCardStyle}">
+              <TextBlock AutomationProperties.AutomationId="ProviderStatusMessage"
+                         FontSize="12"
+                         Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding StatusMessage}"
+                         TextWrapping="WrapWholeWords" />
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
   </Grid>
 </UserControl>

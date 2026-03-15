@@ -10,16 +10,16 @@
         <TextBlock FontSize="18"
                    FontWeight="SemiBold"
                    Text="Profile" />
-        <TextBlock FontSize="12.5"
+        <TextBlock FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Pick the provider, role, and model behavior for a reusable local agent profile."
+                   Text="Review the generated profile and runtime defaults."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 
       <Grid ColumnSpacing="16"
             RowSpacing="16">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="1.35*" MinWidth="260" />
+          <ColumnDefinition Width="1.2*" MinWidth="260" />
           <ColumnDefinition Width="*" MinWidth="220" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -57,7 +57,6 @@
         </StackPanel>
 
         <StackPanel Grid.Row="1"
-                    Grid.ColumnSpan="2"
                     Spacing="8">
           <TextBlock FontSize="12"
                      FontWeight="Medium"
@@ -72,7 +71,8 @@
           </Border>
         </StackPanel>
 
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="1"
+                    Grid.Column="1"
                     Spacing="8">
           <TextBlock FontSize="12"
                      FontWeight="Medium"
@@ -94,27 +94,29 @@
           </TextBlock>
         </StackPanel>
 
-        <Border Grid.Row="2"
-                Grid.Column="1"
-                Style="{StaticResource BuilderSummaryCardStyle}"
-                AutomationProperties.AutomationId="AgentProviderSummaryCard">
-          <StackPanel Spacing="6">
-            <TextBlock FontSize="13"
-                       FontWeight="SemiBold"
-                       Text="{Binding Builder.ProviderDisplayName}" />
-            <TextBlock FontSize="12"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="{Binding Builder.ProviderStatusSummary}"
-                       TextWrapping="WrapWholeWords" />
-            <TextBlock FontSize="11.5"
-                       Foreground="{StaticResource AppSecondaryTextBrush}"
-                       Text="{Binding Builder.ProviderCommandName}" />
-            <TextBlock FontSize="11.5"
-                       Foreground="{StaticResource AppSecondaryTextBrush}"
-                       Text="{Binding Builder.ProviderVersionLabel}"
-                       Visibility="{Binding Builder.HasProviderVersion}" />
-          </StackPanel>
-        </Border>
+        <StackPanel Grid.Row="2"
+                    Grid.ColumnSpan="2"
+                    AutomationProperties.AutomationId="AgentProviderSummaryCard"
+                    Spacing="4">
+          <TextBlock FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="Runtime selection" />
+          <TextBlock FontSize="13"
+                     FontWeight="SemiBold"
+                     Text="{Binding Builder.ProviderDisplayName}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding Builder.ProviderStatusSummary}"
+                     TextWrapping="WrapWholeWords" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="{Binding Builder.ProviderCommandName}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="{Binding Builder.ProviderVersionLabel}"
+                     Visibility="{Binding Builder.HasProviderVersion}" />
+        </StackPanel>
       </Grid>
     </StackPanel>
   </Border>

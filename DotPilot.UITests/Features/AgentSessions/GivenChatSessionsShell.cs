@@ -13,101 +13,153 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ChatScreenAutomationId = "ChatScreen";
     private const string SettingsScreenAutomationId = "SettingsScreen";
     private const string AgentBuilderScreenAutomationId = "AgentBuilderScreen";
+    private const string ChatPageTitleAutomationId = "ChatPageTitle";
+    private const string AgentsPageTitleAutomationId = "AgentsPageTitle";
+    private const string ProvidersPageTitleAutomationId = "ProvidersPageTitle";
+    private const string AppSidebarAutomationId = "AppSidebar";
+    private const string AppSidebarBrandAutomationId = "AppSidebarBrand";
+    private const string AppSidebarNavigationAutomationId = "AppSidebarNavigation";
+    private const string AppSidebarProfileAutomationId = "AppSidebarProfile";
+    private const string ChatNavButtonAutomationId = "ChatNavButton";
     private const string ProvidersNavButtonAutomationId = "ProvidersNavButton";
-    private const string SettingsSidebarAgentsButtonAutomationId = "SettingsSidebarAgentsButton";
-    private const string SettingsSidebarChatButtonAutomationId = "SettingsSidebarChatButton";
-    private const string AgentSidebarChatButtonAutomationId = "AgentSidebarChatButton";
+    private const string AgentsNavButtonAutomationId = "AgentsNavButton";
     private const string ProviderListAutomationId = "ProviderList";
     private const string SelectedProviderTitleAutomationId = "SelectedProviderTitle";
     private const string ToggleProviderButtonAutomationId = "ToggleProviderButton";
+    private const string CodexProviderEntryAutomationId = "ProviderEntry_Codex";
+    private const string AgentCatalogSectionAutomationId = "AgentCatalogSection";
+    private const string AgentCatalogListAutomationId = "AgentCatalogList";
+    private const string AgentCatalogItemAutomationId = "AgentCatalogItem";
+    private const string AgentCatalogStatusMessageAutomationId = "AgentCatalogStatusMessage";
+    private const string OpenCreateAgentButtonAutomationId = "OpenCreateAgentButton";
+    private const string AgentPromptStartSectionAutomationId = "AgentPromptStartSection";
+    private const string AgentPromptInputAutomationId = "AgentPromptInput";
+    private const string GenerateAgentButtonAutomationId = "GenerateAgentButton";
+    private const string AgentBackButtonAutomationId = "AgentBackButton";
     private const string AgentBasicInfoSectionAutomationId = "AgentBasicInfoSection";
-    private const string AgentNameInputAutomationId = "AgentNameInput";
     private const string AgentModelInputAutomationId = "AgentModelInput";
-    private const string AgentRoleComboAutomationId = "AgentRoleCombo";
     private const string AgentPromptSectionAutomationId = "AgentPromptSection";
     private const string AgentSkillsSectionAutomationId = "AgentSkillsSection";
-    private const string AgentSuggestedModelTextAutomationId = "AgentSuggestedModelText";
-    private const string AgentCreateHelperMessageAutomationId = "AgentCreateHelperMessage";
-    private const string AgentCreateStatusMessageAutomationId = "AgentCreateStatusMessage";
-    private const string CreateAgentButtonAutomationId = "CreateAgentButton";
+    private const string SaveAgentButtonAutomationId = "SaveAgentButton";
+    private const string AgentEditorStatusMessageAutomationId = "AgentEditorStatusMessage";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
+    private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
     private const string ChatStartNewButtonAutomationId = "ChatStartNewButton";
     private const string ChatTitleTextAutomationId = "ChatTitleText";
     private const string ChatMessageTextAutomationId = "ChatMessageText";
     private const string ChatRecentChatItemAutomationId = "ChatRecentChatItem";
+    private const string AgentCatalogStartChatButtonAutomationId = "AgentCatalogStartChatButton";
     private const string DebugProviderName = "Debug Provider";
-    private const string CreatedAgentName = "Debug Agent UI";
-    private const string SessionTitle = "Session with Debug Agent UI";
+    private const string RepositoryReviewerPrompt = "Create a repository reviewer";
+    private const string RepositoryReviewerName = "Repository Reviewer Agent";
+    private const string RepositoryReviewerSessionTitle = "Session with Repository Reviewer Agent";
+    private const string DefaultSystemAgentName = "dotPilot System Agent";
+    private const string DefaultSessionTitle = "Session with dotPilot System Agent";
     private const string UserPrompt = "hello from ui";
-    private const string ReadyToCreateDebugAgentText = "Ready to create an agent with Debug Provider.";
+    private const string SavedAgentMessage = "Saved Repository Reviewer Agent using Debug Provider.";
     private const string DebugResponsePrefix = "Debug provider received: hello from ui";
     private const string DebugToolFinishedText = "Debug workflow finished.";
 
     [Test]
-    public async Task WhenOpeningTheAppThenChatNavigationAndComposerAreVisible()
+    public async Task WhenSwitchingBetweenPrimaryScreensThenOneStableShellChromeRemainsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        WaitForTextContains(ChatPageTitleAutomationId, "Chat", ScreenTransitionTimeout);
+        AssertSingleShellChrome();
+
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForTextContains(AgentsPageTitleAutomationId, "All agents", ScreenTransitionTimeout);
+        AssertSingleShellChrome();
+
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForTextContains(ProvidersPageTitleAutomationId, "Providers", ScreenTransitionTimeout);
+        AssertSingleShellChrome();
+
+        TapAutomationElement(ChatNavButtonAutomationId);
+        WaitForElement(ChatScreenAutomationId);
+        WaitForTextContains(ChatPageTitleAutomationId, "Chat", ScreenTransitionTimeout);
+        AssertSingleShellChrome();
+
+        TakeScreenshot("stable_shell_chrome");
+    }
+
+    [Test]
+    public async Task WhenOpeningTheAppThenDefaultSystemAgentCanStartAChat()
     {
         await Task.CompletedTask;
 
         EnsureOnChatScreen();
         WaitForElement(ChatTitleTextAutomationId);
         WaitForElement(ChatComposerInputAutomationId);
+        WaitForElement(ChatComposerSendButtonAutomationId);
         WaitForTextContains(ChatComposerHintAutomationId, "Enter sends.", ScreenTransitionTimeout);
-        WaitForElement(ChatStartNewButtonAutomationId);
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForElement(ChatRecentChatItemAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
 
-        TakeScreenshot("chat_shell_visible");
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
+
+        TakeScreenshot("chat_default_system_agent_flow");
     }
 
     [Test]
-    public async Task WhenEnablingDebugAndOpeningAgentCreationThenBuilderSectionsAreVisible()
+    public async Task WhenOpeningAgentsThenCatalogAndPromptFirstEntryAreVisible()
     {
         await Task.CompletedTask;
 
         EnsureOnChatScreen();
-        TapAutomationElement(ProvidersNavButtonAutomationId);
-        WaitForElement(SettingsScreenAutomationId);
-        WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
-        TapAutomationElement(ToggleProviderButtonAutomationId);
-        WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
-
-        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
+        TapAutomationElement(AgentsNavButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForElement(AgentCatalogSectionAutomationId);
+        WaitForElement(AgentCatalogListAutomationId);
+        WaitForTextContains(AgentCatalogItemAutomationId, DefaultSystemAgentName, ScreenTransitionTimeout);
+
+        TapAutomationElement(OpenCreateAgentButtonAutomationId);
+        WaitForElement(AgentPromptStartSectionAutomationId);
+        WaitForElement(AgentPromptInputAutomationId);
+        WaitForElement(GenerateAgentButtonAutomationId);
+        WaitForElement(AgentBackButtonAutomationId);
+
+        TakeScreenshot("agent_prompt_first_entry");
+    }
+
+    [Test]
+    public async Task WhenGeneratingAndSavingAnAgentThenCatalogShowsTheCreatedProfile()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        TapAutomationElement(OpenCreateAgentButtonAutomationId);
+        WaitForElement(AgentPromptStartSectionAutomationId);
+
+        ReplaceTextAutomationElement(AgentPromptInputAutomationId, RepositoryReviewerPrompt);
+        TapAutomationElement(GenerateAgentButtonAutomationId);
         WaitForElement(AgentBasicInfoSectionAutomationId);
-        WaitForElement(AgentNameInputAutomationId);
-        WaitForElement(AgentRoleComboAutomationId);
+        WaitForTextContains(AgentEditorStatusMessageAutomationId, "Generated draft", ScreenTransitionTimeout);
         WaitForElement(AgentModelInputAutomationId);
         WaitForElement(AgentPromptSectionAutomationId);
         WaitForElement(AgentSkillsSectionAutomationId);
-        WaitForTextContains(AgentSuggestedModelTextAutomationId, "debug-echo", ScreenTransitionTimeout);
-        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
 
-        TakeScreenshot("agent_builder_sections_visible");
+        TapAutomationElement(SaveAgentButtonAutomationId);
+        WaitForElement(AgentCatalogSectionAutomationId);
+        WaitForTextContains(AgentCatalogStatusMessageAutomationId, SavedAgentMessage, ScreenTransitionTimeout);
+        WaitForTextContains(AgentCatalogItemAutomationId, RepositoryReviewerName, ScreenTransitionTimeout);
+
+        TakeScreenshot("agent_catalog_saved_profile");
     }
 
     [Test]
-    public async Task WhenEnablingDebugAndCreatingAgentThenBuilderShowsCreatedStatus()
-    {
-        await Task.CompletedTask;
-
-        EnsureOnChatScreen();
-        TapAutomationElement(ProvidersNavButtonAutomationId);
-        WaitForElement(SettingsScreenAutomationId);
-        WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
-        TapAutomationElement(ToggleProviderButtonAutomationId);
-        WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
-
-        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
-        WaitForElement(AgentBuilderScreenAutomationId);
-        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
-        ReplaceTextAutomationElement(AgentNameInputAutomationId, CreatedAgentName);
-        TapAutomationElement(CreateAgentButtonAutomationId);
-        WaitForTextContains(AgentCreateStatusMessageAutomationId, "Created Debug Agent UI using Debug Provider.", ScreenTransitionTimeout);
-
-        TakeScreenshot("agent_builder_created_status");
-    }
-
-    [Test]
-    public async Task WhenEnablingDebugCreatingAgentAndSendingMessageThenStreamedTranscriptIsVisible()
+    public async Task WhenTogglingTheDebugProviderThenTheSettingsProjectionUpdates()
     {
         await Task.CompletedTask;
 
@@ -116,31 +168,65 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(SettingsScreenAutomationId);
         WaitForElement(ProviderListAutomationId);
         WaitForTextContains(SelectedProviderTitleAutomationId, DebugProviderName, ScreenTransitionTimeout);
+        WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
+
+        TapAutomationElement(ToggleProviderButtonAutomationId);
+        WaitForTextContains(ToggleProviderButtonAutomationId, "Enable provider", ScreenTransitionTimeout);
         TapAutomationElement(ToggleProviderButtonAutomationId);
         WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
 
-        TapAutomationElement(SettingsSidebarAgentsButtonAutomationId);
-        WaitForElement(AgentBuilderScreenAutomationId);
-        WaitForElement(AgentNameInputAutomationId);
-        WaitForElement(AgentModelInputAutomationId);
-        WaitForTextContains(AgentCreateHelperMessageAutomationId, ReadyToCreateDebugAgentText, ScreenTransitionTimeout);
-        ReplaceTextAutomationElement(AgentNameInputAutomationId, CreatedAgentName);
-        TapAutomationElement(CreateAgentButtonAutomationId);
-        WaitForTextContains(AgentCreateStatusMessageAutomationId, "Created Debug Agent UI using Debug Provider.", ScreenTransitionTimeout);
+        TakeScreenshot("settings_toggle_debug_provider");
+    }
 
-        TapAutomationElement(AgentSidebarChatButtonAutomationId);
+    [Test]
+    public async Task WhenSelectingCodexFromProvidersThenDetailsUpdateAndAgentsNavigationStillWorks()
+    {
+        await Task.CompletedTask;
+
         EnsureOnChatScreen();
-        TapAutomationElement(ChatStartNewButtonAutomationId);
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        WaitForElement(ProviderListAutomationId);
+
+        TapAutomationElement(CodexProviderEntryAutomationId);
+        WaitForTextContains(SelectedProviderTitleAutomationId, "Codex", ScreenTransitionTimeout);
+
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+
+        TakeScreenshot("settings_select_provider_then_agents_navigation");
+    }
+
+    [Test]
+    public async Task WhenCreatingAnAgentAndStartingAChatThenTheTranscriptIsVisible()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        TapAutomationElement(OpenCreateAgentButtonAutomationId);
+        WaitForElement(AgentPromptStartSectionAutomationId);
+
+        ReplaceTextAutomationElement(AgentPromptInputAutomationId, RepositoryReviewerPrompt);
+        TapAutomationElement(GenerateAgentButtonAutomationId);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+        TapAutomationElement(SaveAgentButtonAutomationId);
+        WaitForTextContains(AgentCatalogStatusMessageAutomationId, SavedAgentMessage, ScreenTransitionTimeout);
+        TapAutomationElement(AgentCatalogStartChatButtonAutomationId);
+
+        TapAutomationElement(ChatNavButtonAutomationId);
+        EnsureOnChatScreen();
         WaitForElement(ChatRecentChatItemAutomationId);
-        WaitForTextContains(ChatTitleTextAutomationId, SessionTitle, ScreenTransitionTimeout);
+        WaitForElement(ChatComposerSendButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, RepositoryReviewerSessionTitle, ScreenTransitionTimeout);
 
         ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
-        WriteBrowserAutomationDiagnostics(ChatComposerInputAutomationId);
         PressEnterAutomationElement(ChatComposerInputAutomationId);
         WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
 
-        TakeScreenshot("chat_debug_session_flow");
+        TakeScreenshot("chat_created_agent_flow");
     }
 
     private void EnsureOnChatScreen()
@@ -150,14 +236,7 @@ public sealed class GivenChatSessionsShell : TestBase
             return;
         }
 
-        if (TryWaitForElement(AgentSidebarChatButtonAutomationId, InitialScreenProbeTimeout))
-        {
-            TapAutomationElement(AgentSidebarChatButtonAutomationId);
-        }
-        else if (TryWaitForElement(SettingsSidebarChatButtonAutomationId, InitialScreenProbeTimeout))
-        {
-            TapAutomationElement(SettingsSidebarChatButtonAutomationId);
-        }
+        TapAutomationElement(ChatNavButtonAutomationId);
 
         WaitForElement(ChatScreenAutomationId, "Timed out returning to the chat screen.", ScreenTransitionTimeout);
         WaitForElement(ChatComposerInputAutomationId);
@@ -205,6 +284,12 @@ public sealed class GivenChatSessionsShell : TestBase
                 return;
             }
 
+            if (TryReadBrowserInputValue(automationId, out var inputValue) &&
+                NormalizeText(inputValue).Contains(expectedText, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
         }
 
@@ -228,5 +313,21 @@ public sealed class GivenChatSessionsShell : TestBase
         var segments = value
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return string.Join(' ', segments);
+    }
+
+    private void AssertSingleShellChrome()
+    {
+        WaitForElement(AppSidebarAutomationId);
+        WaitForElement(AppSidebarBrandAutomationId);
+        WaitForElement(AppSidebarNavigationAutomationId);
+        WaitForElement(AppSidebarProfileAutomationId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(App.Query(AppSidebarAutomationId), Has.Length.EqualTo(1));
+            Assert.That(App.Query(AppSidebarBrandAutomationId), Has.Length.EqualTo(1));
+            Assert.That(App.Query(AppSidebarNavigationAutomationId), Has.Length.EqualTo(1));
+            Assert.That(App.Query(AppSidebarProfileAutomationId), Has.Length.EqualTo(1));
+        });
     }
 }

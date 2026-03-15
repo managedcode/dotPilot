@@ -5,21 +5,21 @@
   <FontFamily x:Key="AppBodyFontFamily">Poppins</FontFamily>
   <FontFamily x:Key="AppAccentFontFamily">Kodchasan</FontFamily>
 
-  <Color x:Key="AppShellBackgroundColor">#FFE9EEEA</Color>
-  <Color x:Key="AppGlassPanelColor">#66FFFFFF</Color>
-  <Color x:Key="AppGlassBorderColor">#A6FFFFFF</Color>
+  <Color x:Key="AppShellBackgroundColor">#FFF0F2EC</Color>
+  <Color x:Key="AppGlassPanelColor">#CCFFFFFF</Color>
+  <Color x:Key="AppGlassBorderColor">#1F000000</Color>
   <Color x:Key="AppPrimaryTextColor">#FF1C1C1C</Color>
-  <Color x:Key="AppMutedTextColor">#61999999</Color>
-  <Color x:Key="AppSecondaryTextColor">#61555555</Color>
-  <Color x:Key="AppOutlineColor">#14000000</Color>
-  <Color x:Key="AppSoftSurfaceColor">#99FFFFFF</Color>
-  <Color x:Key="AppInputSurfaceColor">#CCFFFFFF</Color>
-  <Color x:Key="AppSelectionColor">#FFE2E6E3</Color>
+  <Color x:Key="AppMutedTextColor">#80696969</Color>
+  <Color x:Key="AppSecondaryTextColor">#A14D4D4D</Color>
+  <Color x:Key="AppOutlineColor">#16000000</Color>
+  <Color x:Key="AppSoftSurfaceColor">#F2FFFFFF</Color>
+  <Color x:Key="AppInputSurfaceColor">#FFFFFFFF</Color>
+  <Color x:Key="AppSelectionColor">#FFE7EDD9</Color>
   <Color x:Key="AppBadgeSurfaceColor">#FFDDE0DE</Color>
   <Color x:Key="AppDarkSurfaceColor">#FF2C2C2C</Color>
-  <Color x:Key="AppAccentColor">#FFECFF8C</Color>
+  <Color x:Key="AppAccentColor">#FFE4F86A</Color>
   <Color x:Key="AppSuccessColor">#FF4CAF50</Color>
-  <Color x:Key="AppShadowColor">#0F000000</Color>
+  <Color x:Key="AppShadowColor">#09000000</Color>
 
   <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="{StaticResource AppShellBackgroundColor}" />
   <SolidColorBrush x:Key="AppGlassPanelBrush" Color="{StaticResource AppGlassPanelColor}" />
@@ -75,9 +75,9 @@
     <Setter Property="Background" Value="{StaticResource AppGlassPanelBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppGlassBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="20" />
-    <Setter Property="Padding" Value="20" />
-    <Setter Property="Translation" Value="0,0,16" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="16" />
+    <Setter Property="Translation" Value="0,0,1" />
     <Setter Property="Shadow">
       <Setter.Value>
         <ThemeShadow />
@@ -85,33 +85,93 @@
     </Setter>
   </Style>
 
+  <Style x:Key="PageHeaderPanelStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Shadow" Value="{x:Null}" />
+  </Style>
+
   <Style x:Key="SectionCardStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
-    <Setter Property="CornerRadius" Value="22" />
-    <Setter Property="Padding" Value="20" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="18" />
     <Setter Property="Margin" Value="0,0,0,16" />
   </Style>
 
   <Style x:Key="SidebarButtonStyle" TargetType="Button">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
     <Setter Property="Padding" Value="12,8" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="MinHeight" Value="38" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="FontFamily" Value="{StaticResource AppBodyFontFamily}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="13" />
   </Style>
 
   <Style x:Key="SidebarButtonSelectedStyle" TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource AppSelectionBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+  </Style>
+
+  <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource AppDarkSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="AccentActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
     <Setter Property="Background" Value="{StaticResource AppAccentBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+  </Style>
+
+  <Style x:Key="SecondaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+  </Style>
+
+  <Style x:Key="InlineActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryActionButtonStyle}">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="MinHeight" Value="34" />
+  </Style>
+
+  <Style x:Key="StatusChipStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppSelectionBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+
+  <Style x:Key="MetricCardStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="12,10" />
   </Style>
 
   <Style x:Key="SearchSurfaceStyle" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Padding" Value="12" />
   </Style>
 
@@ -119,7 +179,7 @@
     <Setter Property="Background" Value="{StaticResource AppInputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="100" />
+    <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Padding" Value="12,10" />
   </Style>
 
@@ -127,24 +187,24 @@
     <Setter Property="Background" Value="{StaticResource AppInputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Padding" Value="12,10" />
   </Style>
 
   <Style x:Key="BuilderSectionStyle" TargetType="Border" BasedOn="{StaticResource GlassPanelStyle}">
-    <Setter Property="CornerRadius" Value="18" />
-    <Setter Property="Padding" Value="24" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="16" />
     <Setter Property="Margin" Value="0" />
-    <Setter Property="Translation" Value="0,0,8" />
+    <Setter Property="Translation" Value="0,0,0" />
   </Style>
 
   <Style x:Key="BuilderInputSurfaceStyle" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource AppInputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="16" />
-    <Setter Property="MinHeight" Value="52" />
-    <Setter Property="Padding" Value="14,6" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="12,6" />
   </Style>
 
   <Style x:Key="BuilderTextBoxStyle" TargetType="TextBox">
@@ -166,22 +226,20 @@
     <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="16" />
-    <Setter Property="Padding" Value="16" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="14" />
   </Style>
 
-  <Style x:Key="PrimaryCapsuleStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource AppDarkSurfaceBrush}" />
-    <Setter Property="CornerRadius" Value="100" />
-    <Setter Property="Padding" Value="20,10" />
-  </Style>
-
-  <Style x:Key="SecondaryCapsuleStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource AppSoftSurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="100" />
-    <Setter Property="Padding" Value="20,10" />
+  <Style x:Key="ListEntryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    <Setter Property="MinHeight" Value="0" />
   </Style>
 
   <Style x:Key="SectionDividerStyle" TargetType="Rectangle">

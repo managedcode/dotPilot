@@ -27,6 +27,8 @@ Stack: `.NET 10`, class library, provider-backed runtime services, local persist
 - Keep external-provider assumptions soft: absence of Codex, Claude Code, or GitHub Copilot in CI must not break the provider-independent baseline.
 - For the first embedded Orleans host implementation, stay local-first with `UseLocalhostClustering` and in-memory storage/reminders so the desktop runtime remains self-contained.
 - Use `ILogger` as the default diagnostics path for runtime operations; provider probes, agent/session lifecycle events, and provider execution failures should be observable without relying on console output.
+- When `Microsoft Agent Framework` agents are involved, route lifecycle diagnostics through agent or run-scope middleware so logs capture agent creation, session binding, request execution, tool activity, result completion, and failures with shared correlation context.
+- Runtime-owned capabilities should be published through the built-in MCP server and gateway rather than hidden behind direct in-process-only helper calls; when a feature becomes agent-usable in `dotPilot`, define it as an MCP tool with a stable schema and let agents discover it from the shared gateway.
 
 ## Local Commands
 

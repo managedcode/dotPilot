@@ -1,4 +1,5 @@
 using OpenQA.Selenium;
+using OpenQA.Selenium.Interactions;
 using UITestPlatform = Uno.UITest.Helpers.Queries.Platform;
 
 namespace DotPilot.UITests.Harness;
@@ -207,6 +208,33 @@ public class TestBase
         {
             HarnessLog.Write($"Browser system log dump failed for '{context}': {exception.Message}");
         }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver)
+            {
+                return;
+            }
+
+            var browserLogs = driver.Manage()
+                .Logs
+                .GetLog("browser")
+                .TakeLast(maxEntries)
+                .ToArray();
+
+            HarnessLog.Write($"Selenium browser log dump for '{context}' contains {browserLogs.Length} entries.");
+            foreach (var entry in browserLogs)
+            {
+                HarnessLog.Write($"SeleniumBrowserLog {entry.Timestamp:O} {entry.Level}: {entry.Message}");
+            }
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Selenium browser log dump failed for '{context}': {exception.Message}");
+        }
     }
 
     protected void WriteBrowserDomSnapshot(string context, string? automationId = null)
@@ -328,23 +356,39 @@ public class TestBase
 
                 if (Constants.CurrentPlatform == UITestPlatform.Browser)
                 {
+                    TryScrollBrowserAutomationElementIntoView(automationId);
+
                     try
                     {
                         App.Tap(automationId);
+                        HarnessLog.Write($"Uno.UITest tap outcome for '{automationId}': tapped");
                         return;
                     }
                     catch (Exception exception)
                     {
-                        HarnessLog.Write($"Browser element tap failed for '{automationId}': {exception.Message}");
+                        HarnessLog.Write($"Uno.UITest tap failed for '{automationId}': {exception.Message}");
                     }
 
-                    if (TryClickBrowserAutomationElement(automationId))
+                    if (TryActivateBrowserAutomationElement(automationId))
                     {
                         return;
                     }
 
-                    App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
-                    return;
+                    if (TryClickBrowserAutomationElementAtCenter(automationId))
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
+                        HarnessLog.Write($"Coordinate tap outcome for '{automationId}': tapped");
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        HarnessLog.Write($"Coordinate tap failed for '{automationId}': {exception.Message}");
+                    }
                 }
             }
 
@@ -377,6 +421,7 @@ public class TestBase
                 if (fallbackMatches.Length > 0)
                 {
                     var fallbackTarget = fallbackMatches[0];
+                    TryScrollBrowserAutomationElementIntoView(automationId);
                     HarnessLog.Write(
                         $"Falling back to coordinate tap for '{automationId}' at '{fallbackTarget.Rect.CenterX},{fallbackTarget.Rect.CenterY}'.");
                     App.TapCoordinates(fallbackTarget.Rect.CenterX, fallbackTarget.Rect.CenterY);
@@ -397,12 +442,33 @@ public class TestBase
 
         if (TryTypeBrowserInputValue(automationId, text))
         {
-            return;
+            LogAutomationQueryState(automationId, "browser-typed");
+            if (TryReadBrowserInputValue(automationId, out var browserValue))
+            {
+                HarnessLog.Write($"Browser input readback for '{automationId}' after typing: '{browserValue}'.");
+                if (string.Equals(browserValue, text, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
         }
+
+        WriteBrowserAutomationDiagnostics(automationId);
 
         if (TrySetBrowserInputValue(automationId, text))
         {
-            return;
+            LogAutomationQueryState(automationId, "browser-set");
+            if (TryReadBrowserInputValue(automationId, out var browserValue))
+            {
+                HarnessLog.Write($"Browser input readback for '{automationId}' after replacement: '{browserValue}'.");
+            }
+
+            if (DoesAutomationElementReflectText(automationId, text))
+            {
+                return;
+            }
+
+            HarnessLog.Write($"Browser replacement did not update the automation-visible state for '{automationId}'. Falling back to Uno.UITest input.");
         }
 
         App.ClearText(automationId);
@@ -413,9 +479,56 @@ public class TestBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
-        if (TryClickBrowserAutomationElement(automationId))
+        if (Constants.CurrentPlatform == UITestPlatform.Browser)
         {
-            return;
+            TryScrollBrowserAutomationElementIntoView(automationId);
+
+            if (TryActivateBrowserAutomationElement(automationId))
+            {
+                return;
+            }
+
+            if (TryClickBrowserAutomationElementAtCenter(automationId))
+            {
+                return;
+            }
+
+            try
+            {
+                var matches = App.Query(automationId);
+                if (matches.Length > 0)
+                {
+                    var target = matches[0];
+                    App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
+                    HarnessLog.Write($"Coordinate action tap outcome for '{automationId}': tapped");
+                    return;
+                }
+            }
+            catch (Exception exception)
+            {
+                HarnessLog.Write($"Coordinate action tap failed for '{automationId}': {exception.Message}");
+            }
+
+            if (TryPerformBrowserClickAction(automationId))
+            {
+                return;
+            }
+
+            if (TryClickBrowserAutomationElement(automationId))
+            {
+                return;
+            }
+
+            try
+            {
+                App.Tap(automationId);
+                HarnessLog.Write($"Uno.UITest action tap outcome for '{automationId}': tapped");
+                return;
+            }
+            catch (Exception exception)
+            {
+                HarnessLog.Write($"Uno.UITest action tap failed for '{automationId}': {exception.Message}");
+            }
         }
 
         TapAutomationElement(automationId);
@@ -431,6 +544,89 @@ public class TestBase
         }
 
         App.EnterText(automationId, Keys.Enter);
+    }
+
+    private bool TryActivateBrowserAutomationElement(string automationId)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver ||
+                driver is not IJavaScriptExecutor javaScriptExecutor)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            if (javaScriptExecutor.ExecuteScript(
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
+                            if (!host) {
+                                return null;
+                            }
+
+                            const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href]';
+                            const element = host.matches(clickableSelector)
+                                ? host
+                                : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+
+                            element.scrollIntoView({ block: 'center', inline: 'center' });
+                            if (!element.hasAttribute('tabindex')) {
+                                element.setAttribute('tabindex', '0');
+                            }
+
+                            if (typeof host.focus === 'function') {
+                                host.focus({ preventScroll: true });
+                            }
+
+                            if (typeof element.focus === 'function') {
+                                element.focus({ preventScroll: true });
+                            }
+
+                            return element;
+                        })();
+                        """)) is not IWebElement resolvedElement)
+            {
+                return false;
+            }
+
+            resolvedElement.SendKeys(Keys.Enter);
+            HarnessLog.Write($"Browser keyboard activation outcome for '{automationId}': enter");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser keyboard activation failed for '{automationId}': {exception.Message}");
+            return false;
+        }
     }
 
     private bool TryClickBrowserAutomationElement(string automationId)
@@ -474,16 +670,43 @@ public class TestBase
                         """
                         ';
                             const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
-                            const host = document.querySelector(selector);
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
                             if (!host) {
                                 return 'missing';
                             }
 
-                            const element = host.matches('button, [role="button"], input[type="button"], input[type="submit"]')
+                            const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href]';
+                            const element = host.matches(clickableSelector)
                                 ? host
-                                : host.querySelector('button, [role="button"], input[type="button"], input[type="submit"]') ?? host;
+                                : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+                            const isNativeClickElement = element.matches(clickableSelector);
 
                             element.scrollIntoView({ block: 'center', inline: 'center' });
+                            if (typeof host.focus === 'function') {
+                                host.focus({ preventScroll: true });
+                            }
+                            if (typeof element.focus === 'function') {
+                                element.focus({ preventScroll: true });
+                            }
+
+                            if (isNativeClickElement && typeof element.click === 'function') {
+                                element.click();
+                                return 'clicked';
+                            }
+
                             const rect = element.getBoundingClientRect();
                             const eventInit = {
                                 bubbles: true,
@@ -523,6 +746,257 @@ public class TestBase
         }
     }
 
+    private bool TryClickBrowserAutomationElementAtCenter(string automationId)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var outcome = executeScriptMethod.Invoke(
+                driver,
+                [
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
+                            if (!host) {
+                                return 'missing';
+                            }
+
+                            host.scrollIntoView({ block: 'center', inline: 'center' });
+                            const rect = host.getBoundingClientRect();
+                            const clientX = rect.left + (rect.width / 2);
+                            const clientY = rect.top + (rect.height / 2);
+                            const target = document.elementFromPoint(clientX, clientY) ?? host;
+                            const eventBase = {
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true,
+                                view: window,
+                                clientX,
+                                clientY,
+                                pointerId: 1,
+                                pointerType: 'mouse',
+                                isPrimary: true
+                            };
+
+                            target.dispatchEvent(new PointerEvent('pointerdown', { ...eventBase, button: 0, buttons: 1, pressure: 0.5 }));
+                            target.dispatchEvent(new MouseEvent('mousedown', { ...eventBase, button: 0, buttons: 1 }));
+                            target.dispatchEvent(new PointerEvent('pointerup', { ...eventBase, button: 0, buttons: 0, pressure: 0 }));
+                            target.dispatchEvent(new MouseEvent('mouseup', { ...eventBase, button: 0, buttons: 0 }));
+                            target.dispatchEvent(new MouseEvent('click', { ...eventBase, button: 0, buttons: 0 }));
+                            return `${target.tagName}:${target.getAttribute('xamlautomationid') ?? ''}:${target.getAttribute('aria-label') ?? ''}`;
+                        })();
+                        """),
+                    Array.Empty<object>(),
+                ]);
+
+            HarnessLog.Write($"Browser center-point click outcome for '{automationId}': {outcome}");
+            return outcome is not null;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser center-point click failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TryPerformBrowserClickAction(string automationId)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_app
+                    .GetType()
+                    .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(_app) is not IWebDriver driver ||
+                driver is not IJavaScriptExecutor javaScriptExecutor)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            if (javaScriptExecutor.ExecuteScript(
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
+                            if (!host) {
+                                return null;
+                            }
+
+                            const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href]';
+                            const element = host.matches(clickableSelector)
+                                ? host
+                                : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+
+                            element.scrollIntoView({ block: 'center', inline: 'center' });
+                            return element;
+                        })();
+                        """)) is not IWebElement resolvedElement)
+            {
+                return false;
+            }
+
+            new Actions(driver)
+                .MoveToElement(resolvedElement)
+                .Click()
+                .Perform();
+
+            HarnessLog.Write($"Browser native click outcome for '{automationId}': clicked");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser native click failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TryScrollBrowserAutomationElementIntoView(string automationId)
+    {
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var outcome = executeScriptMethod.Invoke(
+                driver,
+                [
+                    string.Concat(
+                        """
+                        return (() => {
+                            const automationId = '
+                        """,
+                        escapedAutomationId,
+                        """
+                        ';
+                            const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
+                            if (!host) {
+                                return 'missing';
+                            }
+
+                            host.scrollIntoView({ block: 'center', inline: 'center' });
+                            return 'scrolled';
+                        })();
+                        """),
+                    Array.Empty<object>(),
+                ]);
+
+            HarnessLog.Write($"Browser scroll outcome for '{automationId}': {outcome}");
+            return string.Equals(
+                Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+                "scrolled",
+                StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser scroll failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
     private bool TryTypeBrowserInputValue(string automationId, string text)
     {
         if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
@@ -540,21 +1014,47 @@ public class TestBase
                 return false;
             }
 
-            if (!TryFocusBrowserInput(driver, automationId))
+            var inputHost = TryResolveBrowserInputHost(driver, automationId);
+            try
+            {
+                if (inputHost is not null && TryFocusBrowserInput(driver, automationId, inputHost))
+                {
+                    ClearActiveBrowserInput(inputHost);
+                    inputHost.SendKeys(text);
+                    DispatchBrowserInputEvents(driver, inputHost);
+                    CommitBrowserInput(driver, inputHost);
+
+                    if (TryReadBrowserInputValue(automationId, out var hostRoutedValue) &&
+                        string.Equals(hostRoutedValue, text, StringComparison.Ordinal))
+                    {
+                        HarnessLog.Write($"Browser host typing outcome for '{automationId}': '{hostRoutedValue}'.");
+                        return true;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                HarnessLog.Write($"Browser host typing path failed for '{automationId}': {exception.Message}");
+            }
+
+            var inputElement = TryResolveBrowserInputElement(driver, automationId);
+            if (inputElement is null)
             {
                 return false;
             }
 
-            var activeElement = driver.SwitchTo().ActiveElement();
-            if (activeElement is null)
+            PrepareBrowserInputForTyping(driver, inputElement);
+            if (!TryFocusBrowserInput(driver, automationId, inputElement))
             {
                 return false;
             }
 
-            ClearActiveBrowserInput(activeElement);
-            activeElement.SendKeys(text);
+            ClearActiveBrowserInput(inputElement);
+            inputElement.SendKeys(text);
+            DispatchBrowserInputEvents(driver, inputElement);
+            CommitBrowserInput(driver, inputElement);
 
-            var value = activeElement.GetAttribute("value") ?? activeElement.Text ?? string.Empty;
+            var value = inputElement.GetAttribute("value") ?? inputElement.Text ?? string.Empty;
             HarnessLog.Write($"Browser input typing outcome for '{automationId}': '{value}'.");
             return string.Equals(value, text, StringComparison.Ordinal);
         }
@@ -563,6 +1063,47 @@ public class TestBase
             HarnessLog.Write($"Browser input typing failed for '{automationId}': {exception.Message}");
             return false;
         }
+    }
+
+    private static void PrepareBrowserInputForTyping(IWebDriver driver, IWebElement inputElement)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(inputElement);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return;
+        }
+
+        javaScriptExecutor.ExecuteScript(
+            """
+            const element = arguments[0];
+            if (!element) {
+                return;
+            }
+
+            const style = window.getComputedStyle(element);
+            const isHidden = style.display === 'none' || style.visibility === 'hidden' || Number.parseFloat(style.opacity || '1') === 0;
+            if (!isHidden) {
+                return;
+            }
+
+            if (!element.dataset.codexOriginalStyle) {
+                element.dataset.codexOriginalStyle = element.getAttribute('style') ?? '';
+            }
+
+            element.style.display = 'block';
+            element.style.visibility = 'visible';
+            element.style.opacity = '0.01';
+            element.style.position = 'fixed';
+            element.style.left = '8px';
+            element.style.top = '8px';
+            element.style.width = `${Math.max(element.getBoundingClientRect().width, 1)}px`;
+            element.style.height = `${Math.max(element.getBoundingClientRect().height, 1)}px`;
+            element.style.zIndex = '2147483647';
+            element.style.pointerEvents = 'auto';
+            """,
+            inputElement);
     }
 
     private bool TryPressEnterBrowserInput(string automationId)
@@ -578,13 +1119,130 @@ public class TestBase
                     .GetType()
                     .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                     ?.GetValue(_app) is not IWebDriver driver ||
-                !TryFocusBrowserInput(driver, automationId))
+                !TryFocusBrowserInput(driver, automationId, elementOverride: null))
             {
                 return false;
             }
 
-            driver.SwitchTo().ActiveElement().SendKeys(Keys.Enter);
-            HarnessLog.Write($"Browser input enter outcome for '{automationId}': pressed.");
+            if (driver is not IJavaScriptExecutor javaScriptExecutor)
+            {
+                return false;
+            }
+
+            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var outcome = javaScriptExecutor.ExecuteScript(
+                string.Concat(
+                    """
+                    return (() => {
+                        const automationId = '
+                    """,
+                    escapedAutomationId,
+                    """
+                    ';
+                        const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                        const matches = Array.from(document.querySelectorAll(selector));
+                        const visibleMatches = matches.filter(element => {
+                            const rect = element.getBoundingClientRect();
+                            return rect.width > 0 &&
+                                rect.height > 0 &&
+                                rect.right > 0 &&
+                                rect.bottom > 0 &&
+                                rect.left < window.innerWidth &&
+                                rect.top < window.innerHeight;
+                        });
+                        const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                            ?? visibleMatches[0]
+                            ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                            ?? matches[0];
+                        if (!host) {
+                            return 'missing';
+                        }
+
+                        const inputSelector = 'textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]';
+                        const backingSelector = 'textarea, input:not([type="hidden"])';
+                        const candidates = [
+                            ...(host.matches(inputSelector) ? [host] : []),
+                            ...Array.from(host.querySelectorAll(inputSelector))
+                        ];
+                        const backingElement = host.matches(backingSelector)
+                            ? host
+                            : host.querySelector(backingSelector);
+                        const visibleCandidates = candidates.filter(element => {
+                            const rect = element.getBoundingClientRect();
+                            const style = window.getComputedStyle(element);
+                            const isHidden = style.display === 'none' || style.visibility === 'hidden';
+                            const isDisabled = 'disabled' in element && element.disabled;
+                            const isReadOnly = 'readOnly' in element && element.readOnly;
+                            const isAriaHidden = element.getAttribute('aria-hidden') === 'true';
+
+                            return rect.width > 0 &&
+                                rect.height > 0 &&
+                                !isHidden &&
+                                !isDisabled &&
+                                !isReadOnly &&
+                                !isAriaHidden;
+                        });
+                        const visibleBackingElement = backingElement && visibleCandidates.includes(backingElement)
+                            ? backingElement
+                            : null;
+                        const input = (visibleBackingElement ? [visibleBackingElement] : visibleCandidates.length > 0 ? visibleCandidates : backingElement ? [backingElement, ...candidates] : candidates)
+                            .map(candidate => {
+                                const rect = candidate.getBoundingClientRect();
+                                const isTextArea = candidate.tagName === 'TEXTAREA';
+                                const isTextInput = candidate.tagName === 'INPUT';
+                                const isRoleTextbox = candidate.getAttribute('role') === 'textbox';
+                                const score =
+                                    (isTextArea ? 1000000 : 0) +
+                                    (isTextInput ? 100000 : 0) +
+                                    (isRoleTextbox ? 10000 : 0) +
+                                    (rect.width * rect.height);
+
+                                return { candidate, score };
+                            })
+                            .sort((left, right) => right.score - left.score)[0]?.candidate;
+                        if (!input) {
+                            return 'missing-input';
+                        }
+
+                        host.scrollIntoView({ block: 'center', inline: 'center' });
+                        if (typeof host.focus === 'function') {
+                            host.focus({ preventScroll: true });
+                        }
+                        if (typeof input.focus === 'function') {
+                            input.focus({ preventScroll: true });
+                        }
+
+                        const eventInit = {
+                            bubbles: true,
+                            cancelable: true,
+                            composed: true,
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13
+                        };
+
+                        input.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+                        input.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+                        input.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                        host.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+                        host.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+                        host.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                        return 'pressed';
+                    })();
+                    """));
+
+            HarnessLog.Write($"Browser input enter outcome for '{automationId}': {outcome}.");
+            if (!string.Equals(
+                    Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+                    "pressed",
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var inputElement = TryResolveBrowserInputElement(driver, automationId);
+            inputElement?.SendKeys(Keys.Enter);
             return true;
         }
         catch (Exception exception)
@@ -617,7 +1275,75 @@ public class TestBase
         activeElement.SendKeys(Keys.Backspace);
     }
 
-    private static bool TryFocusBrowserInput(IWebDriver driver, string automationId)
+    private static void DispatchBrowserInputEvents(IWebDriver driver, IWebElement activeElement)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(activeElement);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return;
+        }
+
+        javaScriptExecutor.ExecuteScript(
+            """
+            const element = arguments[0];
+            if (!element) {
+                return;
+            }
+
+            const options = { bubbles: true, cancelable: true, composed: true };
+            element.dispatchEvent(new Event('input', options));
+            element.dispatchEvent(new Event('change', options));
+            """,
+            activeElement);
+    }
+
+    private static void CommitBrowserInput(IWebDriver driver, IWebElement activeElement)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(activeElement);
+
+        if (driver is IJavaScriptExecutor javaScriptExecutor)
+        {
+            javaScriptExecutor.ExecuteScript(
+                """
+                const element = arguments[0];
+                if (!element) {
+                    return;
+                }
+
+                const host = element.closest?.('[xamlautomationid]') ?? element.parentElement ?? element;
+                const options = { bubbles: true, cancelable: true, composed: true };
+
+                element.dispatchEvent(new Event('change', options));
+                element.dispatchEvent(new FocusEvent('blur', options));
+
+                if (host && host !== element) {
+                    host.dispatchEvent(new Event('change', options));
+                    host.dispatchEvent(new FocusEvent('blur', options));
+                }
+
+                if (document.activeElement === element || document.activeElement === host) {
+                    document.body.focus();
+                }
+                """,
+                activeElement);
+        }
+
+        try
+        {
+            activeElement.SendKeys(Keys.Tab);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static bool TryFocusBrowserInput(
+        IWebDriver driver,
+        string automationId,
+        IWebElement? elementOverride)
     {
         ArgumentNullException.ThrowIfNull(driver);
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
@@ -627,8 +1353,50 @@ public class TestBase
             return false;
         }
 
-        var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+        var inputElement = elementOverride ?? TryResolveBrowserInputElement(driver, automationId);
+        if (inputElement is null)
+        {
+            HarnessLog.Write($"Browser input focus outcome for '{automationId}': missing");
+            return false;
+        }
+
         var outcome = javaScriptExecutor.ExecuteScript(
+            """
+            const element = arguments[0];
+            if (!element) {
+                return 'missing';
+            }
+
+            element.scrollIntoView({ block: 'center', inline: 'center' });
+            element.focus();
+
+            if ('select' in element) {
+                element.select();
+            }
+
+            return 'focused';
+            """,
+            inputElement);
+
+        HarnessLog.Write($"Browser input focus outcome for '{automationId}': {outcome}");
+        return string.Equals(
+            Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
+            "focused",
+            StringComparison.Ordinal);
+    }
+
+    private static IWebElement? TryResolveBrowserInputHost(IWebDriver driver, string automationId)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return null;
+        }
+
+        var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+        return javaScriptExecutor.ExecuteScript(
             string.Concat(
                 """
                 return (() => {
@@ -638,34 +1406,104 @@ public class TestBase
                 """
                 ';
                     const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
-                    const host = document.querySelector(selector);
-                    if (!host) {
-                        return 'missing';
-                    }
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    const visibleMatches = matches.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight;
+                    });
 
-                    const element = host.matches('input, textarea, [contenteditable="true"]')
-                        ? host
-                        : host.querySelector('input, textarea, [contenteditable="true"]');
-                    if (!element) {
-                        return 'not-an-input';
-                    }
-
-                    element.scrollIntoView({ block: 'center', inline: 'center' });
-                    element.focus();
-
-                    if ('select' in element) {
-                        element.select();
-                    }
-
-                    return 'focused';
+                    return visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? visibleMatches[0]
+                        ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? matches[0]
+                        ?? null;
                 })();
-                """));
+                """)) as IWebElement;
+    }
 
-        HarnessLog.Write($"Browser input focus outcome for '{automationId}': {outcome}");
-        return string.Equals(
-            Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
-            "focused",
-            StringComparison.Ordinal);
+    private static IWebElement? TryResolveBrowserInputElement(IWebDriver driver, string automationId)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return null;
+        }
+
+        var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+        return javaScriptExecutor.ExecuteScript(
+            string.Concat(
+                """
+                return (() => {
+                    const automationId = '
+                """,
+                escapedAutomationId,
+                """
+                ';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    const visibleMatches = matches.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight;
+                    });
+                    const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? visibleMatches[0]
+                        ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? matches[0];
+                    if (!host) {
+                        return null;
+                    }
+
+                    const inputSelector = 'textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]';
+                    const candidates = [
+                        ...(host.matches(inputSelector) ? [host] : []),
+                        ...Array.from(host.querySelectorAll(inputSelector))
+                    ];
+                    const visibleCandidates = candidates.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        const style = window.getComputedStyle(element);
+                        const isHidden = style.display === 'none' || style.visibility === 'hidden';
+                        const isDisabled = 'disabled' in element && element.disabled;
+                        const isReadOnly = 'readOnly' in element && element.readOnly;
+                        const isAriaHidden = element.getAttribute('aria-hidden') === 'true';
+
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            !isHidden &&
+                            !isDisabled &&
+                            !isReadOnly &&
+                            !isAriaHidden;
+                    });
+                    const rankedCandidates = (visibleCandidates.length > 0 ? visibleCandidates : candidates)
+                        .map(element => {
+                            const rect = element.getBoundingClientRect();
+                            const isTextArea = element.tagName === 'TEXTAREA';
+                            const isTextInput = element.tagName === 'INPUT';
+                            const isRoleTextbox = element.getAttribute('role') === 'textbox';
+                            const score =
+                                (isTextArea ? 1000000 : 0) +
+                                (isTextInput ? 100000 : 0) +
+                                (isRoleTextbox ? 10000 : 0) +
+                                (rect.width * rect.height);
+
+                            return { element, score };
+                        })
+                        .sort((left, right) => right.score - left.score);
+
+                    return rankedCandidates[0]?.element ?? null;
+                })();
+                """)) as IWebElement;
     }
 
     private bool TrySetBrowserInputValue(string automationId, string text)
@@ -719,20 +1557,84 @@ public class TestBase
                         """
                         ';
                             const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
-                            const host = document.querySelector(selector);
+                            const matches = Array.from(document.querySelectorAll(selector));
+                            const visibleMatches = matches.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    rect.right > 0 &&
+                                    rect.bottom > 0 &&
+                                    rect.left < window.innerWidth &&
+                                    rect.top < window.innerHeight;
+                            });
+                            const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? visibleMatches[0]
+                                ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                                ?? matches[0];
                             if (!host) {
                                 return 'missing';
                             }
 
-                            const element = host.matches('input, textarea, [contenteditable="true"]')
+                            const inputSelector = 'textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]';
+                            const backingSelector = 'textarea, input:not([type="hidden"])';
+                            const candidates = [
+                                ...(host.matches(inputSelector) ? [host] : []),
+                                ...Array.from(host.querySelectorAll(inputSelector))
+                            ];
+                            const backingElement = host.matches(backingSelector)
                                 ? host
-                                : host.querySelector('input, textarea, [contenteditable="true"]');
+                                : host.querySelector(backingSelector);
+                            const visibleCandidates = candidates.filter(element => {
+                                const rect = element.getBoundingClientRect();
+                                const style = window.getComputedStyle(element);
+                                const isHidden = style.display === 'none' || style.visibility === 'hidden';
+                                const isDisabled = 'disabled' in element && element.disabled;
+                                const isReadOnly = 'readOnly' in element && element.readOnly;
+                                const isAriaHidden = element.getAttribute('aria-hidden') === 'true';
+
+                                return rect.width > 0 &&
+                                    rect.height > 0 &&
+                                    !isHidden &&
+                                    !isDisabled &&
+                                    !isReadOnly &&
+                                    !isAriaHidden;
+                            });
+                            const visibleBackingElement = backingElement && visibleCandidates.includes(backingElement)
+                                ? backingElement
+                                : null;
+                            const rankedSource = visibleBackingElement
+                                ? [visibleBackingElement]
+                                : visibleCandidates.length > 0
+                                    ? visibleCandidates
+                                    : backingElement
+                                        ? [backingElement, ...candidates]
+                                        : candidates;
+                            const element = rankedSource
+                                .map(candidate => {
+                                    const rect = candidate.getBoundingClientRect();
+                                    const isTextArea = candidate.tagName === 'TEXTAREA';
+                                    const isTextInput = candidate.tagName === 'INPUT';
+                                    const isRoleTextbox = candidate.getAttribute('role') === 'textbox';
+                                    const score =
+                                        (isTextArea ? 1000000 : 0) +
+                                        (isTextInput ? 100000 : 0) +
+                                        (isRoleTextbox ? 10000 : 0) +
+                                        (rect.width * rect.height);
+
+                                    return { candidate, score };
+                                })
+                                .sort((left, right) => right.score - left.score)[0]?.candidate;
                             if (!element) {
                                 return 'not-an-input';
                             }
 
-                            element.scrollIntoView({ block: 'center', inline: 'center' });
-                            element.focus();
+                            host.scrollIntoView({ block: 'center', inline: 'center' });
+                            if (typeof host.focus === 'function') {
+                                host.focus({ preventScroll: true });
+                            }
+                            if (typeof element.focus === 'function') {
+                                element.focus({ preventScroll: true });
+                            }
 
                             if ('value' in element) {
                                 element.value = value;
@@ -741,9 +1643,22 @@ public class TestBase
                             }
 
                             const options = { bubbles: true, cancelable: true, composed: true };
-                            element.dispatchEvent(new Event('input', options));
+                            const inputEvent = typeof InputEvent === 'function'
+                                ? new InputEvent('input', { ...options, data: value, inputType: 'insertText' })
+                                : new Event('input', options);
+                            element.dispatchEvent(new Event('beforeinput', options));
+                            element.dispatchEvent(inputEvent);
                             element.dispatchEvent(new Event('change', options));
+                            const hostInputEvent = typeof InputEvent === 'function'
+                                ? new InputEvent('input', { ...options, data: value, inputType: 'insertText' })
+                                : new Event('input', options);
+                            host.dispatchEvent(new Event('beforeinput', options));
+                            host.dispatchEvent(hostInputEvent);
+                            host.dispatchEvent(new Event('change', options));
                             element.blur();
+                            if (typeof host.blur === 'function') {
+                                host.blur();
+                            }
                             return 'set';
                         })();
                         """),
@@ -813,11 +1728,20 @@ public class TestBase
                             xamlType: element.getAttribute('xamltype') ?? '',
                             text: (element.innerText ?? '').trim(),
                             value: 'value' in element ? element.value : '',
-                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"]')).map((child, childIndex) => ({
+                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]')).map((child, childIndex) => ({
                                 childIndex,
                                 tag: child.tagName,
                                 className: child.className,
-                                value: 'value' in child ? child.value : child.textContent ?? ''
+                                value: 'value' in child ? child.value : child.textContent ?? '',
+                                ariaLabel: child.getAttribute('aria-label') ?? '',
+                                xamlAutomationId: child.getAttribute('xamlautomationid') ?? '',
+                                xamlType: child.getAttribute('xamltype') ?? '',
+                                width: child.getBoundingClientRect().width,
+                                height: child.getBoundingClientRect().height,
+                                display: window.getComputedStyle(child).display,
+                                visibility: window.getComputedStyle(child).visibility,
+                                disabled: 'disabled' in child ? child.disabled : false,
+                                readOnly: 'readOnly' in child ? child.readOnly : false
                             })),
                             html: element.outerHTML.slice(0, 300)
                         }));
@@ -831,11 +1755,20 @@ public class TestBase
                             xamlType: element.getAttribute('xamltype') ?? '',
                             text: (element.innerText ?? '').trim(),
                             value: 'value' in element ? element.value : '',
-                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"]')).map((child, childIndex) => ({
+                            childInputs: Array.from(element.querySelectorAll('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]')).map((child, childIndex) => ({
                                 childIndex,
                                 tag: child.tagName,
                                 className: child.className,
-                                value: 'value' in child ? child.value : child.textContent ?? ''
+                                value: 'value' in child ? child.value : child.textContent ?? '',
+                                ariaLabel: child.getAttribute('aria-label') ?? '',
+                                xamlAutomationId: child.getAttribute('xamlautomationid') ?? '',
+                                xamlType: child.getAttribute('xamltype') ?? '',
+                                width: child.getBoundingClientRect().width,
+                                height: child.getBoundingClientRect().height,
+                                display: window.getComputedStyle(child).display,
+                                visibility: window.getComputedStyle(child).visibility,
+                                disabled: 'disabled' in child ? child.disabled : false,
+                                readOnly: 'readOnly' in child ? child.readOnly : false
                             })),
                             html: element.outerHTML.slice(0, 300)
                         }));
@@ -850,6 +1783,175 @@ public class TestBase
         {
             HarnessLog.Write($"Browser automation diagnostics failed for '{automationId}': {exception.Message}");
         }
+    }
+
+    protected bool TryReadBrowserInputValue(string automationId, out string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        value = string.Empty;
+        if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var driver = _app
+                .GetType()
+                .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.GetValue(_app);
+
+            if (driver is null)
+            {
+                return false;
+            }
+
+            var executeScriptMethod = driver.GetType().GetMethod(
+                "ExecuteScript",
+                [typeof(string), typeof(object[])]);
+
+            if (executeScriptMethod is null)
+            {
+                return false;
+            }
+
+            var script = string.Concat(
+                """
+                return (() => {
+                    const automationId = '
+                """,
+                automationId.Replace("'", "\\'", StringComparison.Ordinal),
+                """
+                ';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    const visibleMatches = matches.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right > 0 &&
+                            rect.bottom > 0 &&
+                            rect.left < window.innerWidth &&
+                            rect.top < window.innerHeight;
+                    });
+                    const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? visibleMatches[0]
+                        ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
+                        ?? matches[0];
+                    if (!host) {
+                        return null;
+                    }
+
+                    const inputSelector = 'textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]';
+                    const backingSelector = 'textarea, input:not([type="hidden"])';
+                    const candidates = [
+                        ...(host.matches(inputSelector) ? [host] : []),
+                        ...Array.from(host.querySelectorAll(inputSelector))
+                    ];
+                    const backingElement = host.matches(backingSelector)
+                        ? host
+                        : host.querySelector(backingSelector);
+                    const visibleCandidates = candidates.filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        const style = window.getComputedStyle(element);
+                        const isHidden = style.display === 'none' || style.visibility === 'hidden';
+                        const isDisabled = 'disabled' in element && element.disabled;
+                        const isReadOnly = 'readOnly' in element && element.readOnly;
+                        const isAriaHidden = element.getAttribute('aria-hidden') === 'true';
+
+                        return rect.width > 0 &&
+                            rect.height > 0 &&
+                            !isHidden &&
+                            !isDisabled &&
+                            !isReadOnly &&
+                            !isAriaHidden;
+                    });
+                    const element = backingElement ?? (visibleCandidates.length > 0 ? visibleCandidates : candidates)
+                        .map(candidate => {
+                            const rect = candidate.getBoundingClientRect();
+                            const isTextArea = candidate.tagName === 'TEXTAREA';
+                            const isTextInput = candidate.tagName === 'INPUT';
+                            const isRoleTextbox = candidate.getAttribute('role') === 'textbox';
+                            const score =
+                                (isTextArea ? 1000000 : 0) +
+                                (isTextInput ? 100000 : 0) +
+                                (isRoleTextbox ? 10000 : 0) +
+                                (rect.width * rect.height);
+
+                            return { candidate, score };
+                        })
+                        .sort((left, right) => right.score - left.score)[0]?.candidate;
+                    if (!element) {
+                        return null;
+                    }
+
+                    return 'value' in element ? (element.value ?? '') : (element.textContent ?? '');
+                })();
+                """);
+
+            var result = executeScriptMethod.Invoke(driver, [script, Array.Empty<object>()]);
+            value = Convert.ToString(result, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Browser input read failed for '{automationId}': {exception.Message}");
+            value = string.Empty;
+            return false;
+        }
+    }
+
+    private void LogAutomationQueryState(string automationId, string context)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context);
+
+        try
+        {
+            var matches = App.Query(automationId);
+            HarnessLog.Write($"Automation query state for '{automationId}' during '{context}' returned {matches.Length} matches.");
+
+            for (var index = 0; index < matches.Length; index++)
+            {
+                var match = matches[index];
+                HarnessLog.Write(
+                    $"Automation query state for '{automationId}' during '{context}' match[{index}] text='{match.Text}' label='{match.Label}' enabled='{match.Enabled}' rect='{match.Rect}'.");
+            }
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Automation query state logging failed for '{automationId}' during '{context}': {exception.Message}");
+        }
+    }
+
+    private bool DoesAutomationElementReflectText(string automationId, string expectedText)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        ArgumentNullException.ThrowIfNull(expectedText);
+
+        var normalizedExpectedText = NormalizeWhitespace(expectedText);
+        try
+        {
+            return App.Query(automationId)
+                .Any(match =>
+                    string.Equals(NormalizeWhitespace(match.Text ?? string.Empty), normalizedExpectedText, StringComparison.Ordinal) ||
+                    string.Equals(NormalizeWhitespace(match.Label ?? string.Empty), normalizedExpectedText, StringComparison.Ordinal));
+        }
+        catch (Exception exception)
+        {
+            HarnessLog.Write($"Automation reflection check failed for '{automationId}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private static string NormalizeWhitespace(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        var segments = value
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return string.Join(' ', segments);
     }
 
     private static bool ResolveBrowserHeadless()

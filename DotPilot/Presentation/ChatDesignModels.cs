@@ -39,7 +39,10 @@ public sealed partial record ParticipantItem(
     string Initial,
     Brush? AvatarBrush,
     string? BadgeText = null,
-    Brush? BadgeBrush = null);
+    Brush? BadgeBrush = null)
+{
+    public bool HasBadge => !string.IsNullOrWhiteSpace(BadgeText);
+}
 
 [Bindable]
 public sealed partial record ProviderStatusItem(
@@ -51,7 +54,9 @@ public sealed partial record ProviderStatusItem(
     bool IsEnabled,
     bool CanCreateAgents,
     string InstallCommand,
-    IReadOnlyList<ProviderActionItem> Actions);
+    IReadOnlyList<ProviderActionItem> Actions,
+    string AutomationId,
+    bool IsSelected);
 
 [Bindable]
 public sealed partial record ProviderActionItem(

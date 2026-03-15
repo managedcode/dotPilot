@@ -10,9 +10,9 @@
         <TextBlock FontSize="18"
                    FontWeight="SemiBold"
                    Text="Capabilities" />
-        <TextBlock FontSize="12.5"
+        <TextBlock FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Choose what this agent is allowed to handle inside each local workflow session."
+                   Text="Enable only the capabilities the workflow actually needs."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 
@@ -21,15 +21,13 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="presentation:CapabilityOption">
             <Border Style="{StaticResource BuilderSummaryCardStyle}"
-                    Margin="0,0,0,12">
+                    Margin="0,0,0,10">
               <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <CheckBox VerticalAlignment="Top"
-                          IsChecked="{x:Bind IsEnabled, Mode=TwoWay}" />
-                <StackPanel Grid.Column="1"
+                <StackPanel
                             Spacing="4">
                   <TextBlock FontSize="13"
                              FontWeight="SemiBold"
@@ -39,6 +37,13 @@
                              Text="{x:Bind Description}"
                              TextWrapping="WrapWholeWords" />
                 </StackPanel>
+
+                <ToggleSwitch Grid.Column="1"
+                              HorizontalAlignment="Right"
+                              OffContent=""
+                              OnContent=""
+                              VerticalAlignment="Top"
+                              IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
               </Grid>
             </Border>
           </DataTemplate>

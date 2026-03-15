@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace DotPilot.Runtime.Features.AgentSessions;
 
 internal sealed class AgentRuntimeConversationFactory(
+    AgentSessionStorageOptions storageOptions,
+    AgentExecutionLoggingMiddleware executionLoggingMiddleware,
     LocalAgentSessionStateStore sessionStateStore,
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
@@ -24,6 +26,12 @@ internal sealed class AgentRuntimeConversationFactory(
         CancellationToken cancellationToken)
     {
         AgentRuntimeConversationFactoryLog.InitializeStarted(logger, sessionId, agentRecord.Id);
+        if (ShouldUseTransientRuntimeConversation(agentRecord))
+        {
+            AgentRuntimeConversationFactoryLog.TransientRuntimeConversation(logger, sessionId, agentRecord.Id);
+            return;
+        }
+
         var runtimeSession = await LoadOrCreateAsync(agentRecord, sessionId, cancellationToken);
         await sessionStateStore.SaveAsync(runtimeSession.Agent, runtimeSession.Session, sessionId, cancellationToken);
         if (logger.IsEnabled(LogLevel.Information))
@@ -43,9 +51,18 @@ internal sealed class AgentRuntimeConversationFactory(
     {
         ArgumentNullException.ThrowIfNull(agentRecord);
 
+        var useTransientConversation = ShouldUseTransientRuntimeConversation(agentRecord);
         var historyProvider = new FolderChatHistoryProvider(
             serviceProvider.GetRequiredService<LocalAgentChatHistoryStore>());
-        var agent = CreateAgent(agentRecord, historyProvider);
+        var descriptor = CreateExecutionDescriptor(agentRecord);
+        var agent = CreateAgent(agentRecord, descriptor, historyProvider);
+        if (useTransientConversation)
+        {
+            var transientSession = await CreateNewSessionAsync(agent, sessionId, cancellationToken);
+            AgentRuntimeConversationFactoryLog.TransientRuntimeConversation(logger, sessionId, agentRecord.Id);
+            return new RuntimeConversationContext(agent, transientSession, descriptor, IsTransient: true);
+        }
+
         var session = await sessionStateStore.TryLoadAsync(agent, sessionId, cancellationToken);
         if (session is null)
         {
@@ -59,7 +76,7 @@ internal sealed class AgentRuntimeConversationFactory(
         }
 
         FolderChatHistoryProvider.BindToSession(session, sessionId);
-        return new RuntimeConversationContext(agent, session);
+        return new RuntimeConversationContext(agent, session, descriptor);
     }
 
     public ValueTask SaveAsync(
@@ -68,12 +85,26 @@ internal sealed class AgentRuntimeConversationFactory(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtimeContext);
+        if (runtimeContext.IsTransient)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         AgentRuntimeConversationFactoryLog.SessionSaved(logger, sessionId, runtimeContext.Agent.Id);
         return sessionStateStore.SaveAsync(runtimeContext.Agent, runtimeContext.Session, sessionId, cancellationToken);
     }
 
+    private bool ShouldUseTransientRuntimeConversation(AgentProfileRecord agentRecord)
+    {
+        ArgumentNullException.ThrowIfNull(agentRecord);
+
+        var providerKind = (AgentProviderKind)agentRecord.ProviderKind;
+        return storageOptions.PreferTransientRuntimeConversation ||
+            (OperatingSystem.IsBrowser() && providerKind == AgentProviderKind.Debug);
+    }
+
     private static async ValueTask<AgentSession> CreateNewSessionAsync(
-        ChatClientAgent agent,
+        AIAgent agent,
         SessionId sessionId,
         CancellationToken cancellationToken)
     {
@@ -82,17 +113,17 @@ internal sealed class AgentRuntimeConversationFactory(
         return session;
     }
 
-    private ChatClientAgent CreateAgent(
+    private AIAgent CreateAgent(
         AgentProfileRecord agentRecord,
+        AgentExecutionDescriptor descriptor,
         FolderChatHistoryProvider historyProvider)
     {
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agentRecord.ProviderKind);
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
         var options = new ChatClientAgentOptions
         {
             Id = agentRecord.Id.ToString("N", CultureInfo.InvariantCulture),
             Name = agentRecord.Name,
-            Description = providerProfile.DisplayName,
+            Description = descriptor.ProviderDisplayName,
             ChatHistoryProvider = historyProvider,
             UseProvidedChatClientAsIs = true,
             ChatOptions = new ChatOptions
@@ -106,24 +137,42 @@ internal sealed class AgentRuntimeConversationFactory(
             logger,
             agentRecord.Id,
             agentRecord.Name,
-            providerProfile.Kind);
+            descriptor.ProviderKind);
 
-        return CreateChatClient(providerProfile, agentRecord.Name)
+        var agent = CreateChatClient(descriptor.ProviderKind, descriptor.ProviderDisplayName, agentRecord.Name)
             .AsAIAgent(options, loggerFactory, serviceProvider);
+
+        return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
+    }
+
+    private static AgentExecutionDescriptor CreateExecutionDescriptor(AgentProfileRecord agentRecord)
+    {
+        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agentRecord.ProviderKind);
+        return new AgentExecutionDescriptor(
+            agentRecord.Id,
+            agentRecord.Name,
+            providerProfile.Kind,
+            providerProfile.DisplayName,
+            agentRecord.ModelName);
     }
 
     private IChatClient CreateChatClient(
-        AgentSessionProviderProfile providerProfile,
+        AgentProviderKind providerKind,
+        string providerDisplayName,
         string agentName)
     {
-        return providerProfile.Kind == AgentProviderKind.Debug
+        return providerKind == AgentProviderKind.Debug
             ? new DebugChatClient(agentName, timeProvider)
             : new UnavailableChatClient(
                 string.Format(
                     CultureInfo.InvariantCulture,
                     NotYetImplementedCompositeFormat,
-                    providerProfile.DisplayName));
+                    providerDisplayName));
     }
 }
 
-internal sealed record RuntimeConversationContext(ChatClientAgent Agent, AgentSession Session);
+internal sealed record RuntimeConversationContext(
+    AIAgent Agent,
+    AgentSession Session,
+    AgentExecutionDescriptor Descriptor,
+    bool IsTransient = false);

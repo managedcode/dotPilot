@@ -18,6 +18,8 @@ public static class AgentSessionServiceCollectionExtensions
         services.AddSingleton<AgentProviderStatusCache>();
         services.AddSingleton<IAgentProviderStatusCache>(serviceProvider =>
             serviceProvider.GetRequiredService<AgentProviderStatusCache>());
+        services.AddSingleton<AgentPromptDraftGenerator>();
+        services.AddSingleton<AgentExecutionLoggingMiddleware>();
         services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<DotPilot.Core.Features.AgentSessions.IAgentSessionService, AgentSessionService>();
         services.AddSingleton<IAgentWorkspaceState, AgentWorkspaceState>();

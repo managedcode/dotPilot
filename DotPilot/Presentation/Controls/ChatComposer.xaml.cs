@@ -27,7 +27,7 @@ public sealed partial class ChatComposer : UserControl
             isAltPressed: IsKeyPressed(VirtualKey.Menu));
         if (action is ChatComposerKeyboardAction.SendMessage)
         {
-            ExecuteSubmitCommand();
+            ExecuteSubmitAction(textBox);
             e.Handled = true;
             return;
         }
@@ -41,16 +41,56 @@ public sealed partial class ChatComposer : UserControl
         e.Handled = true;
     }
 
-    private void ExecuteSubmitCommand()
+    private void OnSendButtonClick(object sender, RoutedEventArgs e)
     {
+#if USE_UITESTS
+        BrowserConsoleDiagnostics.Error("[DotPilot.ChatComposer] Send button click received.");
+#endif
+        ExecuteSubmitAction(ComposerInput);
+    }
+
+    private void ExecuteSubmitAction(TextBox textBox)
+    {
+        ArgumentNullException.ThrowIfNull(textBox);
+
+        SynchronizeComposerText(textBox);
         var command = SendButton.Command;
-        var parameter = SendButton.CommandParameter;
-        if (command?.CanExecute(parameter) != true)
+        if (command is null)
         {
+#if USE_UITESTS
+            BrowserConsoleDiagnostics.Error("[DotPilot.ChatComposer] Submit ignored because SendButton.Command is null.");
+#endif
             return;
         }
 
-        command.Execute(parameter);
+        var parameter = textBox.Text;
+        var canExecute = command.CanExecute(parameter);
+        if (!canExecute)
+        {
+#if USE_UITESTS
+            BrowserConsoleDiagnostics.Error("[DotPilot.ChatComposer] Submit ignored because command.CanExecute returned false.");
+#endif
+            return;
+        }
+
+#if USE_UITESTS
+        BrowserConsoleDiagnostics.Error("[DotPilot.ChatComposer] Submit command executing.");
+#endif
+        if (canExecute)
+        {
+            command.Execute(parameter);
+#if USE_UITESTS
+            BrowserConsoleDiagnostics.Error("[DotPilot.ChatComposer] Submit command executed.");
+#endif
+        }
+    }
+
+    private static void SynchronizeComposerText(TextBox textBox)
+    {
+        ArgumentNullException.ThrowIfNull(textBox);
+
+        var bindingExpression = textBox.GetBindingExpression(TextBox.TextProperty);
+        bindingExpression?.UpdateSource();
     }
 
     private static bool IsKeyPressed(VirtualKey key)

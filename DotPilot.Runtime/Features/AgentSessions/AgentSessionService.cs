@@ -8,6 +8,7 @@ namespace DotPilot.Runtime.Features.AgentSessions;
 
 internal sealed class AgentSessionService(
     IDbContextFactory<LocalAgentSessionDbContext> dbContextFactory,
+    AgentExecutionLoggingMiddleware executionLoggingMiddleware,
     AgentProviderStatusCache providerStatusCache,
     AgentRuntimeConversationFactory runtimeConversationFactory,
     IServiceProvider serviceProvider,
@@ -37,8 +38,8 @@ internal sealed class AgentSessionService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var agents = await dbContext.AgentProfiles
-            .OrderBy(record => record.Name)
             .ToListAsync(cancellationToken);
+        agents = OrderAgents(agents);
         var sessions = (await dbContext.Sessions
                 .ToListAsync(cancellationToken))
             .OrderByDescending(record => record.UpdatedAt)
@@ -327,11 +328,21 @@ internal sealed class AgentSessionService(
 
         string? streamedMessageId = null;
         var accumulated = new System.Text.StringBuilder();
+        var runConfiguration = executionLoggingMiddleware.CreateRunConfiguration(
+            runtimeConversation.Descriptor,
+            command.SessionId);
+        AgentSessionServiceLog.SendRunPrepared(
+            logger,
+            command.SessionId,
+            agent.Id,
+            runConfiguration.Context.RunId,
+            providerProfile.Kind,
+            agent.ModelName);
 
         await using var updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
                 command.Message.Trim(),
                 runtimeConversation.Session,
-                options: null,
+                runConfiguration.Options,
                 cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
 
@@ -431,6 +442,7 @@ internal sealed class AgentSessionService(
             AgentSessionServiceLog.InitializationStarted(logger);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
             await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            await EnsureDefaultProviderAndAgentAsync(dbContext, cancellationToken);
             _initialized = true;
             AgentSessionServiceLog.InitializationCompleted(logger);
         }
@@ -438,6 +450,64 @@ internal sealed class AgentSessionService(
         {
             _initializationGate.Release();
         }
+    }
+
+    private async Task EnsureDefaultProviderAndAgentAsync(
+        LocalAgentSessionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var hasEnabledProvider = await dbContext.ProviderPreferences
+            .AnyAsync(record => record.IsEnabled, cancellationToken);
+        if (!hasEnabledProvider)
+        {
+            var debugPreference = await dbContext.ProviderPreferences
+                .FirstOrDefaultAsync(
+                    record => record.ProviderKind == (int)AgentProviderKind.Debug,
+                    cancellationToken);
+
+            if (debugPreference is null)
+            {
+                debugPreference = new ProviderPreferenceRecord
+                {
+                    ProviderKind = (int)AgentProviderKind.Debug,
+                };
+                dbContext.ProviderPreferences.Add(debugPreference);
+            }
+
+            debugPreference.IsEnabled = true;
+            debugPreference.UpdatedAt = timeProvider.GetUtcNow();
+            AgentSessionServiceLog.DefaultProviderEnabled(logger, AgentProviderKind.Debug);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await providerStatusCache.RefreshAsync(cancellationToken);
+        }
+
+        var hasAgents = await dbContext.AgentProfiles.AnyAsync(cancellationToken);
+        if (hasAgents)
+        {
+            return;
+        }
+
+        var providerSnapshot = await providerStatusCache.GetSnapshotAsync(cancellationToken);
+        var providerKind = providerSnapshot
+            .Where(static provider => provider.CanCreateAgents)
+            .Select(static provider => provider.Kind)
+            .FirstOrDefault(AgentProviderKind.Debug);
+        var record = new AgentProfileRecord
+        {
+            Id = Guid.CreateVersion7(),
+            Name = AgentSessionDefaults.SystemAgentName,
+            Role = (int)AgentRoleKind.Operator,
+            ProviderKind = (int)providerKind,
+            ModelName = AgentSessionDefaults.GetDefaultModel(providerKind),
+            SystemPrompt = AgentSessionDefaults.SystemAgentPrompt,
+            CapabilitiesJson = SerializeCapabilities(AgentSessionDefaults.SystemCapabilities),
+            CreatedAt = timeProvider.GetUtcNow(),
+        };
+
+        dbContext.AgentProfiles.Add(record);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await UpsertAgentGrainAsync(MapAgentDescriptor(record));
+        AgentSessionServiceLog.DefaultAgentSeeded(logger, record.Id, providerKind, record.ModelName);
     }
 
     private static SessionEntryRecord CreateEntryRecord(
@@ -512,6 +582,17 @@ internal sealed class AgentSessionService(
             record.SystemPrompt,
             DeserializeCapabilities(record.CapabilitiesJson),
             record.CreatedAt);
+    }
+
+    private static List<AgentProfileRecord> OrderAgents(IReadOnlyList<AgentProfileRecord> agents)
+    {
+        var hasNonSystemAgents = agents.Any(record => !AgentSessionDefaults.IsSystemAgent(record.Name));
+
+        return agents
+            .OrderBy(record => hasNonSystemAgents && AgentSessionDefaults.IsSystemAgent(record.Name) ? 1 : 0)
+            .ThenByDescending(record => record.CreatedAt)
+            .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static AgentProfileDescriptor MapAgentDescriptor(AgentProfileRecord record)

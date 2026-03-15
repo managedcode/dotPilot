@@ -32,6 +32,18 @@ internal static partial class MainViewModelLog
         Message = "Chat shell send completed. SessionId={SessionId}.")]
     public static partial void SendCompleted(ILogger logger, string sessionId);
 
+    [LoggerMessage(
+        EventId = 2008,
+        Level = LogLevel.Information,
+        Message = "Ignoring shell send because the submitted message is empty after normalization.")]
+    public static partial void SendIgnoredEmpty(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 2009,
+        Level = LogLevel.Warning,
+        Message = "Ignoring shell send because no agent is available to start or continue a session.")]
+    public static partial void SendIgnoredNoAgents(ILogger logger);
+
     [LoggerMessage(EventId = 2007, Level = LogLevel.Error, Message = "Chat shell operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
@@ -68,7 +80,22 @@ internal static partial class SecondViewModelLog
         AgentProviderKind providerKind,
         string modelName);
 
-    [LoggerMessage(EventId = 2104, Level = LogLevel.Error, Message = "Agent builder operation failed.")]
+    [LoggerMessage(
+        EventId = 2104,
+        Level = LogLevel.Information,
+        Message = "Generating prompt-based agent draft. PromptCharacters={PromptCharacterCount}.")]
+    public static partial void DraftGenerationRequested(ILogger logger, int promptCharacterCount);
+
+    [LoggerMessage(EventId = 2105, Level = LogLevel.Information, Message = "Created manual agent draft.")]
+    public static partial void ManualDraftCreated(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 2106,
+        Level = LogLevel.Information,
+        Message = "Starting a chat session from the agent catalog. AgentId={AgentId} Name={AgentName}.")]
+    public static partial void ChatSessionRequested(ILogger logger, Guid agentId, string agentName);
+
+    [LoggerMessage(EventId = 2107, Level = LogLevel.Error, Message = "Agent builder operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
 
@@ -86,7 +113,13 @@ internal static partial class SettingsViewModelLog
     [LoggerMessage(EventId = 2202, Level = LogLevel.Information, Message = "Refreshing provider readiness settings.")]
     public static partial void RefreshRequested(ILogger logger);
 
-    [LoggerMessage(EventId = 2203, Level = LogLevel.Error, Message = "Provider settings operation failed.")]
+    [LoggerMessage(
+        EventId = 2203,
+        Level = LogLevel.Information,
+        Message = "Selected provider from settings. Provider={ProviderKind} DisplayName={DisplayName}.")]
+    public static partial void ProviderSelected(ILogger logger, AgentProviderKind providerKind, string displayName);
+
+    [LoggerMessage(EventId = 2204, Level = LogLevel.Error, Message = "Provider settings operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
 

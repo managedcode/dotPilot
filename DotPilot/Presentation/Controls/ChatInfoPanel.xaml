@@ -44,7 +44,8 @@
                 VerticalAlignment="Center"
                 Background="{x:Bind BadgeBrush}"
                 CornerRadius="100"
-                Padding="8,2">
+                Padding="8,2"
+                Visibility="{x:Bind HasBadge}">
           <TextBlock FontSize="10"
                      Foreground="{StaticResource AppPrimaryTextBrush}"
                      Text="{x:Bind BadgeText}" />
@@ -91,48 +92,20 @@
 
   <Border Style="{StaticResource GlassPanelStyle}"
           Padding="0">
-    <Grid>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-      </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="18"
+                  AutomationProperties.AutomationId="ChatInfoPanelContent"
+                  Spacing="14">
+        <Grid AutomationProperties.AutomationId="ChatInfoPanelHeader"
+              ColumnSpacing="12">
+          <TextBlock FontSize="15"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="Session details" />
+        </Grid>
 
-      <Grid Margin="20,16,16,12"
-            AutomationProperties.AutomationId="ChatInfoPanelHeader"
-            ColumnSpacing="12">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-
-        <TextBlock FontSize="15"
-                   FontWeight="Medium"
-                   Foreground="{StaticResource AppPrimaryTextBrush}"
-                   Text="Session details" />
-
-        <Button Grid.Column="1"
-                AutomationProperties.AutomationId="ChatInfoPanelCloseButton"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                BorderThickness="0"
-                Padding="4">
-          <TextBlock FontSize="14"
-                     Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="x" />
-        </Button>
-      </Grid>
-
-      <ScrollViewer Grid.Row="1"
-                    VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="20,0,20,20"
-                    AutomationProperties.AutomationId="ChatInfoPanelContent"
-                    Spacing="20">
+        <Border Style="{StaticResource MetricCardStyle}">
           <StackPanel Spacing="4">
-            <TextBlock CharacterSpacing="80"
-                       FontSize="12"
-                       FontWeight="Medium"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="SESSION" />
             <TextBlock FontSize="14"
                        FontWeight="Medium"
                        Foreground="{StaticResource AppPrimaryTextBrush}"
@@ -142,134 +115,54 @@
                        Text="{Binding ActiveSession.StatusSummary}"
                        TextWrapping="WrapWholeWords" />
           </StackPanel>
+        </Border>
 
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+        <Grid ColumnSpacing="10">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
 
-          <StackPanel Spacing="10">
-            <TextBlock CharacterSpacing="80"
-                       FontSize="12"
-                       FontWeight="Medium"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="QUICK ACTIONS" />
-            <Button AutomationProperties.AutomationId="ChatInfoAgentsButton"
-                    Background="{StaticResource AppSoftSurfaceBrush}"
-                    BorderBrush="{StaticResource AppOutlineBrush}"
-                    BorderThickness="1"
-                    CornerRadius="16"
-                    Padding="12,10"
-                    uen:Navigation.Request="Second">
-              <TextBlock FontSize="13"
-                         FontWeight="SemiBold"
-                         Text="Create or edit agents" />
-            </Button>
-            <Button AutomationProperties.AutomationId="ChatInfoProvidersButton"
-                    Background="{StaticResource AppSoftSurfaceBrush}"
-                    BorderBrush="{StaticResource AppOutlineBrush}"
-                    BorderThickness="1"
-                    CornerRadius="16"
-                    Padding="12,10"
-                    uen:Navigation.Request="Settings">
-              <TextBlock FontSize="13"
-                         FontWeight="SemiBold"
-                         Text="Open provider settings" />
-            </Button>
-          </StackPanel>
+          <Button AutomationProperties.AutomationId="ChatInfoAgentsButton"
+                  Style="{StaticResource SecondaryActionButtonStyle}"
+                  uen:Navigation.Request="Second">
+            <TextBlock FontSize="12.5"
+                       FontWeight="SemiBold"
+                       Text="Agents" />
+          </Button>
 
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+          <Button Grid.Column="1"
+                  AutomationProperties.AutomationId="ChatInfoProvidersButton"
+                  Style="{StaticResource SecondaryActionButtonStyle}"
+                  uen:Navigation.Request="Settings">
+            <TextBlock FontSize="12.5"
+                       FontWeight="SemiBold"
+                       Text="Providers" />
+          </Button>
+        </Grid>
 
-          <StackPanel Spacing="12">
-            <Grid ColumnSpacing="12">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-
-              <TextBlock CharacterSpacing="80"
-                         FontSize="12"
-                         FontWeight="Medium"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="MEMBERS" />
-
-              <Button Grid.Column="1"
-                      AutomationProperties.AutomationId="ChatOpenSettingsButton"
-                      Background="{StaticResource AppSoftSurfaceBrush}"
-                      BorderBrush="{StaticResource AppOutlineBrush}"
-                      BorderThickness="1"
-                      CornerRadius="100"
-                      Padding="8,4"
-                      uen:Navigation.Request="Settings">
-                <TextBlock FontSize="11"
-                           FontWeight="Medium"
-                           Text="Settings" />
-              </Button>
-            </Grid>
-
-            <ItemsControl AutomationProperties.AutomationId="ChatMembersList"
-                          ItemTemplate="{StaticResource MemberTemplate}"
-                          ItemsSource="{Binding ActiveSession.Members}" />
-          </StackPanel>
-
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
-
-          <StackPanel Spacing="12">
-            <Grid ColumnSpacing="12">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-
-              <TextBlock CharacterSpacing="80"
-                         FontSize="12"
-                         FontWeight="Medium"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="AGENTS" />
-
-              <Button Grid.Column="1"
-                      AutomationProperties.AutomationId="ChatAddAgentButton"
-                      Background="{StaticResource AppSoftSurfaceBrush}"
-                      BorderBrush="{StaticResource AppOutlineBrush}"
-                      BorderThickness="1"
-                      CornerRadius="100"
-                      Padding="8,4"
-                      uen:Navigation.Request="Second">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="4">
-                  <TextBlock FontSize="11"
-                             Text="+" />
-                  <TextBlock FontSize="11"
-                             FontWeight="Medium"
-                             Text="Add agent" />
-                </StackPanel>
-              </Button>
-            </Grid>
-
-            <ItemsControl AutomationProperties.AutomationId="ChatAgentsList"
-                          ItemTemplate="{StaticResource AgentTemplate}"
-                          ItemsSource="{Binding ActiveSession.Agents}" />
-          </StackPanel>
-
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
-
-          <StackPanel Spacing="8">
-            <TextBlock CharacterSpacing="80"
-                       FontSize="12"
-                       FontWeight="Medium"
-                       Foreground="{StaticResource AppMutedTextBrush}"
-                       Text="FEEDBACK" />
-            <Border Background="{StaticResource AppSoftSurfaceBrush}"
-                    BorderBrush="{StaticResource AppOutlineBrush}"
-                    BorderThickness="1"
-                    CornerRadius="16"
-                    Padding="12,10">
-              <TextBlock AutomationProperties.AutomationId="ChatInfoFeedback"
-                         FontSize="12"
-                         Foreground="{StaticResource AppMutedTextBrush}"
-                         Text="{Binding FeedbackMessage}"
-                         TextWrapping="WrapWholeWords" />
-            </Border>
-          </StackPanel>
+        <StackPanel Spacing="8">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="MEMBERS" />
+          <ItemsControl AutomationProperties.AutomationId="ChatMembersList"
+                        ItemTemplate="{StaticResource MemberTemplate}"
+                        ItemsSource="{Binding ActiveSession.Members}" />
         </StackPanel>
-      </ScrollViewer>
-    </Grid>
+
+        <StackPanel Spacing="8">
+          <TextBlock CharacterSpacing="80"
+                     FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="AGENTS" />
+          <ItemsControl AutomationProperties.AutomationId="ChatAgentsList"
+                        ItemTemplate="{StaticResource AgentTemplate}"
+                        ItemsSource="{Binding ActiveSession.Agents}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
   </Border>
 </UserControl>

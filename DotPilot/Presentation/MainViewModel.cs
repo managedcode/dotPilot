@@ -13,11 +13,11 @@ public partial record MainModel(
     ILogger<MainModel> logger)
 {
     private const string EmptyTitleValue = "No active session";
-    private const string EmptyStatusValue = "Create an agent, start a session, then chat from here.";
-    private const string ReadyToStartStatusValue = "Start a new session from the sidebar or send the first message.";
+    private const string EmptyStatusValue = "A default system agent is ready. Start a session or create another agent.";
+    private const string ReadyToStartStatusValue = "Start a session or send the first message.";
     private const string DefaultComposerPlaceholder = "Message your local agent session";
-    private const string SendInProgressMessage = "Sending message to the local workflow...";
-    private const string StartSessionValidationMessage = "Create at least one agent before starting a session.";
+    private const string SendInProgressMessage = "Sending message...";
+    private const string StartSessionValidationMessage = "Create an agent before starting a session.";
     private const string LocalMemberName = "Local operator";
     private const string LocalMemberSummary = "This desktop instance";
     private static readonly SessionSidebarItem EmptySelectedChat = new(default, string.Empty, string.Empty);
@@ -26,6 +26,8 @@ public partial record MainModel(
         LocalMemberSummary,
         "L",
         DesignBrushPalette.UserAvatarBrush);
+    private AsyncCommand? _startNewSessionCommand;
+    private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
     private readonly Signal _sessionRefresh = new();
 
@@ -44,6 +46,14 @@ public partial record MainModel(
     public IState<bool> HasAgents => State.Async(this, LoadHasAgentsAsync, _workspaceRefresh);
 
     public IState<bool> CanSend => State.Async(this, LoadCanSendAsync);
+
+    public ICommand StartNewSessionCommand =>
+        _startNewSessionCommand ??= new AsyncCommand(
+            () => StartNewSession(CancellationToken.None));
+
+    public ICommand SubmitMessageCommand =>
+        _submitMessageCommand ??= new AsyncCommand(
+            parameter => SendMessageCore(parameter as string, CancellationToken.None));
 
     public async ValueTask Refresh(CancellationToken cancellationToken)
     {
@@ -91,16 +101,30 @@ public partial record MainModel(
         }
     }
 
-    public async ValueTask SendMessage(CancellationToken cancellationToken)
+    public ValueTask SendMessage(CancellationToken cancellationToken)
     {
-        var message = ((await ComposerText) ?? string.Empty).Trim();
+        return SendMessageCore(messageOverride: null, cancellationToken);
+    }
+
+    public ValueTask SubmitMessage(CancellationToken cancellationToken)
+    {
+        return SendMessageCore(messageOverride: null, cancellationToken);
+    }
+
+    private async ValueTask SendMessageCore(string? messageOverride, CancellationToken cancellationToken)
+    {
+        var message = string.IsNullOrWhiteSpace(messageOverride)
+            ? ((await ComposerText) ?? string.Empty).Trim()
+            : messageOverride.Trim();
         if (string.IsNullOrWhiteSpace(message))
         {
+            MainViewModelLog.SendIgnoredEmpty(logger);
             return;
         }
 
         if (!await HasAgents)
         {
+            MainViewModelLog.SendIgnoredNoAgents(logger);
             await FeedbackMessage.SetAsync(StartSessionValidationMessage, cancellationToken);
             return;
         }
@@ -127,6 +151,7 @@ public partial record MainModel(
                 MainViewModelLog.SendRequested(logger, sessionId, message.Length);
                 BrowserConsoleDiagnostics.Info($"[DotPilot.Chat] Send requested. SessionId={sessionId} CharacterCount={message.Length}");
             }
+
             await foreach (var _ in workspaceState.SendMessageAsync(
                                new SendSessionMessageCommand(selectedChat.Id, message),
                                cancellationToken))
@@ -141,6 +166,7 @@ public partial record MainModel(
                 MainViewModelLog.SendCompleted(logger, sessionId);
                 BrowserConsoleDiagnostics.Info($"[DotPilot.Chat] Send completed. SessionId={sessionId}");
             }
+
             await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
         }
         catch (Exception exception)
@@ -177,6 +203,7 @@ public partial record MainModel(
         if (snapshot is null)
         {
             return new ChatSessionView(
+                "S",
                 EmptyTitleValue,
                 await HasAgents ? ReadyToStartStatusValue : EmptyStatusValue,
                 [],
@@ -185,6 +212,7 @@ public partial record MainModel(
         }
 
         return new ChatSessionView(
+            GetInitial(snapshot.Session.Title),
             snapshot.Session.Title,
             $"{snapshot.Session.PrimaryAgentName} · {snapshot.Session.ProviderDisplayName}",
             snapshot.Entries

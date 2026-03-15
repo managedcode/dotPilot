@@ -4,6 +4,8 @@ public sealed class AgentSessionStorageOptions
 {
     public bool UseInMemoryDatabase { get; init; }
 
+    public bool PreferTransientRuntimeConversation { get; init; }
+
     public string InMemoryDatabaseName { get; init; } = "DotPilotAgentSessions";
 
     public string? DatabasePath { get; init; }

@@ -71,7 +71,7 @@ internal sealed class AgentWorkspaceState(
         try
         {
             _sessions[sessionId] = session;
-            _workspace = MergeWorkspaceSession(_workspace, session.Session);
+            _workspace = MergeWorkspaceSession(_workspace, session.Session, selectSession: false);
         }
         finally
         {
@@ -92,9 +92,7 @@ internal sealed class AgentWorkspaceState(
         {
             if (_workspace is not null)
             {
-                var agents = _workspace.Agents
-                    .Append(created)
-                    .OrderBy(agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+                var agents = OrderAgents(_workspace.Agents.Append(created))
                     .ToImmutableArray();
                 _workspace = _workspace with
                 {
@@ -122,7 +120,7 @@ internal sealed class AgentWorkspaceState(
         try
         {
             _sessions[created.Session.Id] = created;
-            _workspace = MergeWorkspaceSession(_workspace, created.Session);
+            _workspace = MergeWorkspaceSession(_workspace, created.Session, selectSession: true);
         }
         finally
         {
@@ -184,7 +182,8 @@ internal sealed class AgentWorkspaceState(
                     _sessions[command.SessionId] = updatedSession;
                     _workspace = MergeWorkspaceSession(
                         _workspace,
-                        UpdateSessionPreview(updatedSession.Session, entry));
+                        UpdateSessionPreview(updatedSession.Session, entry),
+                        selectSession: false);
                 }
             }
             finally
@@ -198,7 +197,8 @@ internal sealed class AgentWorkspaceState(
 
     private static AgentWorkspaceSnapshot? MergeWorkspaceSession(
         AgentWorkspaceSnapshot? workspace,
-        SessionListItem session)
+        SessionListItem session,
+        bool selectSession)
     {
         if (workspace is null)
         {
@@ -214,8 +214,19 @@ internal sealed class AgentWorkspaceState(
         return workspace with
         {
             Sessions = sessions,
-            SelectedSessionId = workspace.SelectedSessionId ?? session.Id,
+            SelectedSessionId = selectSession ? session.Id : workspace.SelectedSessionId ?? session.Id,
         };
+    }
+
+    private static IEnumerable<AgentProfileSummary> OrderAgents(IEnumerable<AgentProfileSummary> agents)
+    {
+        var orderedAgents = agents.ToList();
+        var hasNonSystemAgents = orderedAgents.Any(agent => !AgentSessionDefaults.IsSystemAgent(agent.Name));
+
+        return orderedAgents
+            .OrderBy(agent => hasNonSystemAgents && AgentSessionDefaults.IsSystemAgent(agent.Name) ? 1 : 0)
+            .ThenByDescending(agent => agent.CreatedAt)
+            .ThenBy(agent => agent.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     private static ImmutableArray<SessionStreamEntry> UpsertEntries(

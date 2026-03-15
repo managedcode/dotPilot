@@ -1,6 +1,7 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.AgentPromptSection"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
              FontFamily="{StaticResource AppBodyFontFamily}">
   <Border Style="{StaticResource BuilderSectionStyle}"
           AutomationProperties.AutomationId="AgentPromptSection">
@@ -8,22 +9,44 @@
       <StackPanel Spacing="6">
         <TextBlock FontSize="18"
                    FontWeight="SemiBold"
-                   Text="Behavior" />
-        <TextBlock FontSize="12.5"
+                   Text="Instructions" />
+        <TextBlock FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Write the baseline prompt this local agent should carry into each session."
+                   Text="Adjust the description and operating instructions before saving."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 
-      <Border Style="{StaticResource BuilderSummaryCardStyle}"
-              MinHeight="224">
-        <TextBox AutomationProperties.AutomationId="AgentSystemPromptInput"
-                 AcceptsReturn="True"
-                 Style="{StaticResource BuilderTextBoxStyle}"
-                 Foreground="{StaticResource AppPrimaryTextBrush}"
-                 Text="{Binding SystemPrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 TextWrapping="Wrap" />
-      </Border>
+      <StackPanel Spacing="8">
+        <TextBlock FontSize="12"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppSecondaryTextBrush}"
+                   Text="Description" />
+        <Border Style="{StaticResource BuilderInputSurfaceStyle}">
+          <TextBox x:Name="DescriptionInput"
+                   AutomationProperties.AutomationId="AgentDescriptionInput"
+                   Style="{StaticResource BuilderTextBoxStyle}"
+                   PlaceholderText="Briefly describe what this agent does."
+                   Text="{Binding AgentDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   TextWrapping="Wrap" />
+        </Border>
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock FontSize="12"
+                   FontWeight="Medium"
+                   Foreground="{StaticResource AppSecondaryTextBrush}"
+                   Text="System prompt" />
+        <Border Style="{StaticResource BuilderSummaryCardStyle}"
+                MinHeight="224">
+          <TextBox x:Name="SystemPromptInput"
+                   AutomationProperties.AutomationId="AgentSystemPromptInput"
+                   AcceptsReturn="True"
+                   Style="{StaticResource BuilderTextBoxStyle}"
+                   Foreground="{StaticResource AppPrimaryTextBrush}"
+                   Text="{Binding SystemPrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   TextWrapping="Wrap" />
+        </Border>
+      </StackPanel>
 
       <Grid ColumnSpacing="16">
         <Grid.ColumnDefinitions>
@@ -44,19 +67,12 @@
                      Text="{Binding OperationMessage}"
                      TextWrapping="WrapWholeWords" />
         </StackPanel>
-        <Button Grid.Column="1"
-                AutomationProperties.AutomationId="CreateAgentButton"
-                Background="{StaticResource AppAccentBrush}"
-                BorderBrush="Transparent"
-                BorderThickness="0"
-                Command="{Binding CreateAgent}"
-                CornerRadius="16"
-                IsEnabled="{Binding Builder.CanCreateAgent}"
-                Padding="18,12">
-          <TextBlock FontSize="12.5"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource AppPrimaryTextBrush}"
-                     Text="Create agent" />
+        <Button x:Name="SaveAgentActionButton"
+                Grid.Column="1"
+                AutomationProperties.AutomationId="SaveAgentButton"
+                Command="{Binding SaveAgentCommand}"
+                Style="{StaticResource AccentActionButtonStyle}">
+          <TextBlock Text="Save agent" />
         </Button>
       </Grid>
     </StackPanel>

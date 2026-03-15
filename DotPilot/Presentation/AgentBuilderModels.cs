@@ -36,3 +36,24 @@ public sealed class CapabilityOption(
 public sealed partial record RoleOption(
     string Label,
     AgentRoleKind Role);
+
+[Bindable]
+public sealed partial record AgentCatalogItem(
+    AgentProfileId Id,
+    string Initial,
+    string Name,
+    string Description,
+    string ProviderDisplayName,
+    string ModelName,
+    IReadOnlyList<string> Tags,
+    bool IsDefault);
+
+[Bindable]
+public sealed partial record AgentBuilderSurface(
+    string Title,
+    string Subtitle,
+    bool ShowCatalog,
+    bool ShowPromptComposer,
+    bool ShowEditor,
+    bool ShowBackButton,
+    string PrimaryActionLabel);
