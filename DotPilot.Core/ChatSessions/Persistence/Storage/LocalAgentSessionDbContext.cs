@@ -13,8 +13,6 @@ internal sealed class LocalAgentSessionDbContext(DbContextOptions<LocalAgentSess
 
     public DbSet<ProviderPreferenceRecord> ProviderPreferences => Set<ProviderPreferenceRecord>();
 
-    public DbSet<OperatorPreferenceRecord> OperatorPreferences => Set<OperatorPreferenceRecord>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AgentProfileRecord>(entity =>
@@ -23,7 +21,6 @@ internal sealed class LocalAgentSessionDbContext(DbContextOptions<LocalAgentSess
             entity.Property(record => record.Name).IsRequired();
             entity.Property(record => record.ModelName).IsRequired();
             entity.Property(record => record.SystemPrompt).IsRequired();
-            entity.Property(record => record.CapabilitiesJson).IsRequired();
         });
 
         modelBuilder.Entity<SessionRecord>(entity =>
@@ -45,12 +42,6 @@ internal sealed class LocalAgentSessionDbContext(DbContextOptions<LocalAgentSess
         {
             entity.HasKey(record => record.ProviderKind);
             entity.Property(record => record.ProviderKind).ValueGeneratedNever();
-        });
-
-        modelBuilder.Entity<OperatorPreferenceRecord>(entity =>
-        {
-            entity.HasKey(record => record.Id);
-            entity.Property(record => record.Id).ValueGeneratedNever();
         });
     }
 }

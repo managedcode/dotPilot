@@ -16,13 +16,16 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
 - `ControlPlaneDomain/{Identifiers,Contracts,Models,Policies}/*`
 - `HttpDiagnostics/DebugHttpHandler.cs`
 - `Providers/{Configuration,Infrastructure,Interfaces,Models,Services}/*`
-- `Settings/Models/*`
 - `Workspace/{Interfaces,Services}/*`
 
 ## Boundaries
 
 - Keep this project free of `Uno Platform`, XAML, brushes, and page/view-model concerns.
 - Keep app-shell, app-host, and application-configuration types out of this project; those belong in `DotPilot`.
+- Do not keep UI-only preference models or shell interaction settings here; if a setting exists only to control presentation behavior such as composer key handling, it belongs in `DotPilot`.
+- Do not add cache-specific abstractions, services, or snapshot layers here by default; `DotPilot.Core` should read from the real source of truth unless the user explicitly asks for a cache boundary.
+- Keep provider readiness, workspace/session projections, and similar environment state uncached by default; do not add in-memory mirrors or snapshot caches unless the user explicitly asks for that tradeoff.
+- Do not introduce fabricated role enums, hardcoded tool catalogs, skill catalogs, or encoded capability tags for agents unless the product has a real backing registry and runtime implementation for them.
 - Organize code by vertical feature slice, not by shared horizontal folders such as generic `Services` or `Helpers`.
 - `DotPilot.Core` is the default non-UI home, not a permanent dumping ground: when a feature becomes large enough to justify its own architectural boundary, extract it into a dedicated DLL that references `DotPilot.Core`
 - do not introduce a generic `Runtime` naming layer inside this project or split code out into a vaguely named runtime assembly unless the user explicitly asks for that boundary; keep non-UI logic in explicit feature slices under `DotPilot.Core`
@@ -34,7 +37,7 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
 - Keep contract-centric slices explicit inside each feature root: commands live under `Commands`, public DTO shapes live under `Contracts`, public service seams live under `Interfaces`, state records or enums live under `Models`, diagnostics under `Diagnostics`, and persistence under `Persistence`.
 - When a slice exposes `Commands` and `Results`, use the solution-standard `ManagedCode.Communication` primitives instead of hand-rolled command/result record types.
 - Keep the top level readable as two kinds of folders:
-  - shared/domain folders such as `ControlPlaneDomain`, `Settings`, and `Workspace`
+  - shared/domain folders such as `ControlPlaneDomain` and `Workspace`
   - operational/system folders such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`
 - keep this structure SOLID at the folder and project level too: cohesive feature slices stay together, but once a slice becomes too large or too independent, it should graduate into its own project instead of turning `DotPilot.Core` into mud
 - Keep provider-independent testing seams real and deterministic so CI can validate core flows without external CLIs.

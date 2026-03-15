@@ -22,7 +22,7 @@
         <TextBlock MaxWidth="560"
                    FontSize="12"
                    Foreground="{StaticResource AppMutedTextBrush}"
-                   Text="Describe the job once. dotPilot drafts the profile, provider, model, tools, and skills for review."
+                   Text="Describe the job once. dotPilot drafts the profile, provider, and model for review."
                    TextWrapping="WrapWholeWords" />
       </StackPanel>
 

@@ -7,6 +7,4 @@ public sealed record AgentPromptDraft(
     string Description,
     AgentProviderKind ProviderKind,
     string ModelName,
-    string SystemPrompt,
-    IReadOnlyList<string> Tools,
-    IReadOnlyList<string> Skills);
+    string SystemPrompt);

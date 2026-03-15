@@ -33,6 +33,7 @@ public partial record SettingsModel
         false);
 
     private readonly IAgentWorkspaceState workspaceState;
+    private readonly IOperatorPreferencesStore operatorPreferencesStore;
     private readonly WorkspaceProjectionNotifier workspaceProjectionNotifier;
     private readonly ILogger<SettingsModel> logger;
     private AsyncCommand? _refreshCommand;
@@ -45,10 +46,12 @@ public partial record SettingsModel
 
     public SettingsModel(
         IAgentWorkspaceState workspaceState,
+        IOperatorPreferencesStore operatorPreferencesStore,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
         ILogger<SettingsModel> logger)
     {
         this.workspaceState = workspaceState;
+        this.operatorPreferencesStore = operatorPreferencesStore;
         this.workspaceProjectionNotifier = workspaceProjectionNotifier;
         this.logger = logger;
         workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
@@ -148,7 +151,7 @@ public partial record SettingsModel
 
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
         }
@@ -188,7 +191,7 @@ public partial record SettingsModel
 
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: null);
             await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
             workspaceProjectionNotifier.Publish();
@@ -230,15 +233,7 @@ public partial record SettingsModel
 
         try
         {
-            var preferencesResult = await workspaceState.UpdateComposerSendBehaviorAsync(
-                new UpdateComposerSendBehaviorCommand(behavior),
-                cancellationToken);
-            if (!preferencesResult.TryGetValue(out var preferences))
-            {
-                await StatusMessage.SetAsync(preferencesResult.ToOperatorMessage("Could not update message behavior."), cancellationToken);
-                return;
-            }
-
+            var preferences = await operatorPreferencesStore.SetAsync(behavior, cancellationToken);
             await SynchronizeComposerSendBehaviorAsync(preferences, cancellationToken);
             await StatusMessage.SetAsync(ComposerBehaviorSavedMessage, cancellationToken);
             _workspaceRefresh.Raise();
@@ -293,7 +288,7 @@ public partial record SettingsModel
             SettingsModelLog.ProvidersLoaded(logger, workspace.Providers.Count);
             var providers = MapProviderStatusItems(workspace.Providers, selectedProvider: (await SelectedProvider) ?? EmptySelectedProvider);
             var selectedProvider = await EnsureSelectedProviderAsync(workspace, providers, cancellationToken);
-            await SynchronizeComposerSendBehaviorAsync(workspace.Preferences, cancellationToken);
+            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
             return MapProviderStatusItems(workspace.Providers, selectedProvider);
         }
         catch (Exception exception)
@@ -397,6 +392,10 @@ public partial record SettingsModel
         await IsMessagesSectionSelected.SetAsync(section is SettingsSection.Messages, cancellationToken);
         await ShowProvidersSection.SetAsync(section is SettingsSection.Providers, cancellationToken);
         await ShowMessagesSection.SetAsync(section is SettingsSection.Messages, cancellationToken);
+        if (section is SettingsSection.Messages)
+        {
+            await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
+        }
     }
 
     private async ValueTask SynchronizeComposerSendBehaviorAsync(

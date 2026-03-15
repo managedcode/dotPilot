@@ -114,23 +114,6 @@
                                Foreground="{StaticResource AppMutedTextBrush}"
                                Text="{x:Bind ModelName}" />
                   </Border>
-                  <ItemsControl ItemsSource="{x:Bind Tags}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Border Style="{StaticResource StatusChipStyle}"
-                                Margin="0,0,6,0">
-                          <TextBlock FontSize="10.5"
-                                     Foreground="{StaticResource AppMutedTextBrush}"
-                                     Text="{Binding}" />
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
                 </StackPanel>
 
                 <Button Grid.Column="1"

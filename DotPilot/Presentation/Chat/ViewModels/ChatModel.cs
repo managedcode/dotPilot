@@ -24,6 +24,7 @@ public partial record ChatModel
         "L",
         DesignBrushPalette.UserAvatarBrush);
     private readonly IAgentWorkspaceState workspaceState;
+    private readonly IOperatorPreferencesStore operatorPreferencesStore;
     private readonly ILogger<ChatModel> logger;
     private AsyncCommand? _startNewSessionCommand;
     private AsyncCommand? _submitMessageCommand;
@@ -32,10 +33,12 @@ public partial record ChatModel
 
     public ChatModel(
         IAgentWorkspaceState workspaceState,
+        IOperatorPreferencesStore operatorPreferencesStore,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
         ILogger<ChatModel> logger)
     {
         this.workspaceState = workspaceState;
+        this.operatorPreferencesStore = operatorPreferencesStore;
         this.logger = logger;
         workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
     }
@@ -290,13 +293,8 @@ public partial record ChatModel
 
     private async ValueTask<ComposerSendBehavior> LoadComposerSendBehaviorAsync(CancellationToken cancellationToken)
     {
-        var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
-        if (!workspaceResult.TryGetValue(out var workspace))
-        {
-            return global::DotPilot.Core.Settings.Models.ComposerSendBehavior.EnterSends;
-        }
-
-        return workspace.Preferences.ComposerSendBehavior;
+        var preferences = await operatorPreferencesStore.GetAsync(cancellationToken);
+        return preferences.ComposerSendBehavior;
     }
 
     private async ValueTask<string> LoadComposerSendHintAsync(CancellationToken cancellationToken)

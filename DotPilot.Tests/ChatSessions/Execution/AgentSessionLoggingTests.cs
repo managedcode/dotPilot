@@ -21,11 +21,9 @@ public sealed class AgentSessionLoggingTests
         var agent = (await fixture.Service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Logged Agent",
-                AgentRoleKind.Operator,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Be explicit in tests.",
-                ["Shell"]),
+                "Be explicit in tests."),
             CancellationToken.None)).ShouldSucceed();
 
         var session = (await fixture.Service.CreateSessionAsync(

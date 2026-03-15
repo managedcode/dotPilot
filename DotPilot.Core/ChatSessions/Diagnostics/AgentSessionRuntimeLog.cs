@@ -3,28 +3,22 @@ using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.ChatSessions;
 
-internal static partial class AgentProviderStatusCacheLog
+internal static partial class AgentProviderStatusReaderLog
 {
     [LoggerMessage(
         EventId = 1000,
         Level = LogLevel.Information,
-        Message = "Using cached provider readiness snapshot. AgeMilliseconds={AgeMilliseconds}.")]
-    public static partial void CacheHit(ILogger logger, double ageMilliseconds);
+        Message = "Reading provider readiness state from local sources.")]
+    public static partial void ReadStarted(ILogger logger);
 
     [LoggerMessage(
         EventId = 1001,
         Level = LogLevel.Information,
-        Message = "Refreshing provider readiness snapshot. ForceRefresh={ForceRefresh}.")]
-    public static partial void RefreshStarted(ILogger logger, bool forceRefresh);
+        Message = "Provider readiness state read for {ProviderCount} providers in {ElapsedMilliseconds} ms.")]
+    public static partial void ReadCompleted(ILogger logger, int providerCount, double elapsedMilliseconds);
 
     [LoggerMessage(
         EventId = 1002,
-        Level = LogLevel.Information,
-        Message = "Provider readiness snapshot refreshed for {ProviderCount} providers in {ElapsedMilliseconds} ms.")]
-    public static partial void RefreshCompleted(ILogger logger, int providerCount, double elapsedMilliseconds);
-
-    [LoggerMessage(
-        EventId = 1003,
         Level = LogLevel.Information,
         Message = "Provider probe completed. Provider={ProviderKind} Status={Status} Enabled={IsEnabled} CanCreateAgents={CanCreateAgents} InstalledVersion={InstalledVersion} ExecutablePath={ExecutablePath}.")]
     public static partial void ProbeCompleted(
@@ -37,10 +31,10 @@ internal static partial class AgentProviderStatusCacheLog
         string executablePath);
 
     [LoggerMessage(
-        EventId = 1004,
+        EventId = 1003,
         Level = LogLevel.Error,
-        Message = "Provider readiness snapshot refresh failed.")]
-    public static partial void RefreshFailed(ILogger logger, Exception exception);
+        Message = "Provider readiness state read failed.")]
+    public static partial void ReadFailed(ILogger logger, Exception exception);
 }
 
 internal static partial class AgentRuntimeConversationFactoryLog
@@ -149,12 +143,11 @@ internal static partial class AgentSessionServiceLog
     [LoggerMessage(
         EventId = 1205,
         Level = LogLevel.Information,
-        Message = "Creating agent profile. Name={AgentName} Provider={ProviderKind} Role={Role}.")]
+        Message = "Creating agent profile. Name={AgentName} Provider={ProviderKind}.")]
     public static partial void AgentCreationStarted(
         ILogger logger,
         string agentName,
-        AgentProviderKind providerKind,
-        AgentRoleKind role);
+        AgentProviderKind providerKind);
 
     [LoggerMessage(
         EventId = 1206,
@@ -222,23 +215,6 @@ internal static partial class AgentSessionServiceLog
         bool isEnabled);
 
     [LoggerMessage(
-        EventId = 1219,
-        Level = LogLevel.Information,
-        Message = "Updated composer send behavior preference. Behavior={Behavior}.")]
-    public static partial void ComposerSendBehaviorUpdated(
-        ILogger logger,
-        ComposerSendBehavior behavior);
-
-    [LoggerMessage(
-        EventId = 1223,
-        Level = LogLevel.Error,
-        Message = "Composer send behavior update failed. Behavior={Behavior}.")]
-    public static partial void ComposerSendBehaviorUpdateFailed(
-        ILogger logger,
-        Exception exception,
-        ComposerSendBehavior behavior);
-
-    [LoggerMessage(
         EventId = 1212,
         Level = LogLevel.Information,
         Message = "Starting session send. SessionId={SessionId} AgentId={AgentId} Provider={ProviderKind}.")]
@@ -281,43 +257,4 @@ internal static partial class AgentSessionServiceLog
         Level = LogLevel.Error,
         Message = "Session send failed. SessionId={SessionId} AgentId={AgentId}.")]
     public static partial void SendFailed(ILogger logger, Exception exception, SessionId sessionId, Guid agentId);
-}
-
-internal static partial class AgentWorkspaceStateLog
-{
-    [LoggerMessage(
-        EventId = 1300,
-        Level = LogLevel.Information,
-        Message = "Returning cached workspace projection. Sessions={SessionCount} Agents={AgentCount} Providers={ProviderCount}.")]
-    public static partial void WorkspaceCacheHit(ILogger logger, int sessionCount, int agentCount, int providerCount);
-
-    [LoggerMessage(
-        EventId = 1301,
-        Level = LogLevel.Information,
-        Message = "Workspace projection refreshed. Sessions={SessionCount} Agents={AgentCount} Providers={ProviderCount}.")]
-    public static partial void WorkspaceRefreshed(ILogger logger, int sessionCount, int agentCount, int providerCount);
-
-    [LoggerMessage(
-        EventId = 1302,
-        Level = LogLevel.Information,
-        Message = "Returning cached session projection. SessionId={SessionId} Entries={EntryCount}.")]
-    public static partial void SessionCacheHit(ILogger logger, SessionId sessionId, int entryCount);
-
-    [LoggerMessage(
-        EventId = 1303,
-        Level = LogLevel.Information,
-        Message = "Cached workspace updated after agent creation. AgentId={AgentId} Provider={ProviderKind}.")]
-    public static partial void AgentCached(ILogger logger, AgentProfileId agentId, AgentProviderKind providerKind);
-
-    [LoggerMessage(
-        EventId = 1304,
-        Level = LogLevel.Information,
-        Message = "Cached workspace updated after session creation. SessionId={SessionId} AgentId={AgentId}.")]
-    public static partial void SessionCached(ILogger logger, SessionId sessionId, AgentProfileId agentId);
-
-    [LoggerMessage(
-        EventId = 1305,
-        Level = LogLevel.Information,
-        Message = "Cached workspace updated after provider preference change. Provider={ProviderKind} Enabled={IsEnabled}.")]
-    public static partial void ProviderCached(ILogger logger, AgentProviderKind providerKind, bool isEnabled);
 }

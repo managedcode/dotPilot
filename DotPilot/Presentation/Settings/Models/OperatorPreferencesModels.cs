@@ -1,4 +1,4 @@
-namespace DotPilot.Core.Settings.Models;
+namespace DotPilot.Presentation;
 
 public enum ComposerSendBehavior
 {

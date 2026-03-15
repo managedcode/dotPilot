@@ -27,16 +27,6 @@ public enum ApprovalState
     Rejected,
 }
 
-public enum AgentRoleKind
-{
-    Coding,
-    Research,
-    Analyst,
-    Reviewer,
-    Operator,
-    Orchestrator,
-}
-
 public enum FleetExecutionMode
 {
     SingleAgent,

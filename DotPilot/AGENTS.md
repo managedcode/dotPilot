@@ -31,8 +31,8 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Build the visible product around a desktop chat shell: session list, active transcript, terminal-like activity pane, agent/profile controls, and provider settings are the primary surfaces.
 - Keep agent creation prompt-first in the UI: the default `New agent` experience should start from a natural-language description that generates a draft agent, while manual field-by-field configuration stays a secondary fallback path.
 - Keep a visible default-agent path in the shell: the app should surface a usable system/default agent by default and must not make the operator build everything manually before they can start a session.
-- Treat agent creation as profile authoring, not role assignment: do not expose role pickers or role-derived copy in the operator flow because an agent is created from its prompt, instructions, provider, tools, and skills.
-- Keep the operator-facing draft free of placeholder/debug presentation: show real provider/model defaults plus tool and skill choices, and reserve deterministic debug fallbacks for true no-provider fallback paths only.
+- Treat agent creation as profile authoring, not role assignment: do not expose role pickers or role-derived copy in the operator flow because an agent is created from its prompt, instructions, provider, model, and system prompt.
+- Do not fabricate tool lists, skill lists, role taxonomies, or capability chips in the operator flow when the app does not have a real backing registry or runtime implementation for them; if a capability is not real, leave it out of the UI and saved draft.
 - Do not present a live provider like Codex in the desktop shell as selected or runnable when the local runtime still cannot execute through its installed CLI; the visible session path must match the actual provider that will answer.
 - Do not use workbench, issue-center, domain-browser, or other backlog-driven IA labels as the product shell.
 - Do not preserve legacy prototype pages or controls once the replacement chat/session surface is underway; remove obsolete UI paths instead of carrying both shells.

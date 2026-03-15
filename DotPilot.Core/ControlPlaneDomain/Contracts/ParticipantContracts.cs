@@ -26,18 +26,15 @@ public sealed record AgentProfileDescriptor
     public string Name { get; init; } = string.Empty;
 
     [Id(2)]
-    public AgentRoleKind Role { get; init; }
-
-    [Id(3)]
     public ProviderId? ProviderId { get; init; }
 
-    [Id(4)]
+    [Id(3)]
     public ModelRuntimeId? ModelRuntimeId { get; init; }
 
-    [Id(5)]
+    [Id(4)]
     public ToolCapabilityId[] ToolCapabilityIds { get; init; } = [];
 
-    [Id(6)]
+    [Id(5)]
     public string[] Tags { get; init; } = [];
 }
 

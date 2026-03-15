@@ -137,11 +137,9 @@ public sealed class AgentSessionPersistenceTests
         return (await service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 name,
-                AgentRoleKind.Operator,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Be deterministic for automated verification.",
-                ["Shell"]),
+                "Be deterministic for automated verification."),
             CancellationToken.None)).ShouldSucceed();
     }
 

@@ -29,11 +29,9 @@ public sealed class ChatModelTests
         (await fixture.WorkspaceState.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Debug Agent",
-                AgentRoleKind.Operator,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Be deterministic for automated verification.",
-                ["Shell"]),
+                "Be deterministic for automated verification."),
             CancellationToken.None)).ShouldSucceed();
         var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
 
@@ -58,11 +56,9 @@ public sealed class ChatModelTests
         (await fixture.WorkspaceState.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Repository Reviewer Agent",
-                AgentRoleKind.Reviewer,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Review repository changes and explain the diff.",
-                ["Git", "Files"]),
+                "Review repository changes and explain the diff."),
             CancellationToken.None)).ShouldSucceed();
         var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
 
@@ -79,6 +75,7 @@ public sealed class ChatModelTests
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddAgentSessions(new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,

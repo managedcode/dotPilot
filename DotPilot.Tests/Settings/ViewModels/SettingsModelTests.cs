@@ -49,7 +49,7 @@ public sealed class SettingsModelTests
     }
 
     [Test]
-    public async Task SelectComposerSendBehaviorUpdatesProjectionAndWorkspacePreference()
+    public async Task SelectComposerSendBehaviorUpdatesProjectionAndPreferenceStore()
     {
         await using var fixture = CreateFixture();
         var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
@@ -63,8 +63,9 @@ public sealed class SettingsModelTests
         (await model.IsEnterInsertsNewLineSelected).Should().BeTrue();
         (await model.ComposerSendBehaviorHint).Should().Be("Enter adds a new line. Enter with a modifier sends.");
 
-        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        workspace.Preferences.ComposerSendBehavior.Should().Be(ComposerSendBehavior.EnterInsertsNewLine);
+        var preferencesStore = fixture.Provider.GetRequiredService<IOperatorPreferencesStore>();
+        (await preferencesStore.GetAsync(CancellationToken.None)).ComposerSendBehavior
+            .Should().Be(ComposerSendBehavior.EnterInsertsNewLine);
     }
 
     private static TestFixture CreateFixture()
@@ -72,6 +73,7 @@ public sealed class SettingsModelTests
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddAgentSessions(new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,

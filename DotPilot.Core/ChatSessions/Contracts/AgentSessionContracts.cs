@@ -22,12 +22,10 @@ public sealed record ProviderStatusDescriptor(
 public sealed record AgentProfileSummary(
     AgentProfileId Id,
     string Name,
-    AgentRoleKind Role,
     AgentProviderKind ProviderKind,
     string ProviderDisplayName,
     string ModelName,
     string SystemPrompt,
-    IReadOnlyList<string> Capabilities,
     DateTimeOffset CreatedAt);
 
 public sealed record SessionListItem(
@@ -59,5 +57,4 @@ public sealed record AgentWorkspaceSnapshot(
     IReadOnlyList<SessionListItem> Sessions,
     IReadOnlyList<AgentProfileSummary> Agents,
     IReadOnlyList<ProviderStatusDescriptor> Providers,
-    OperatorPreferencesSnapshot Preferences,
     SessionId? SelectedSessionId);

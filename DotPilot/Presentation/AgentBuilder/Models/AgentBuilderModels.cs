@@ -20,28 +20,6 @@ public sealed partial record AgentProviderOption(
     bool CanCreateAgents);
 
 [Bindable]
-public sealed class SelectionOption(
-    string key,
-    string label,
-    string description,
-    bool isEnabled) : ObservableObject
-{
-    private bool _isEnabled = isEnabled;
-
-    public string Key { get; } = key;
-
-    public string Label { get; } = label;
-
-    public string Description { get; } = description;
-
-    public bool IsEnabled
-    {
-        get => _isEnabled;
-        set => SetProperty(ref _isEnabled, value);
-    }
-}
-
-[Bindable]
 public sealed partial record AgentCatalogItem(
     AgentProfileId Id,
     string Initial,
@@ -49,7 +27,6 @@ public sealed partial record AgentCatalogItem(
     string Description,
     string ProviderDisplayName,
     string ModelName,
-    IReadOnlyList<string> Tags,
     bool IsDefault);
 
 [Bindable]

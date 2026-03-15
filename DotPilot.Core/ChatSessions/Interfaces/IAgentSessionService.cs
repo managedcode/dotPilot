@@ -21,10 +21,6 @@ public interface IAgentSessionService
         UpdateProviderPreferenceCommand command,
         CancellationToken cancellationToken);
 
-    ValueTask<Result<OperatorPreferencesSnapshot>> UpdateComposerSendBehaviorAsync(
-        UpdateComposerSendBehaviorCommand command,
-        CancellationToken cancellationToken);
-
     IAsyncEnumerable<Result<SessionStreamEntry>> SendMessageAsync(
         SendSessionMessageCommand command,
         CancellationToken cancellationToken);

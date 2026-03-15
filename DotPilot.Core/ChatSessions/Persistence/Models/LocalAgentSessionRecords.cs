@@ -6,15 +6,11 @@ internal sealed class AgentProfileRecord
 
     public string Name { get; set; } = string.Empty;
 
-    public int Role { get; set; }
-
     public int ProviderKind { get; set; }
 
     public string ModelName { get; set; } = string.Empty;
 
     public string SystemPrompt { get; set; } = string.Empty;
-
-    public string CapabilitiesJson { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; }
 }
@@ -56,15 +52,6 @@ internal sealed class ProviderPreferenceRecord
     public int ProviderKind { get; set; }
 
     public bool IsEnabled { get; set; }
-
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-internal sealed class OperatorPreferenceRecord
-{
-    public int Id { get; set; }
-
-    public int ComposerSendBehavior { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
 }

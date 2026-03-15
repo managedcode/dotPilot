@@ -7,18 +7,30 @@ namespace DotPilot.Tests.Workspace;
 public sealed class AgentWorkspaceStateTests
 {
     [Test]
-    public async Task ConcurrentColdWorkspaceReadsOnlyProbeProviderStatusOnce()
+    public async Task RepeatedWorkspaceReadsSeeUpdatedProviderStatusWithoutManualRefresh()
     {
         using var commandScope = CommandProbeScope.Create();
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
 
         await using var fixture = CreateFixture();
 
-        await Task.WhenAll(
-            Enumerable.Range(0, 4)
-                .Select(async _ => (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed()));
+        var initialWorkspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        initialWorkspace.Providers
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("1.0.0");
 
-        commandScope.ReadInvocationCount("codex").Should().Be(1);
+        commandScope.WriteVersionCommand("codex", "codex version 2.0.0");
+
+        var refreshedWorkspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        refreshedWorkspace.Providers
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("2.0.0");
+
+        commandScope.ReadInvocationCount("codex").Should().BeGreaterThan(1);
     }
 
     private static TestFixture CreateFixture()

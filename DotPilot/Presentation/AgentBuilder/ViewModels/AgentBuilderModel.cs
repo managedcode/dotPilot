@@ -75,12 +75,6 @@ public partial record AgentBuilderModel(
 
     public IState<AgentProviderOption> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
-    public IImmutableList<SelectionOption> Tools { get; } =
-        CreateOptions(AgentSessionDefaults.AllTools, AgentSessionDefaults.GetToolDescription);
-
-    public IImmutableList<SelectionOption> Skills { get; } =
-        CreateOptions(AgentSessionDefaults.AllSkills, AgentSessionDefaults.GetSkillDescription);
-
     public IState<bool> CanGenerateDraft => State.Async(this, LoadCanGenerateDraftAsync);
 
     public IState<bool> CanSaveAgent => State.Async(this, LoadCanSaveAgentAsync);
@@ -248,14 +242,9 @@ public partial record AgentBuilderModel(
             var createdResult = await workspaceState.CreateAgentAsync(
                 new CreateAgentProfileCommand(
                     agentName,
-                    AgentRoleKind.Operator,
                     selectedProvider.Kind,
                     modelName,
-                    ((await SystemPrompt) ?? string.Empty).Trim(),
-                    AgentSessionDefaults.EncodeSelections(
-                            GetSelectedValues(Tools),
-                            GetSelectedValues(Skills))
-                        .ToArray()),
+                    ((await SystemPrompt) ?? string.Empty).Trim()),
                 cancellationToken);
             if (!createdResult.TryGetValue(out var created))
             {
@@ -422,8 +411,6 @@ public partial record AgentBuilderModel(
 
         await HandleSelectedProviderChanged(provider, cancellationToken);
         await ModelName.SetAsync(draft.ModelName, cancellationToken);
-        ApplySelectionState(Tools, draft.Tools);
-        ApplySelectionState(Skills, draft.Skills);
     }
 
     private async ValueTask EnsureSelectedProviderAsync(
@@ -495,7 +482,6 @@ public partial record AgentBuilderModel(
             AgentSessionDefaults.CreateAgentDescription(agent.SystemPrompt),
             agent.ProviderDisplayName,
             agent.ModelName,
-            AgentSessionDefaults.CreateVisibleTags(agent.Capabilities),
             AgentSessionDefaults.IsSystemAgent(agent.Name));
     }
 
@@ -555,31 +541,4 @@ public partial record AgentBuilderModel(
         return provider is null || string.IsNullOrWhiteSpace(provider.DisplayName);
     }
 
-    private static ImmutableArray<SelectionOption> CreateOptions(
-        IReadOnlyList<string> values,
-        Func<string, string> descriptionSelector)
-    {
-        return values
-            .Select(value => new SelectionOption(value, value, descriptionSelector(value), false))
-            .ToImmutableArray();
-    }
-
-    private static void ApplySelectionState(
-        IEnumerable<SelectionOption> options,
-        IReadOnlyList<string> selectedValues)
-    {
-        var selected = selectedValues.ToHashSet(StringComparer.Ordinal);
-        foreach (var option in options)
-        {
-            option.IsEnabled = selected.Contains(option.Key);
-        }
-    }
-
-    private static string[] GetSelectedValues(IEnumerable<SelectionOption> options)
-    {
-        return options
-            .Where(static option => option.IsEnabled)
-            .Select(static option => option.Key)
-            .ToArray();
-    }
 }

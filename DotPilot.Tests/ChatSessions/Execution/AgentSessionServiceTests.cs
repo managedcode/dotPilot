@@ -39,11 +39,9 @@ public sealed class AgentSessionServiceTests
         var created = (await fixture.Service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 "Debug Agent",
-                AgentRoleKind.Coding,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Act as a deterministic local test agent.",
-                ["Shell", "Files"]),
+                "Act as a deterministic local test agent."),
             CancellationToken.None)).ShouldSucceed();
 
         var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
@@ -186,11 +184,9 @@ public sealed class AgentSessionServiceTests
         return (await service.CreateAgentAsync(
             new CreateAgentProfileCommand(
                 name,
-                AgentRoleKind.Operator,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Be deterministic for automated verification.",
-                ["Shell"]),
+                "Be deterministic for automated verification."),
             CancellationToken.None)).ShouldSucceed();
     }
 
@@ -230,11 +226,9 @@ public sealed class AgentSessionServiceTests
             ?? throw new InvalidOperationException("AgentProfileRecord could not be created.");
         SetProperty(record, "Id", agentId);
         SetProperty(record, "Name", "Legacy Codex Agent");
-        SetProperty(record, "Role", (int)AgentRoleKind.Operator);
         SetProperty(record, "ProviderKind", (int)AgentProviderKind.Codex);
         SetProperty(record, "ModelName", "gpt-5");
         SetProperty(record, "SystemPrompt", "Use Codex when available.");
-        SetProperty(record, "CapabilitiesJson", "[]");
         SetProperty(record, "CreatedAt", DateTimeOffset.UtcNow);
 
         dbContext.Add(record);

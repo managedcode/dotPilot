@@ -109,7 +109,6 @@ public class ControlPlaneDomainContractsTests
         {
             Id = AgentProfileId.New(),
             Name = "Implementation Agent",
-            Role = AgentRoleKind.Coding,
             ProviderId = provider.Id,
             ToolCapabilityIds = [tool.Id],
             Tags = ["implementation", "provider"],
@@ -119,7 +118,6 @@ public class ControlPlaneDomainContractsTests
         {
             Id = AgentProfileId.New(),
             Name = "Runtime Reviewer",
-            Role = AgentRoleKind.Reviewer,
             ModelRuntimeId = localRuntime.Id,
             ToolCapabilityIds = [tool.Id],
             Tags = ["review", "local"],

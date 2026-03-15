@@ -18,12 +18,9 @@ public sealed class AgentPromptDraftGeneratorTests
         draft.Name.Should().Be("Repository Reviewer Checks Agent");
         draft.ProviderKind.Should().Be(AgentProviderKind.Debug);
         draft.ModelName.Should().Be("debug-echo");
-        draft.Tools.Should().Contain(AgentSessionDefaults.GitCapability);
-        draft.Tools.Should().Contain(AgentSessionDefaults.FilesCapability);
-        draft.Skills.Should().Contain(AgentSessionDefaults.RepositoryReviewSkill);
-        draft.Skills.Should().Contain(AgentSessionDefaults.ChangeExplanationSkill);
         draft.SystemPrompt.Should().Contain("Mission:");
-        draft.SystemPrompt.Should().Contain("Primary tools:");
+        draft.SystemPrompt.Should().NotContain("Primary tools:");
+        draft.SystemPrompt.Should().NotContain("Preferred skills:");
         draft.SystemPrompt.Should().NotContain("Role:");
     }
 
@@ -37,8 +34,6 @@ public sealed class AgentPromptDraftGeneratorTests
         draft.Name.Should().Be("New agent");
         draft.ProviderKind.Should().Be(AgentProviderKind.Debug);
         draft.ModelName.Should().Be("debug-echo");
-        draft.Tools.Should().Contain(AgentSessionDefaults.ShellCapability);
-        draft.Skills.Should().Contain(AgentSessionDefaults.TaskPlanningSkill);
     }
 
     private static TestFixture CreateFixture()

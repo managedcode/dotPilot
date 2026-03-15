@@ -29,15 +29,7 @@
 
         <controls:AgentBasicInfoSection />
 
-        <Grid ColumnSpacing="20">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.65*" />
-            <ColumnDefinition Width="*" />
-          </Grid.ColumnDefinitions>
-
-          <controls:AgentPromptSection />
-          <controls:AgentSkillsSection Grid.Column="1" />
-        </Grid>
+        <controls:AgentPromptSection />
       </StackPanel>
     </DataTemplate>
 

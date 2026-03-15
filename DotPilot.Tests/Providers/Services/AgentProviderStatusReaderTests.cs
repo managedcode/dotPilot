@@ -4,10 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DotPilot.Tests.Providers;
 
 [NonParallelizable]
-public sealed class AgentProviderStatusCacheTests
+public sealed class AgentProviderStatusReaderTests
 {
     [Test]
-    public async Task GetWorkspaceAsyncReturnsCachedProviderStatusUntilRefreshRequested()
+    public async Task GetWorkspaceAsyncReadsProviderStatusFromCurrentSourceOfTruth()
     {
         using var commandScope = CommandProbeScope.Create();
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
@@ -21,17 +21,8 @@ public sealed class AgentProviderStatusCacheTests
 
         commandScope.WriteVersionCommand("codex", "codex version 2.0.0");
 
-        var cachedWorkspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        cachedWorkspace.Providers
-            .Single(provider => provider.Kind == AgentProviderKind.Codex)
-            .InstalledVersion
-            .Should()
-            .Be("1.0.0");
-
-        await fixture.ProviderStatusCache.RefreshAsync(CancellationToken.None);
-
-        var refreshedWorkspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        refreshedWorkspace.Providers
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        workspace.Providers
             .Single(provider => provider.Kind == AgentProviderKind.Codex)
             .InstalledVersion
             .Should()
@@ -88,19 +79,15 @@ public sealed class AgentProviderStatusCacheTests
         var provider = services.BuildServiceProvider();
         return new TestFixture(
             provider,
-            provider.GetRequiredService<IAgentSessionService>(),
-            provider.GetRequiredService<IAgentProviderStatusCache>());
+            provider.GetRequiredService<IAgentSessionService>());
     }
 
     private sealed class TestFixture(
         ServiceProvider provider,
-        IAgentSessionService service,
-        IAgentProviderStatusCache providerStatusCache)
+        IAgentSessionService service)
         : IAsyncDisposable
     {
         public IAgentSessionService Service { get; } = service;
-
-        public IAgentProviderStatusCache ProviderStatusCache { get; } = providerStatusCache;
 
         public ValueTask DisposeAsync()
         {
@@ -126,7 +113,7 @@ public sealed class AgentProviderStatusCacheTests
             var rootPath = Path.Combine(
                 Path.GetTempPath(),
                 "DotPilot.Tests",
-                nameof(AgentProviderStatusCacheTests),
+                nameof(AgentProviderStatusReaderTests),
                 Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture));
             Directory.CreateDirectory(rootPath);
             Environment.SetEnvironmentVariable("PATH", rootPath);

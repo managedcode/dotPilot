@@ -18,6 +18,7 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
         <PackageReference Include="Microsoft.Extensions.AI" />
+        <PackageReference Include="Microsoft.Orleans.Server" />
     </ItemGroup>
 
 </Project>
