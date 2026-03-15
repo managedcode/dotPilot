@@ -167,10 +167,22 @@ public partial record SecondModel(
             return;
         }
 
+        var previousProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        var currentModelName = (await ModelName) ?? string.Empty;
+        var previousSuggestedModel = ResolveSuggestedModelName(previousProvider);
         var nextSuggestedModel = ResolveSuggestedModelName(provider);
 
         await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
-        await ModelName.SetAsync(nextSuggestedModel, cancellationToken);
+        if (!provider.CanCreateAgents)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentModelName) ||
+            string.Equals(currentModelName, previousSuggestedModel, StringComparison.Ordinal))
+        {
+            await ModelName.UpdateAsync(_ => nextSuggestedModel, cancellationToken);
+        }
     }
 
     private async ValueTask SubmitAgentDraftCore(string? promptOverride, CancellationToken cancellationToken)

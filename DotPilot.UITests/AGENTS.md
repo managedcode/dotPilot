@@ -13,7 +13,7 @@ Stack: `.NET 10`, `NUnit`, `Uno.UITest`, browser-driven UI tests
 - `DotPilot.UITests.csproj`
 - `Harness/Constants.cs`
 - `Harness/TestBase.cs`
-- `Features/AgentSessions/GivenChatSessionsShell.cs`
+- `Features/AgentSessions/Flows/GivenChatSessionsShell.cs`
 
 ## Boundaries
 

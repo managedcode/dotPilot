@@ -2,6 +2,7 @@ using DotPilot.Core.Features.AgentSessions;
 using DotPilot.Core.Features.ControlPlaneDomain;
 using DotPilot.Runtime.Features.AgentSessions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace DotPilot.Tests.Features.AgentSessions;
 
@@ -137,6 +138,45 @@ public sealed class AgentSessionServiceTests
             entry.Text.Contains("Debug workflow finished", StringComparison.Ordinal));
     }
 
+    [Test]
+    public async Task LegacyUnsupportedProviderSessionReturnsExplicitErrorWithoutRuntimePlaceholderClient()
+    {
+        await using var fixture = CreateFixture();
+        await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None);
+
+        var legacyAgentId = Guid.CreateVersion7();
+        await SeedLegacyAgentAsync(fixture.Provider, legacyAgentId);
+
+        var session = await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Legacy session", new AgentProfileId(legacyAgentId)),
+            CancellationToken.None);
+
+        List<SessionStreamEntry> streamedEntries = [];
+        await foreach (var entry in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "hello legacy"),
+                           CancellationToken.None))
+        {
+            streamedEntries.Add(entry);
+        }
+
+        var reloaded = await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None);
+
+        streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.UserMessage);
+        streamedEntries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.Error &&
+            entry.Text.Contains("Codex live CLI execution is not wired yet in this slice.", StringComparison.Ordinal));
+        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolStarted);
+        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolCompleted);
+        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.AssistantMessage);
+
+        reloaded.Should().NotBeNull();
+        reloaded!.Entries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.Error &&
+            entry.Text.Contains("Codex live CLI execution is not wired yet in this slice.", StringComparison.Ordinal));
+    }
+
     private static async Task<AgentProfileSummary> EnableDebugAndCreateAgentAsync(
         IAgentSessionService service,
         string name)
@@ -171,13 +211,66 @@ public sealed class AgentSessionServiceTests
         return new TestFixture(provider, service);
     }
 
-    private sealed class TestFixture(ServiceProvider provider, IAgentSessionService service) : IAsyncDisposable
+    private static async Task SeedLegacyAgentAsync(ServiceProvider provider, Guid agentId)
     {
-        public IAgentSessionService Service { get; } = service;
+        ArgumentNullException.ThrowIfNull(provider);
+
+        var serviceAssembly = provider.GetRequiredService<IAgentSessionService>().GetType().Assembly;
+        var dbContextType = serviceAssembly.GetType("DotPilot.Runtime.Features.AgentSessions.LocalAgentSessionDbContext")
+            ?? throw new InvalidOperationException("LocalAgentSessionDbContext type was not found.");
+        var agentProfileRecordType = serviceAssembly.GetType("DotPilot.Runtime.Features.AgentSessions.AgentProfileRecord")
+            ?? throw new InvalidOperationException("AgentProfileRecord type was not found.");
+        var dbContextFactoryType = typeof(IDbContextFactory<>).MakeGenericType(dbContextType);
+        var dbContextFactory = provider.GetRequiredService(dbContextFactoryType);
+        var createDbContextMethod = dbContextFactoryType.GetMethod("CreateDbContext", Type.EmptyTypes)
+            ?? throw new InvalidOperationException("CreateDbContext method was not found.");
+
+        await using var dbContext = (DbContext)(createDbContextMethod.Invoke(dbContextFactory, []) ??
+            throw new InvalidOperationException("CreateDbContext returned null."));
+
+        var record = Activator.CreateInstance(agentProfileRecordType)
+            ?? throw new InvalidOperationException("AgentProfileRecord could not be created.");
+        SetProperty(record, "Id", agentId);
+        SetProperty(record, "Name", "Legacy Codex Agent");
+        SetProperty(record, "Role", (int)AgentRoleKind.Operator);
+        SetProperty(record, "ProviderKind", (int)AgentProviderKind.Codex);
+        SetProperty(record, "ModelName", "gpt-5");
+        SetProperty(record, "SystemPrompt", "Use Codex when available.");
+        SetProperty(record, "CapabilitiesJson", "[]");
+        SetProperty(record, "CreatedAt", DateTimeOffset.UtcNow);
+
+        dbContext.Add(record);
+        _ = await dbContext.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private static void SetProperty(object instance, string propertyName, object value)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
+
+        var property = instance.GetType().GetProperty(propertyName)
+            ?? throw new InvalidOperationException($"Property '{propertyName}' was not found on '{instance.GetType().FullName}'.");
+        property.SetValue(instance, value);
+    }
+
+    private sealed class TestFixture : IAsyncDisposable
+    {
+        private readonly ServiceProvider _provider;
+
+        public TestFixture(ServiceProvider provider, IAgentSessionService service)
+        {
+            _provider = provider;
+            Provider = provider;
+            Service = service;
+        }
+
+        public ServiceProvider Provider { get; }
+
+        public IAgentSessionService Service { get; }
 
         public ValueTask DisposeAsync()
         {
-            return provider.DisposeAsync();
+            return _provider.DisposeAsync();
         }
     }
 }

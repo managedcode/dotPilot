@@ -79,7 +79,7 @@ public sealed class SecondModelTests
     }
 
     [Test]
-    public async Task HandleSelectedProviderChangedUpdatesModelWhenCurrentValueMatchesPreviousSuggestion()
+    public async Task HandleSelectedProviderChangedKeepsRunnableModelWhenProviderCannotCreateAgents()
     {
         await using var fixture = await CreateFixtureAsync();
         var model = ActivatorUtilities.CreateInstance<SecondModel>(fixture.Provider);
@@ -92,12 +92,12 @@ public sealed class SecondModelTests
                 AgentProviderKind.Codex,
                 "Codex",
                 "codex",
-                "Codex CLI is available on PATH.",
+                "Codex CLI is detected, but live desktop execution is not available in this app yet.",
                 "1.0.0",
-                true),
+                false),
             CancellationToken.None);
 
-        (await model.ModelName).Should().Be("gpt-5");
+        (await model.ModelName).Should().Be("debug-echo");
         (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Codex);
     }
 

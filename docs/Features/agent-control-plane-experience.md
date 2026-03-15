@@ -147,11 +147,9 @@ sequenceDiagram
 
 - If the app restarts, previously persisted sessions and transcript history must still load from the local store.
 
-### Live Provider Availability
+### Live Provider Not Yet Wired
 
-- Only providers with a wired live runtime path may allow agent creation in the desktop flow.
-- `Codex` uses the local `codex` CLI for live session execution when its CLI is installed and enabled.
-- Providers that are installed but not yet wired for live desktop execution must stay visible in settings with clear status text, but they must not be offered as creatable/runnable agent defaults.
+- If a provider is configured but live execution is not implemented yet, the session flow must surface that state as an explicit transcript error entry.
 
 ## Verification Strategy
 

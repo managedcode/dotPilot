@@ -78,6 +78,7 @@ public sealed class MainModelTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddAgentSessions(new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,

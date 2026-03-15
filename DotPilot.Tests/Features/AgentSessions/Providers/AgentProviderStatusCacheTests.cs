@@ -40,7 +40,7 @@ public sealed class AgentProviderStatusCacheTests
     }
 
     [Test]
-    public async Task EnabledCodexProviderCanCreateProfilesWhenLiveRuntimeIsAvailable()
+    public async Task EnabledCodexProviderWithoutLiveRuntimeCannotCreateProfiles()
     {
         using var commandScope = CommandProbeScope.Create();
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
@@ -51,9 +51,9 @@ public sealed class AgentProviderStatusCacheTests
             CancellationToken.None);
 
         provider.IsEnabled.Should().BeTrue();
-        provider.CanCreateAgents.Should().BeTrue();
-        provider.Status.Should().Be(AgentProviderStatus.Ready);
-        provider.StatusSummary.Should().Contain("Codex CLI is available on PATH.");
+        provider.CanCreateAgents.Should().BeFalse();
+        provider.Status.Should().Be(AgentProviderStatus.Unsupported);
+        provider.StatusSummary.Should().Contain("live desktop execution is not available");
         provider.InstalledVersion.Should().Be("1.0.0");
     }
 

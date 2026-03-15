@@ -17,9 +17,10 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - `App.xaml`
 - `App.xaml.cs`
 - `Platforms/Desktop/Program.cs`
-- `Presentation/Shell.xaml`
-- `Presentation/MainPage.xaml`
-- `Presentation/SecondPage.xaml`
+- `Presentation/Shell/Shell.xaml`
+- `Presentation/AgentSessions/Chat/MainPage.xaml`
+- `Presentation/AgentSessions/Builder/SecondPage.xaml`
+- `Presentation/AgentSessions/Settings/SettingsPage.xaml`
 - `Styles/ColorPaletteOverride.xaml`
 
 ## Boundaries

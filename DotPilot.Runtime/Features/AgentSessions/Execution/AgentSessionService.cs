@@ -17,6 +17,7 @@ internal sealed class AgentSessionService(
     : IAgentSessionService, IDisposable
 {
     private const int OperatorPreferenceRecordId = 1;
+    private const string NotYetImplementedFormat = "{0} live CLI execution is not wired yet in this slice.";
     private const string SessionReadyText = "Session created. Send the first message to start the workflow.";
     private const string UserAuthor = "You";
     private const string ToolAuthor = "Tool";
@@ -27,6 +28,8 @@ internal sealed class AgentSessionService(
     private const string ToolAccentLabel = "tool";
     private const string StatusAccentLabel = "status";
     private const string ErrorAccentLabel = "error";
+    internal static readonly System.Text.CompositeFormat LiveExecutionUnavailableCompositeFormat =
+        System.Text.CompositeFormat.Parse(NotYetImplementedFormat);
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private bool _initialized;
 
@@ -170,6 +173,7 @@ internal sealed class AgentSessionService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var agent = await dbContext.AgentProfiles
             .FirstAsync(record => record.Id == command.AgentProfileId.Value, cancellationToken);
+        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
         var now = timeProvider.GetUtcNow();
         var sessionId = SessionId.New();
         var session = new SessionRecord
@@ -184,7 +188,11 @@ internal sealed class AgentSessionService(
         dbContext.Sessions.Add(session);
         dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
         await dbContext.SaveChangesAsync(cancellationToken);
-        await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
+        if (providerProfile.SupportsLiveExecution)
+        {
+            await runtimeConversationFactory.InitializeAsync(agent, sessionId, cancellationToken);
+        }
+
         await UpsertSessionGrainAsync(session);
 
         AgentSessionServiceLog.SessionCreated(logger, sessionId, session.Title, command.AgentProfileId);
@@ -264,7 +272,6 @@ internal sealed class AgentSessionService(
         var agent = await dbContext.AgentProfiles
             .FirstAsync(record => record.Id == session.PrimaryAgentProfileId, cancellationToken);
         var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
-        var runtimeConversation = await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
 
         AgentSessionServiceLog.SendStarted(
@@ -310,26 +317,42 @@ internal sealed class AgentSessionService(
             yield break;
         }
 
-        var useDebugToolEntries = providerProfile.Kind == AgentProviderKind.Debug;
-        if (useDebugToolEntries)
+        if (!providerProfile.SupportsLiveExecution)
         {
-            var toolStartEntry = CreateEntryRecord(
+            AgentSessionServiceLog.SendBlockedNotWired(logger, command.SessionId, providerProfile.Kind);
+            var notImplementedEntry = CreateEntryRecord(
                 command.SessionId,
-                SessionStreamEntryKind.ToolStarted,
-                ToolAuthor,
-                DebugToolStartText,
+                SessionStreamEntryKind.Error,
+                StatusAuthor,
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    LiveExecutionUnavailableCompositeFormat,
+                    providerProfile.DisplayName),
                 timeProvider.GetUtcNow(),
-                agentProfileId: new AgentProfileId(agent.Id),
-                accentLabel: ToolAccentLabel);
-            dbContext.SessionEntries.Add(toolStartEntry);
+                accentLabel: ErrorAccentLabel);
+            dbContext.SessionEntries.Add(notImplementedEntry);
+            session.UpdatedAt = notImplementedEntry.Timestamp;
             await dbContext.SaveChangesAsync(cancellationToken);
-            yield return MapEntry(toolStartEntry);
+
+            yield return MapEntry(notImplementedEntry);
+            yield break;
         }
+
+        var runtimeConversation = await runtimeConversationFactory.LoadOrCreateAsync(agent, command.SessionId, cancellationToken);
+        var toolStartEntry = CreateEntryRecord(
+            command.SessionId,
+            SessionStreamEntryKind.ToolStarted,
+            ToolAuthor,
+            DebugToolStartText,
+            timeProvider.GetUtcNow(),
+            agentProfileId: new AgentProfileId(agent.Id),
+            accentLabel: ToolAccentLabel);
+        dbContext.SessionEntries.Add(toolStartEntry);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        yield return MapEntry(toolStartEntry);
 
         string? streamedMessageId = null;
         var accumulated = new System.Text.StringBuilder();
-        Exception? sendException = null;
-        SessionStreamEntry? toolDoneStreamEntry = null;
         var runConfiguration = executionLoggingMiddleware.CreateRunConfiguration(
             runtimeConversation.Descriptor,
             command.SessionId);
@@ -362,8 +385,8 @@ internal sealed class AgentSessionService(
             }
             catch (Exception exception)
             {
-                sendException = exception;
-                break;
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                throw;
             }
 
             if (string.IsNullOrEmpty(update.Text))
@@ -385,71 +408,45 @@ internal sealed class AgentSessionService(
                 new AgentProfileId(agent.Id));
         }
 
-        if (sendException is null)
+        SessionStreamEntry toolDoneStreamEntry;
+        try
         {
-            try
+            await runtimeConversationFactory.SaveAsync(runtimeConversation, command.SessionId, cancellationToken);
+
+            var assistantEntry = new SessionEntryRecord
             {
-                await runtimeConversationFactory.SaveAsync(runtimeConversation, command.SessionId, cancellationToken);
-
-                var assistantEntry = new SessionEntryRecord
-                {
-                    Id = streamedMessageId ?? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture),
-                    SessionId = command.SessionId.Value,
-                    AgentProfileId = agent.Id,
-                    Kind = (int)SessionStreamEntryKind.AssistantMessage,
-                    Author = agent.Name,
-                    Text = accumulated.ToString(),
-                    Timestamp = timeProvider.GetUtcNow(),
-                };
-
-                dbContext.SessionEntries.Add(assistantEntry);
-                if (useDebugToolEntries)
-                {
-                    var toolDoneEntry = CreateEntryRecord(
-                        command.SessionId,
-                        SessionStreamEntryKind.ToolCompleted,
-                        ToolAuthor,
-                        DebugToolDoneText,
-                        timeProvider.GetUtcNow(),
-                        agentProfileId: new AgentProfileId(agent.Id),
-                        accentLabel: ToolAccentLabel);
-                    dbContext.SessionEntries.Add(toolDoneEntry);
-                    toolDoneStreamEntry = MapEntry(toolDoneEntry);
-                }
-
-                session.UpdatedAt = assistantEntry.Timestamp;
-                await dbContext.SaveChangesAsync(cancellationToken);
-
-                AgentSessionServiceLog.SendCompleted(logger, command.SessionId, agent.Id, accumulated.Length);
-            }
-            catch (Exception exception)
-            {
-                sendException = exception;
-            }
-        }
-
-        if (sendException is not null)
-        {
-            AgentSessionServiceLog.SendFailed(logger, sendException, command.SessionId, agent.Id);
-            var errorEntry = CreateEntryRecord(
+                Id = streamedMessageId ?? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture),
+                SessionId = command.SessionId.Value,
+                AgentProfileId = agent.Id,
+                Kind = (int)SessionStreamEntryKind.AssistantMessage,
+                Author = agent.Name,
+                Text = accumulated.ToString(),
+                Timestamp = timeProvider.GetUtcNow(),
+            };
+            var toolDoneEntry = CreateEntryRecord(
                 command.SessionId,
-                SessionStreamEntryKind.Error,
-                StatusAuthor,
-                sendException.Message,
+                SessionStreamEntryKind.ToolCompleted,
+                ToolAuthor,
+                DebugToolDoneText,
                 timeProvider.GetUtcNow(),
                 agentProfileId: new AgentProfileId(agent.Id),
-                accentLabel: ErrorAccentLabel);
-            dbContext.SessionEntries.Add(errorEntry);
-            session.UpdatedAt = errorEntry.Timestamp;
+                accentLabel: ToolAccentLabel);
+
+            dbContext.SessionEntries.Add(assistantEntry);
+            dbContext.SessionEntries.Add(toolDoneEntry);
+            session.UpdatedAt = assistantEntry.Timestamp;
             await dbContext.SaveChangesAsync(cancellationToken);
-            yield return MapEntry(errorEntry);
-            yield break;
+
+            AgentSessionServiceLog.SendCompleted(logger, command.SessionId, agent.Id, accumulated.Length);
+            toolDoneStreamEntry = MapEntry(toolDoneEntry);
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+            throw;
         }
 
-        if (toolDoneStreamEntry is not null)
-        {
-            yield return toolDoneStreamEntry;
-        }
+        yield return toolDoneStreamEntry;
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

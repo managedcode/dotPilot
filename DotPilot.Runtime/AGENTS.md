@@ -23,6 +23,8 @@ Stack: `.NET 10`, class library, provider-backed runtime services, local persist
 - Agent draft generation for the create-agent surface must emit concrete provider/model/tool defaults for real creatable providers and must not synthesize agent roles or debug-only placeholders unless every live provider path is unavailable.
 - Do not report an installed external provider such as Codex as locally ready for operator use unless the matching live execution path is wired end to end; once the UI can select that provider on a machine with the CLI installed, runtime send execution must actually invoke it instead of falling through to a placeholder error.
 - When a provider SDK already ships an `Extensions.AI` or equivalent `IChatClient` bridge, use that bridge instead of hand-rolling a custom chat client adapter for the same provider path.
+- Do not introduce placeholder runtime adapters such as an `UnavailableChatClient` just to satisfy an `IChatClient` seam; unsupported providers must be gated explicitly in the service/runtime flow.
+- Keep runtime chat-client factories abstracted on `IChatClient`; do not leak provider-specific concrete client types into orchestration boundaries just to satisfy analyzer preferences.
 - Keep hot-path state in memory and safe background workers: ordinary UI navigation should consume cached runtime projections, while refresh/probe/update loops run off the UI thread and publish changes back asynchronously.
 - When conversation continuity is required, keep the durable chat/session runtime state split correctly:
   - transcript and operator-facing projections can stay in `SQLite`

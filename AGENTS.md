@@ -152,6 +152,7 @@ For this app:
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
+- when a feature slice grows beyond a few files, split it into responsibility-based subfolders that mirror the slice's real concerns such as chat, drafting, providers, persistence, settings, or tests; do not leave large flat file dumps that force unrelated code to coexist in one directory
 - keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
 - UI-facing shell, app-host, and application-configuration types belong in `DotPilot`, not in `DotPilot.Core`, `DotPilot.Runtime`, or `DotPilot.Runtime.Host`; the non-UI projects are reserved for contracts, runtime logic, and Orleans/host behavior only
 - when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out

@@ -10,14 +10,14 @@ internal static class AgentProviderStatusSnapshotReader
     private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
     private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
     private const string ReadySummaryFormat = "{0} CLI is available on PATH.";
-    private const string CliDetectedButUnavailableSummaryFormat =
-        "{0} CLI is available on PATH, but live desktop execution is not available in this build yet.";
+    private const string LiveExecutionUnavailableSummaryFormat =
+        "{0} CLI is detected, but live desktop execution is not available in this app yet.";
     private static readonly System.Text.CompositeFormat MissingCliSummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(MissingCliSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadySummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(ReadySummaryFormat);
-    private static readonly System.Text.CompositeFormat CliDetectedButUnavailableCompositeFormat =
-        System.Text.CompositeFormat.Parse(CliDetectedButUnavailableSummaryFormat);
+    private static readonly System.Text.CompositeFormat LiveExecutionUnavailableCompositeFormat =
+        System.Text.CompositeFormat.Parse(LiveExecutionUnavailableSummaryFormat);
 
     public static async Task<IReadOnlyList<ProviderStatusProbeResult>> BuildAsync(
         LocalAgentSessionDbContext dbContext,
@@ -72,7 +72,7 @@ internal static class AgentProviderStatusSnapshotReader
         }
         else if (profile.IsBuiltIn)
         {
-            installedVersion = null;
+            installedVersion = profile.DefaultModelName;
         }
         else
         {
@@ -97,7 +97,7 @@ internal static class AgentProviderStatusSnapshotReader
                     status = AgentProviderStatus.Unsupported;
                     statusSummary = string.Format(
                         System.Globalization.CultureInfo.InvariantCulture,
-                        CliDetectedButUnavailableCompositeFormat,
+                        LiveExecutionUnavailableCompositeFormat,
                         profile.DisplayName);
                     canCreateAgents = false;
                 }
