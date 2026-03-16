@@ -1,5 +1,6 @@
 using DotPilot.Core.ChatSessions;
 using DotPilot.Tests.Providers;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Workspace;
@@ -7,7 +8,7 @@ namespace DotPilot.Tests.Workspace;
 [NonParallelizable]
 public sealed class StartupWorkspaceHydrationTests
 {
-    private const int DeleteRetryCount = 20;
+    private const int DeleteRetryCount = 40;
     private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
 
     [Test]
@@ -112,6 +113,7 @@ public sealed class StartupWorkspaceHydrationTests
     {
         for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
         {
+            SqliteConnection.ClearAllPools();
             if (!Directory.Exists(path))
             {
                 return;

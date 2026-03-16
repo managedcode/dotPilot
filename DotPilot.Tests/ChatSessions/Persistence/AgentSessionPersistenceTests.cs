@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using DotPilot.Core.ChatSessions;
 using DotPilot.Core.ControlPlaneDomain;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,7 +10,7 @@ namespace DotPilot.Tests.ChatSessions;
 
 public sealed class AgentSessionPersistenceTests
 {
-    private const int DeleteRetryCount = 20;
+    private const int DeleteRetryCount = 40;
     private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
     private static readonly JsonSerializerOptions HistorySerializerOptions = new()
     {
@@ -158,6 +159,7 @@ public sealed class AgentSessionPersistenceTests
     {
         for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
         {
+            SqliteConnection.ClearAllPools();
             if (!Directory.Exists(path))
             {
                 return;

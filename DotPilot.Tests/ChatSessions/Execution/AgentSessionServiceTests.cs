@@ -13,7 +13,7 @@ public sealed class AgentSessionServiceTests
 {
     private const int LegacyDefaultRole = 4;
     private const string LegacyEmptyCapabilitiesJson = "[]";
-    private const int DeleteRetryCount = 20;
+    private const int DeleteRetryCount = 40;
     private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
 
     [Test]
@@ -650,6 +650,7 @@ public sealed class AgentSessionServiceTests
     {
         for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
         {
+            SqliteConnection.ClearAllPools();
             if (!Directory.Exists(path))
             {
                 return;
