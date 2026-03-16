@@ -56,18 +56,13 @@ internal sealed class StartupWorkspaceHydration(
                 return;
             }
 
+            var hydrationSucceeded = false;
             UpdateState(isHydrating: true, isReady: false);
             StartupWorkspaceHydrationLog.HydrationStarted(logger);
 
             try
             {
-                var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
-                if (workspace.IsFailed)
-                {
-                    StartupWorkspaceHydrationLog.HydrationFailed(
-                        logger,
-                        new InvalidOperationException("Startup workspace hydration failed."));
-                }
+                hydrationSucceeded = await TryHydrateWorkspaceAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -79,14 +74,28 @@ internal sealed class StartupWorkspaceHydration(
             }
             finally
             {
-                UpdateState(isHydrating: false, isReady: true);
-                StartupWorkspaceHydrationLog.HydrationCompleted(logger);
+                UpdateState(isHydrating: false, isReady: hydrationSucceeded);
             }
         }
         finally
         {
             hydrationGate.Release();
         }
+    }
+
+    private async ValueTask<bool> TryHydrateWorkspaceAsync(CancellationToken cancellationToken)
+    {
+        var workspace = await workspaceState.GetWorkspaceAsync(cancellationToken);
+        if (workspace.IsFailed)
+        {
+            StartupWorkspaceHydrationLog.HydrationFailed(
+                logger,
+                new InvalidOperationException("Startup workspace hydration failed."));
+            return false;
+        }
+
+        StartupWorkspaceHydrationLog.HydrationCompleted(logger);
+        return true;
     }
 
     private void UpdateState(bool isHydrating, bool isReady)

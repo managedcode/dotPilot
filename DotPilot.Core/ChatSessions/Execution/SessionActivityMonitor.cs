@@ -81,34 +81,45 @@ internal sealed class SessionActivityMonitor(ILogger<SessionActivityMonitor> log
 
     private SessionActivitySnapshot UpdateSnapshotUnsafe()
     {
+        if (_leases.Count == 0)
+        {
+            _current = EmptySnapshot;
+            return _current;
+        }
+
         var activeSessions = GetActiveSessionsUnsafe();
-        _current = _leases.Count == 0
-            ? EmptySnapshot
-            : CreateSnapshot(activeSessions);
+        _current = CreateSnapshot(activeSessions, _leases[^1].Descriptor);
         return _current;
     }
 
-    private IReadOnlyList<SessionActivityDescriptor> GetActiveSessionsUnsafe()
+    private List<SessionActivityDescriptor> GetActiveSessionsUnsafe()
     {
         if (_leases.Count == 0)
         {
             return [];
         }
 
-        var descriptors = new Dictionary<SessionId, SessionActivityDescriptor>();
-        for (var index = 0; index < _leases.Count; index++)
+        HashSet<SessionId> seen = [];
+        List<SessionActivityDescriptor> descriptors = [];
+        for (var index = _leases.Count - 1; index >= 0; index--)
         {
             var descriptor = _leases[index].Descriptor;
-            descriptors.Remove(descriptor.SessionId);
-            descriptors[descriptor.SessionId] = descriptor;
+            if (!seen.Add(descriptor.SessionId))
+            {
+                continue;
+            }
+
+            descriptors.Add(descriptor);
         }
 
-        return [.. descriptors.Values];
+        descriptors.Reverse();
+        return descriptors;
     }
 
-    private static SessionActivitySnapshot CreateSnapshot(IReadOnlyList<SessionActivityDescriptor> activeSessions)
+    private static SessionActivitySnapshot CreateSnapshot(
+        List<SessionActivityDescriptor> activeSessions,
+        SessionActivityDescriptor latestSession)
     {
-        var latestSession = activeSessions[^1];
         return new SessionActivitySnapshot(
             true,
             activeSessions.Count,

@@ -30,12 +30,24 @@ internal static class AgentProviderStatusSnapshotReader
             .ToDictionaryAsync(
                 preference => (AgentProviderKind)preference.ProviderKind,
                 cancellationToken);
+        var profiles = AgentSessionProviderCatalog.All;
 
         return await Task.Run(
-            () => AgentSessionProviderCatalog.All
-                .Select(profile => BuildProviderStatus(profile, GetProviderPreference(profile.Kind, preferences)))
-                .ToArray(),
-            cancellationToken);
+            async () =>
+            {
+                List<ProviderStatusProbeResult> results = new(profiles.Count);
+                foreach (var profile in profiles)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    results.Add(await BuildProviderStatusAsync(
+                        profile,
+                        GetProviderPreference(profile.Kind, preferences),
+                        cancellationToken).ConfigureAwait(false));
+                }
+
+                return (IReadOnlyList<ProviderStatusProbeResult>)results;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static ProviderPreferenceRecord GetProviderPreference(
@@ -52,9 +64,10 @@ internal static class AgentProviderStatusSnapshotReader
             };
     }
 
-    private static ProviderStatusProbeResult BuildProviderStatus(
+    private static async ValueTask<ProviderStatusProbeResult> BuildProviderStatusAsync(
         AgentSessionProviderProfile profile,
-        ProviderPreferenceRecord preference)
+        ProviderPreferenceRecord preference,
+        CancellationToken cancellationToken)
     {
         var providerId = AgentSessionDeterministicIdentity.CreateProviderId(profile.CommandName);
         var actions = new List<ProviderActionDescriptor>();
@@ -95,7 +108,7 @@ internal static class AgentProviderStatusSnapshotReader
                 installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
                 actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
 
-                var metadata = ResolveMetadata(profile, executablePath);
+                var metadata = await ResolveMetadataAsync(profile, executablePath, cancellationToken).ConfigureAwait(false);
                 installedVersion = ResolveInstalledVersion(
                     installedVersion,
                     metadata.InstalledVersion,
@@ -150,15 +163,19 @@ internal static class AgentProviderStatusSnapshotReader
             executablePath);
     }
 
-    private static ProviderCliMetadataSnapshot ResolveMetadata(
+    private static async ValueTask<ProviderCliMetadataSnapshot> ResolveMetadataAsync(
         AgentSessionProviderProfile profile,
-        string executablePath)
+        string executablePath,
+        CancellationToken cancellationToken)
     {
         return profile.Kind switch
         {
             AgentProviderKind.Codex => CreateCodexSnapshot(CodexCliMetadataReader.TryRead(executablePath)),
             AgentProviderKind.ClaudeCode => ClaudeCodeCliMetadataReader.TryRead(executablePath, profile),
-            AgentProviderKind.GitHubCopilot => CopilotCliMetadataReader.TryRead(executablePath, profile),
+            AgentProviderKind.GitHubCopilot => await CopilotCliMetadataReader.TryReadAsync(
+                executablePath,
+                profile,
+                cancellationToken).ConfigureAwait(false),
             _ => new ProviderCliMetadataSnapshot(null, null, []),
         };
     }

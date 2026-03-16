@@ -10,7 +10,10 @@ internal static class CopilotCliMetadataReader
     private const string EnabledPolicyState = "enabled";
     private const string ModelSettingHeader = "`model`:";
 
-    public static ProviderCliMetadataSnapshot TryRead(string executablePath, AgentSessionProviderProfile profile)
+    public static async ValueTask<ProviderCliMetadataSnapshot> TryReadAsync(
+        string executablePath,
+        AgentSessionProviderProfile profile,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
         ArgumentNullException.ThrowIfNull(profile);
@@ -18,7 +21,7 @@ internal static class CopilotCliMetadataReader
         var configuredModel = ReadConfiguredModel();
         try
         {
-            return ReadViaSdkAsync(executablePath, configuredModel).AsTask().GetAwaiter().GetResult();
+            return await ReadViaSdkAsync(executablePath, configuredModel, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -31,7 +34,8 @@ internal static class CopilotCliMetadataReader
 
     private static async ValueTask<ProviderCliMetadataSnapshot> ReadViaSdkAsync(
         string executablePath,
-        string? configuredModel)
+        string? configuredModel,
+        CancellationToken cancellationToken)
     {
         await using var client = new CopilotClient(new CopilotClientOptions
         {
@@ -40,9 +44,9 @@ internal static class CopilotCliMetadataReader
             UseStdio = true,
         });
 
-        await client.StartAsync(CancellationToken.None);
-        var status = await client.GetStatusAsync(CancellationToken.None);
-        var models = await client.ListModelsAsync(CancellationToken.None);
+        await client.StartAsync(cancellationToken).ConfigureAwait(false);
+        var status = await client.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        var models = await client.ListModelsAsync(cancellationToken).ConfigureAwait(false);
 
         return new ProviderCliMetadataSnapshot(
             status.Version,

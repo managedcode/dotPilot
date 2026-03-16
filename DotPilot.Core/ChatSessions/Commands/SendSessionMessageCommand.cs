@@ -6,24 +6,26 @@ namespace DotPilot.Core.ChatSessions.Commands;
 
 public sealed class SendSessionMessageCommand : Command<SendSessionMessageCommand.Payload>
 {
-    private readonly Payload _payload;
+    private readonly Payload payload;
 
     public SendSessionMessageCommand(
         SessionId sessionId,
         string message)
-        : base(
-            Guid.CreateVersion7(),
-            nameof(SendSessionMessageCommand),
-            new Payload(sessionId, message))
+        : this(new Payload(sessionId, message))
     {
-        _payload = new Payload(sessionId, message);
-        Value = _payload;
-        base.SessionId = sessionId.Value.ToString("N", CultureInfo.InvariantCulture);
     }
 
-    public new SessionId SessionId => _payload.SessionId;
+    private SendSessionMessageCommand(Payload payload)
+        : base(Guid.CreateVersion7(), nameof(SendSessionMessageCommand), payload)
+    {
+        this.payload = payload;
+        Value = payload;
+        base.SessionId = payload.SessionId.Value.ToString("N", CultureInfo.InvariantCulture);
+    }
 
-    public string Message => _payload.Message;
+    public new SessionId SessionId => payload.SessionId;
+
+    public string Message => payload.Message;
 
     [GenerateSerializer]
     public sealed record Payload(

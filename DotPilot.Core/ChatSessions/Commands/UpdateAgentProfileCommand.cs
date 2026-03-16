@@ -5,7 +5,7 @@ namespace DotPilot.Core.ChatSessions.Commands;
 
 public sealed class UpdateAgentProfileCommand : Command<UpdateAgentProfileCommand.Payload>
 {
-    private readonly Payload _payload;
+    private readonly Payload payload;
 
     public UpdateAgentProfileCommand(
         AgentProfileId agentId,
@@ -14,26 +14,28 @@ public sealed class UpdateAgentProfileCommand : Command<UpdateAgentProfileComman
         string modelName,
         string systemPrompt,
         string description = "")
-        : base(
-            Guid.CreateVersion7(),
-            nameof(UpdateAgentProfileCommand),
-            new Payload(agentId, name, providerKind, modelName, systemPrompt, description))
+        : this(new Payload(agentId, name, providerKind, modelName, systemPrompt, description))
     {
-        _payload = new Payload(agentId, name, providerKind, modelName, systemPrompt, description);
-        Value = _payload;
     }
 
-    public AgentProfileId AgentId => _payload.AgentId;
+    private UpdateAgentProfileCommand(Payload payload)
+        : base(Guid.CreateVersion7(), nameof(UpdateAgentProfileCommand), payload)
+    {
+        this.payload = payload;
+        Value = payload;
+    }
 
-    public string Name => _payload.Name;
+    public AgentProfileId AgentId => payload.AgentId;
 
-    public AgentProviderKind ProviderKind => _payload.ProviderKind;
+    public string Name => payload.Name;
 
-    public string ModelName => _payload.ModelName;
+    public AgentProviderKind ProviderKind => payload.ProviderKind;
 
-    public string SystemPrompt => _payload.SystemPrompt;
+    public string ModelName => payload.ModelName;
 
-    public string Description => _payload.Description;
+    public string SystemPrompt => payload.SystemPrompt;
+
+    public string Description => payload.Description;
 
     [GenerateSerializer]
     public sealed record Payload(

@@ -5,23 +5,25 @@ namespace DotPilot.Core.ChatSessions.Commands;
 
 public sealed class CreateSessionCommand : Command<CreateSessionCommand.Payload>
 {
-    private readonly Payload _payload;
+    private readonly Payload payload;
 
     public CreateSessionCommand(
         string title,
         AgentProfileId agentProfileId)
-        : base(
-            Guid.CreateVersion7(),
-            nameof(CreateSessionCommand),
-            new Payload(title, agentProfileId))
+        : this(new Payload(title, agentProfileId))
     {
-        _payload = new Payload(title, agentProfileId);
-        Value = _payload;
     }
 
-    public string Title => _payload.Title;
+    private CreateSessionCommand(Payload payload)
+        : base(Guid.CreateVersion7(), nameof(CreateSessionCommand), payload)
+    {
+        this.payload = payload;
+        Value = payload;
+    }
 
-    public AgentProfileId AgentProfileId => _payload.AgentProfileId;
+    public string Title => payload.Title;
+
+    public AgentProfileId AgentProfileId => payload.AgentProfileId;
 
     [GenerateSerializer]
     public sealed record Payload(

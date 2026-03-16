@@ -4,23 +4,25 @@ namespace DotPilot.Core.ChatSessions.Commands;
 
 public sealed class UpdateProviderPreferenceCommand : Command<UpdateProviderPreferenceCommand.Payload>
 {
-    private readonly Payload _payload;
+    private readonly Payload payload;
 
     public UpdateProviderPreferenceCommand(
         AgentProviderKind providerKind,
         bool isEnabled)
-        : base(
-            Guid.CreateVersion7(),
-            nameof(UpdateProviderPreferenceCommand),
-            new Payload(providerKind, isEnabled))
+        : this(new Payload(providerKind, isEnabled))
     {
-        _payload = new Payload(providerKind, isEnabled);
-        Value = _payload;
     }
 
-    public AgentProviderKind ProviderKind => _payload.ProviderKind;
+    private UpdateProviderPreferenceCommand(Payload payload)
+        : base(Guid.CreateVersion7(), nameof(UpdateProviderPreferenceCommand), payload)
+    {
+        this.payload = payload;
+        Value = payload;
+    }
 
-    public bool IsEnabled => _payload.IsEnabled;
+    public AgentProviderKind ProviderKind => payload.ProviderKind;
+
+    public bool IsEnabled => payload.IsEnabled;
 
     [GenerateSerializer]
     public sealed record Payload(
