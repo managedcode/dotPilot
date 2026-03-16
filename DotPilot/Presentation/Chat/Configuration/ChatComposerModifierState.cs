@@ -17,6 +17,12 @@ public sealed class ChatComposerModifierState
 
     public bool HasPressedModifier => pressedModifierKeys.Count > 0;
 
+    public bool IsPressed(VirtualKey key)
+    {
+        var normalizedKey = NormalizeModifierKey(key);
+        return normalizedKey is not null && pressedModifierKeys.ContainsKey(normalizedKey.Value);
+    }
+
     public bool HasPressedModifierOrCurrentState(Func<VirtualKey, bool>? isCurrentlyPressed)
     {
         if (HasPressedModifier)

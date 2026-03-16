@@ -56,4 +56,68 @@ public sealed class ChatComposerKeyboardPolicyTests
 
         action.Should().Be(ChatComposerKeyboardAction.None);
     }
+
+    [Test]
+    public void ShouldHandleInComposerReturnsTrueForPlainEnterWhenEnterSends()
+    {
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterSends,
+            isEnterKey: true,
+            hasModifier: false);
+
+        var shouldHandle = ChatComposerKeyboardPolicy.ShouldHandleInComposer(
+            ComposerSendBehavior.EnterSends,
+            action,
+            hasModifier: false);
+
+        shouldHandle.Should().BeTrue();
+    }
+
+    [Test]
+    public void ShouldHandleInComposerReturnsTrueForModifierEnterWhenEnterSends()
+    {
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterSends,
+            isEnterKey: true,
+            hasModifier: true);
+
+        var shouldHandle = ChatComposerKeyboardPolicy.ShouldHandleInComposer(
+            ComposerSendBehavior.EnterSends,
+            action,
+            hasModifier: true);
+
+        shouldHandle.Should().BeTrue();
+    }
+
+    [Test]
+    public void ShouldHandleInComposerReturnsFalseForPlainEnterWhenEnterAddsNewLine()
+    {
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterInsertsNewLine,
+            isEnterKey: true,
+            hasModifier: false);
+
+        var shouldHandle = ChatComposerKeyboardPolicy.ShouldHandleInComposer(
+            ComposerSendBehavior.EnterInsertsNewLine,
+            action,
+            hasModifier: false);
+
+        shouldHandle.Should().BeFalse();
+    }
+
+    [Test]
+    public void ShouldHandleInComposerReturnsTrueForModifierEnterWhenEnterAddsNewLine()
+    {
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: ComposerSendBehavior.EnterInsertsNewLine,
+            isEnterKey: true,
+            hasModifier: true);
+
+        var shouldHandle = ChatComposerKeyboardPolicy.ShouldHandleInComposer(
+            ComposerSendBehavior.EnterInsertsNewLine,
+            action,
+            hasModifier: true);
+
+        shouldHandle.Should().BeTrue();
+    }
 }

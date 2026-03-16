@@ -58,6 +58,16 @@ public sealed class ChatComposerModifierStateTests
     }
 
     [Test]
+    public void IsPressedNormalizesModifierFamilies()
+    {
+        var state = new ChatComposerModifierState();
+        state.RegisterKeyDown(VirtualKey.RightMenu);
+
+        state.IsPressed(VirtualKey.Menu).Should().BeTrue();
+        state.IsPressed(VirtualKey.LeftMenu).Should().BeTrue();
+    }
+
+    [Test]
     public void ResetClearsTrackedModifiers()
     {
         var state = new ChatComposerModifierState();

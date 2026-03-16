@@ -1,4 +1,5 @@
 using DotPilot.UITests.Harness;
+using FluentAssertions;
 using OpenQA.Selenium;
 using UITestPlatform = Uno.UITest.Helpers.Queries.Platform;
 
@@ -345,8 +346,30 @@ public sealed class GivenChatSessionsShell : TestBase
         TakeScreenshot("chat_message_send_behavior");
     }
 
+    [TestCase(BrowserEnterModifier.Shift)]
+    [TestCase(BrowserEnterModifier.Control)]
+    [TestCase(BrowserEnterModifier.Alt)]
+    [TestCase(BrowserEnterModifier.Command)]
+    public async Task WhenEnterSendsThenModifierEnterInsertsANewLine(BrowserEnterModifier modifier)
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressModifierEnterAutomationElement(ChatComposerInputAutomationId, modifier);
+
+        TryReadBrowserInputValue(ChatComposerInputAutomationId, out var composerValue).Should().BeTrue();
+        NormalizeText(composerValue).Should().Be(UserPrompt);
+        composerValue.Replace("\r\n", "\n", StringComparison.Ordinal).Should().EndWith("\n");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        HasTextContaining(ChatMessageTextAutomationId, DebugResponsePrefix).Should().BeFalse();
+    }
+
     [Test]
-    public async Task WhenEnterAddsNewLineThenModifierEnterStillSendsTheMessage()
+    public async Task WhenEnterAddsNewLineThenPlainEnterInsertsANewLine()
     {
         await Task.CompletedTask;
 
@@ -365,14 +388,46 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
 
         ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
-        PressModifierEnterAutomationElement(ChatComposerInputAutomationId);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
+
+        TryReadBrowserInputValue(ChatComposerInputAutomationId, out var composerValue).Should().BeTrue();
+        NormalizeText(composerValue).Should().Be(UserPrompt);
+        composerValue.Replace("\r\n", "\n", StringComparison.Ordinal).Should().EndWith("\n");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        HasTextContaining(ChatMessageTextAutomationId, DebugResponsePrefix).Should().BeFalse();
+    }
+
+    [TestCase(BrowserEnterModifier.Shift)]
+    [TestCase(BrowserEnterModifier.Control)]
+    [TestCase(BrowserEnterModifier.Alt)]
+    [TestCase(BrowserEnterModifier.Command)]
+    public async Task WhenEnterAddsNewLineThenModifierEnterSendsTheMessage(BrowserEnterModifier modifier)
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        ClickActionAutomationElement(SettingsSectionMessagesButtonAutomationId);
+        WaitForElement(ComposerBehaviorSectionAutomationId);
+        ClickActionAutomationElement(ComposerBehaviorEnterInsertsNewLineButtonAutomationId);
+        WaitForTextContains(ComposerBehaviorCurrentHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+
+        TapAutomationElement(ChatNavButtonAutomationId);
+        EnsureOnChatScreen();
+        WaitForTextContains(ChatComposerHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressModifierEnterAutomationElement(ChatComposerInputAutomationId, modifier);
         WaitForElement(ChatActivityItemAutomationId);
         WaitForTextContains(ChatActivityLabelAutomationId, "status", ScreenTransitionTimeout);
         WaitForTextContains(ChatActivityLabelAutomationId, "tool", ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
 
-        TakeScreenshot("chat_shift_enter_send_behavior");
+        TakeScreenshot($"chat_{modifier.ToString().ToLowerInvariant()}_enter_send_behavior");
     }
 
     private void EnsureOnChatScreen()

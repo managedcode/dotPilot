@@ -1,68 +1,100 @@
-using Microsoft.UI.Input;
-using Microsoft.UI.Xaml.Input;
+#if !__WASM__
 using Windows.System;
-using Windows.UI.Core;
+#endif
 
 namespace DotPilot.Presentation.Controls;
 
 public sealed partial class ChatComposer : UserControl
 {
+    private const string ComposerInputAutomationId = "ChatComposerInput";
+    private const string SendButtonAutomationId = "ChatComposerSendButton";
     private const string NewLineValue = "\n";
     private readonly ChatComposerModifierState _modifierState = new();
-    public static readonly DependencyProperty SendBehaviorProperty =
-        DependencyProperty.Register(
-            nameof(SendBehavior),
-            typeof(ComposerSendBehavior),
-            typeof(ChatComposer),
-            new PropertyMetadata(ComposerSendBehavior.EnterSends));
 
     public ChatComposer()
     {
         InitializeComponent();
+        RegisterPropertyChangedCallback(TagProperty, OnBehaviorTagChanged);
+        UpdateAcceptsReturn();
     }
 
-    public ComposerSendBehavior SendBehavior
+    private void OnComposerInputKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
     {
-        get => (ComposerSendBehavior)GetValue(SendBehaviorProperty);
-        set => SetValue(SendBehaviorProperty, value);
-    }
-
-    private void OnComposerInputKeyDown(object sender, KeyRoutedEventArgs e)
-    {
+#if __WASM__
+        return;
+#else
         if (sender is not TextBox textBox)
         {
             return;
         }
 
-        _modifierState.RegisterKeyDown(e.Key);
-        var action = ChatComposerKeyboardPolicy.Resolve(
-            behavior: SendBehavior,
-            isEnterKey: e.Key is VirtualKey.Enter,
-            hasModifier: HasEffectiveModifierPressed());
-        if (action is ChatComposerKeyboardAction.SendMessage)
+        _modifierState.RegisterKeyDown(args.Key);
+        if (args.Key is not VirtualKey.Enter)
         {
-            ExecuteSubmitAction(textBox);
-            e.Handled = true;
             return;
         }
 
-        if (action is not ChatComposerKeyboardAction.InsertNewLine)
+        var hasModifier = _modifierState.HasPressedModifier;
+
+        var action = ChatComposerKeyboardPolicy.Resolve(
+            behavior: CurrentSendBehavior,
+            isEnterKey: true,
+            hasModifier: hasModifier);
+        if (!ChatComposerKeyboardPolicy.ShouldHandleInComposer(CurrentSendBehavior, action, hasModifier))
         {
+            return;
+        }
+
+#if USE_UITESTS
+        BrowserConsoleDiagnostics.Error(
+            $"[DotPilot.ChatComposer] KeyDown invoked. HasModifier={hasModifier} Action={action} Behavior={CurrentSendBehavior}.");
+#endif
+
+        args.Handled = true;
+        if (action is ChatComposerKeyboardAction.SendMessage)
+        {
+            ExecuteSubmitAction(textBox);
             return;
         }
 
         InsertNewLine(textBox);
-        e.Handled = true;
+#endif
     }
 
-    private void OnComposerInputKeyUp(object sender, KeyRoutedEventArgs e)
+    private void OnComposerInputKeyUp(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
     {
-        _modifierState.RegisterKeyUp(e.Key);
+#if !__WASM__
+        _modifierState.RegisterKeyUp(args.Key);
+#endif
     }
 
     private void OnComposerInputLostFocus(object sender, RoutedEventArgs e)
     {
         _modifierState.Reset();
+    }
+
+    private void OnBehaviorTagChanged(DependencyObject sender, DependencyProperty dependencyProperty)
+    {
+        if (!ReferenceEquals(sender, this) || dependencyProperty != TagProperty)
+        {
+            return;
+        }
+
+        UpdateAcceptsReturn();
+        _ = SynchronizeBrowserKeyboardInteropAsync();
+    }
+
+    private async void OnLoadedAsync(object sender, RoutedEventArgs e)
+    {
+        ChatComposerBrowserInterop.RegisterComposer(ComposerInputAutomationId, this);
+        await SynchronizeBrowserKeyboardInteropAsync();
+    }
+
+    private async void OnUnloadedAsync(object sender, RoutedEventArgs e)
+    {
+        _modifierState.Reset();
+        ChatComposerBrowserInterop.UnregisterComposer(ComposerInputAutomationId, this);
+        await ChatComposerBrowserInterop.DisposeAsync(ComposerInputAutomationId);
     }
 
     private void OnSendButtonClick(object sender, RoutedEventArgs e)
@@ -109,6 +141,21 @@ public sealed partial class ChatComposer : UserControl
         }
     }
 
+    internal void SubmitFromBrowser()
+    {
+        ExecuteSubmitAction(ComposerInput);
+    }
+
+    internal void ApplyTextFromBrowser(string value, int selectionStart)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        ComposerInput.Text = value;
+        ComposerInput.SelectionStart = Math.Clamp(selectionStart, 0, value.Length);
+        ComposerInput.SelectionLength = 0;
+        SynchronizeComposerText(ComposerInput);
+    }
+
     private static void SynchronizeComposerText(TextBox textBox)
     {
         ArgumentNullException.ThrowIfNull(textBox);
@@ -117,6 +164,10 @@ public sealed partial class ChatComposer : UserControl
         bindingExpression?.UpdateSource();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Style",
+        "IDE0051:Remove unused private members",
+        Justification = "Used on non-browser targets for desktop keyboard handling.")]
     private static void InsertNewLine(TextBox textBox)
     {
         ArgumentNullException.ThrowIfNull(textBox);
@@ -134,21 +185,26 @@ public sealed partial class ChatComposer : UserControl
         SynchronizeComposerText(textBox);
     }
 
-    private bool HasEffectiveModifierPressed()
+    private void UpdateAcceptsReturn()
     {
-        return _modifierState.HasPressedModifierOrCurrentState(IsModifierKeyPressed);
+        if (ComposerInput is null)
+        {
+            return;
+        }
+
+        ComposerInput.AcceptsReturn = true;
     }
 
-    private static bool IsModifierKeyPressed(VirtualKey key)
+    private Task SynchronizeBrowserKeyboardInteropAsync()
     {
-        try
-        {
-            return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & CoreVirtualKeyStates.Down)
-                == CoreVirtualKeyStates.Down;
-        }
-        catch
-        {
-            return false;
-        }
+        return ChatComposerBrowserInterop.SynchronizeAsync(
+            ComposerInputAutomationId,
+            SendButtonAutomationId,
+            CurrentSendBehavior);
     }
+
+    private ComposerSendBehavior CurrentSendBehavior =>
+        Tag is ComposerSendBehavior behavior
+            ? behavior
+            : ComposerSendBehavior.EnterSends;
 }

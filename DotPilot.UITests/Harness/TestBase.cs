@@ -284,6 +284,52 @@ public class TestBase
             var readyState = Normalize(ExecuteScript("return document.readyState;"));
             var location = Normalize(ExecuteScript("return window.location.href;"));
             var automationCount = Normalize(ExecuteScript("return document.querySelectorAll('[xamlautomationid]').length;"));
+            var composerInteropState = Normalize(ExecuteScript(
+                "return JSON.stringify(globalThis.dotPilotComposerInterop?.getDebugState?.() ?? null);"));
+            var composerInputValue = Normalize(ExecuteScript(
+                """
+                return (() => {
+                    const host = document.querySelector('[xamlautomationid="ChatComposerInput"], [aria-label="ChatComposerInput"]');
+                    const input = host?.matches('textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"]')
+                        ? host
+                        : host?.querySelector('textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"]')
+                            ?? (host?.matches('[role="textbox"]') ? host : host?.querySelector('[role="textbox"]'));
+                    if (!input) {
+                        return '';
+                    }
+
+                    if ('value' in input) {
+                        return input.value ?? '';
+                    }
+
+                    return input.textContent ?? '';
+                })();
+                """));
+            var sendButtonState = Normalize(ExecuteScript(
+                """
+                return (() => {
+                    const automationId = 'ChatComposerSendButton';
+                    const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
+                    const host = document.querySelector(selector);
+                    if (!host) {
+                        return 'missing';
+                    }
+
+                    const clickableSelector = 'button, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], a[href]';
+                    const element = host.matches(clickableSelector)
+                        ? host
+                        : host.closest(clickableSelector) ?? host.querySelector(clickableSelector) ?? host;
+
+                    return JSON.stringify({
+                        hostTag: host.tagName,
+                        hostType: host.getAttribute('xamltype') ?? '',
+                        elementTag: element?.tagName ?? '',
+                        elementRole: element?.getAttribute('role') ?? '',
+                        elementType: element?.getAttribute('type') ?? '',
+                        text: element?.innerText ?? element?.textContent ?? ''
+                    });
+                })();
+                """));
             var automationIds = Normalize(ExecuteScript(
                 "return Array.from(document.querySelectorAll('[xamlautomationid]')).slice(0, 25).map(e => e.getAttribute('xamlautomationid')).join(' | ');"));
             var ariaLabels = Normalize(ExecuteScript(
@@ -332,6 +378,9 @@ public class TestBase
                 """)));
 
             HarnessLog.Write($"Browser DOM snapshot for '{context}': readyState='{readyState}', location='{location}', xamlautomationid-count='{automationCount}'.");
+            HarnessLog.Write($"Browser DOM snapshot composer interop for '{context}': {composerInteropState}");
+            HarnessLog.Write($"Browser DOM snapshot composer input value for '{context}': {composerInputValue}");
+            HarnessLog.Write($"Browser DOM snapshot send button state for '{context}': {sendButtonState}");
             HarnessLog.Write($"Browser DOM snapshot automation ids for '{context}': {automationIds}");
             HarnessLog.Write($"Browser DOM snapshot aria-labels for '{context}': {ariaLabels}");
             HarnessLog.Write($"Browser DOM snapshot target hit test for '{context}' and automation id '{inspectedAutomationId}': {targetHitTest}");
@@ -646,7 +695,7 @@ public class TestBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
-        if (TryPressEnterBrowserInput(automationId, useModifier: false))
+        if (TryPressEnterBrowserInput(automationId, BrowserEnterModifier.None))
         {
             return;
         }
@@ -656,14 +705,25 @@ public class TestBase
 
     protected void PressModifierEnterAutomationElement(string automationId)
     {
+        PressModifierEnterAutomationElement(automationId, BrowserEnterModifier.Control);
+    }
+
+    protected void PressModifierEnterAutomationElement(string automationId, BrowserEnterModifier modifier)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
-        if (TryPressEnterBrowserInput(automationId, useModifier: true))
+        if (modifier is BrowserEnterModifier.None)
+        {
+            PressEnterAutomationElement(automationId);
+            return;
+        }
+
+        if (TryPressEnterBrowserInput(automationId, modifier))
         {
             return;
         }
 
-        App.EnterText(automationId, ComposeEnterSequence(useModifier: true));
+        App.EnterText(automationId, ComposeEnterSequence(modifier));
     }
 
     protected void WaitForAutomationElementToDisappearById(string automationId)
@@ -1623,7 +1683,7 @@ public class TestBase
             inputElement);
     }
 
-    private bool TryPressEnterBrowserInput(string automationId, bool useModifier)
+    private bool TryPressEnterBrowserInput(string automationId, BrowserEnterModifier modifier)
     {
         if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
@@ -1635,182 +1695,21 @@ public class TestBase
             if (_app
                     .GetType()
                     .GetField("_driver", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                    ?.GetValue(_app) is not IWebDriver driver ||
-                !TryFocusBrowserInput(driver, automationId, elementOverride: null))
+                    ?.GetValue(_app) is not IWebDriver driver)
             {
                 return false;
             }
 
-            if (driver is not IJavaScriptExecutor javaScriptExecutor)
+            if (TryDispatchBrowserComposerEnterShortcut(driver, automationId, modifier))
             {
-                return false;
-            }
-
-            var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
-            var controlModifier = useModifier ? "true" : "false";
-            var outcome = javaScriptExecutor.ExecuteScript(
-                string.Concat(
-                    """
-                    return (() => {
-                        const automationId = '
-                    """,
-                    escapedAutomationId,
-                    """
-                    ';
-                        const selector = `[xamlautomationid="${automationId}"], [aria-label="${automationId}"]`;
-                        const matches = Array.from(document.querySelectorAll(selector));
-                        const visibleMatches = matches.filter(element => {
-                            const rect = element.getBoundingClientRect();
-                            return rect.width > 0 &&
-                                rect.height > 0 &&
-                                rect.right > 0 &&
-                                rect.bottom > 0 &&
-                                rect.left < window.innerWidth &&
-                                rect.top < window.innerHeight;
-                        });
-                        const host = visibleMatches.find(element => element.getAttribute('xamlautomationid') === automationId)
-                            ?? visibleMatches[0]
-                            ?? matches.find(element => element.getAttribute('xamlautomationid') === automationId)
-                            ?? matches[0];
-                        if (!host) {
-                            return 'missing';
-                        }
-
-                        const inputSelector = 'textarea, input:not([type="hidden"]), [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"]';
-                        const backingSelector = 'textarea, input:not([type="hidden"])';
-                        const candidates = [
-                            ...(host.matches(inputSelector) ? [host] : []),
-                            ...Array.from(host.querySelectorAll(inputSelector))
-                        ];
-                        const backingElement = host.matches(backingSelector)
-                            ? host
-                            : host.querySelector(backingSelector);
-                        const visibleCandidates = candidates.filter(element => {
-                            const rect = element.getBoundingClientRect();
-                            const style = window.getComputedStyle(element);
-                            const isHidden = style.display === 'none' || style.visibility === 'hidden';
-                            const isDisabled = 'disabled' in element && element.disabled;
-                            const isReadOnly = 'readOnly' in element && element.readOnly;
-                            const isAriaHidden = element.getAttribute('aria-hidden') === 'true';
-
-                            return rect.width > 0 &&
-                                rect.height > 0 &&
-                                !isHidden &&
-                                !isDisabled &&
-                                !isReadOnly &&
-                                !isAriaHidden;
-                        });
-                        const visibleBackingElement = backingElement && visibleCandidates.includes(backingElement)
-                            ? backingElement
-                            : null;
-                        const input = (visibleBackingElement ? [visibleBackingElement] : visibleCandidates.length > 0 ? visibleCandidates : backingElement ? [backingElement, ...candidates] : candidates)
-                            .map(candidate => {
-                                const rect = candidate.getBoundingClientRect();
-                                const isTextArea = candidate.tagName === 'TEXTAREA';
-                                const isTextInput = candidate.tagName === 'INPUT';
-                                const isRoleTextbox = candidate.getAttribute('role') === 'textbox';
-                                const score =
-                                    (isTextArea ? 1000000 : 0) +
-                                    (isTextInput ? 100000 : 0) +
-                                    (isRoleTextbox ? 10000 : 0) +
-                                    (rect.width * rect.height);
-
-                                return { candidate, score };
-                            })
-                            .sort((left, right) => right.score - left.score)[0]?.candidate;
-                        if (!input) {
-                            return 'missing-input';
-                        }
-
-                        host.scrollIntoView({ block: 'center', inline: 'center' });
-                        if (typeof host.focus === 'function') {
-                            host.focus({ preventScroll: true });
-                        }
-                        if (typeof input.focus === 'function') {
-                            input.focus({ preventScroll: true });
-                        }
-
-                        const eventInit = {
-                            bubbles: true,
-                            cancelable: true,
-                            composed: true,
-                            key: 'Enter',
-                            code: 'Enter',
-                            keyCode: 13,
-                            which: 13,
-                            shiftKey: false,
-                            ctrlKey: 
-                    """,
-                    controlModifier,
-                    """
-                        };
-
-                        if (
-                    """,
-                    controlModifier,
-                    """
-                        ) {
-                            const modifierDownInit = {
-                                bubbles: true,
-                                cancelable: true,
-                                composed: true,
-                                key: 'Control',
-                                code: 'ControlLeft',
-                                keyCode: 17,
-                                which: 17,
-                                shiftKey: false,
-                                ctrlKey: true
-                            };
-
-                            input.dispatchEvent(new KeyboardEvent('keydown', modifierDownInit));
-                            host.dispatchEvent(new KeyboardEvent('keydown', modifierDownInit));
-                        }
-
-                        input.dispatchEvent(new KeyboardEvent('keydown', eventInit));
-                        input.dispatchEvent(new KeyboardEvent('keypress', eventInit));
-                        input.dispatchEvent(new KeyboardEvent('keyup', eventInit));
-                        host.dispatchEvent(new KeyboardEvent('keydown', eventInit));
-                        host.dispatchEvent(new KeyboardEvent('keypress', eventInit));
-                        host.dispatchEvent(new KeyboardEvent('keyup', eventInit));
-
-                        if (
-                    """,
-                    controlModifier,
-                    """
-                        ) {
-                            const modifierUpInit = {
-                                bubbles: true,
-                                cancelable: true,
-                                composed: true,
-                                key: 'Control',
-                                code: 'ControlLeft',
-                                keyCode: 17,
-                                which: 17,
-                                shiftKey: false,
-                                ctrlKey: false
-                            };
-
-                            input.dispatchEvent(new KeyboardEvent('keyup', modifierUpInit));
-                            host.dispatchEvent(new KeyboardEvent('keyup', modifierUpInit));
-                        }
-
-                        return 'pressed';
-                    })();
-                    """));
-
-            HarnessLog.Write(
-                $"Browser input {(useModifier ? "modifier+enter" : "enter")} outcome for '{automationId}': {outcome}.");
-            if (!string.Equals(
-                    Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
-                    "pressed",
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (useModifier)
-            {
+                HarnessLog.Write(
+                    $"Browser input {DescribeEnterGesture(modifier)} outcome for '{automationId}': dispatched via composer interop.");
                 return true;
+            }
+
+            if (!TryFocusBrowserInput(driver, automationId, elementOverride: null))
+            {
+                return false;
             }
 
             var inputElement = TryResolveBrowserInputElement(driver, automationId);
@@ -1819,23 +1718,166 @@ public class TestBase
                 return false;
             }
 
-            inputElement.SendKeys(Keys.Enter);
+            MoveBrowserInputCaretToEnd(driver, inputElement);
 
+            switch (modifier)
+            {
+                case BrowserEnterModifier.None:
+                    inputElement.SendKeys(Keys.Enter);
+                    break;
+                case BrowserEnterModifier.Shift:
+                case BrowserEnterModifier.Control:
+                case BrowserEnterModifier.Alt:
+                case BrowserEnterModifier.Command:
+                    var modifierKey = ResolveBrowserModifierKey(modifier);
+                    new Actions(driver)
+                        .Click(inputElement)
+                        .KeyDown(modifierKey)
+                        .SendKeys(Keys.Enter)
+                        .KeyUp(modifierKey)
+                        .Perform();
+                    break;
+                default:
+                    return false;
+            }
+
+            HarnessLog.Write(
+                $"Browser input {DescribeEnterGesture(modifier)} outcome for '{automationId}': pressed.");
             return true;
         }
         catch (Exception exception)
         {
             HarnessLog.Write(
-                $"Browser input {(useModifier ? "modifier+enter" : "enter")} failed for '{automationId}': {exception.Message}");
+                $"Browser input {DescribeEnterGesture(modifier)} failed for '{automationId}': {exception.Message}");
             return false;
         }
     }
 
-    private static string ComposeEnterSequence(bool useModifier)
+    private static bool TryDispatchBrowserComposerEnterShortcut(
+        IWebDriver driver,
+        string automationId,
+        BrowserEnterModifier modifier)
     {
-        return useModifier
-            ? string.Concat(Keys.Control, Keys.Enter, Keys.Null)
-            : Keys.Enter;
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return false;
+        }
+
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(2);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            var dispatched = javaScriptExecutor.ExecuteScript(
+                """
+                const automationId = arguments[0];
+                const modifier = arguments[1];
+                const interop = globalThis.dotPilotComposerInterop;
+                if (!interop || typeof interop.dispatchEnter !== 'function') {
+                    return "__missing__";
+                }
+
+                return interop.dispatchEnter(automationId, modifier);
+                """,
+                automationId,
+                modifier.ToString());
+
+            if (dispatched is true)
+            {
+                var debugState = javaScriptExecutor.ExecuteScript(
+                    """
+                    return JSON.stringify(globalThis.dotPilotComposerInterop?.getDebugState?.() ?? null);
+                    """);
+                HarnessLog.Write(
+                    $"Browser composer interop debug state after {DescribeEnterGesture(modifier)} for '{automationId}': {debugState}");
+                return true;
+            }
+
+            Task.Delay(TimeSpan.FromMilliseconds(50)).GetAwaiter().GetResult();
+        }
+
+        return false;
+    }
+
+    private static string ComposeEnterSequence(BrowserEnterModifier modifier)
+    {
+        return modifier switch
+        {
+            BrowserEnterModifier.None => Keys.Enter,
+            BrowserEnterModifier.Shift => string.Concat(Keys.Shift, Keys.Enter, Keys.Null),
+            BrowserEnterModifier.Control => string.Concat(Keys.Control, Keys.Enter, Keys.Null),
+            BrowserEnterModifier.Alt => string.Concat(Keys.Alt, Keys.Enter, Keys.Null),
+            BrowserEnterModifier.Command => string.Concat(Keys.Command, Keys.Enter, Keys.Null),
+            _ => Keys.Enter,
+        };
+    }
+
+    private static string DescribeEnterGesture(BrowserEnterModifier modifier)
+    {
+        return modifier switch
+        {
+            BrowserEnterModifier.None => "enter",
+            BrowserEnterModifier.Shift => "shift+enter",
+            BrowserEnterModifier.Control => "ctrl+enter",
+            BrowserEnterModifier.Alt => "alt+enter",
+            BrowserEnterModifier.Command => "command+enter",
+            _ => "enter",
+        };
+    }
+
+    private static string ResolveBrowserModifierKey(BrowserEnterModifier modifier)
+    {
+        return modifier switch
+        {
+            BrowserEnterModifier.Shift => Keys.Shift,
+            BrowserEnterModifier.Control => Keys.Control,
+            BrowserEnterModifier.Alt => Keys.Alt,
+            BrowserEnterModifier.Command => Keys.Command,
+            _ => string.Empty,
+        };
+    }
+
+    private static void MoveBrowserInputCaretToEnd(IWebDriver driver, IWebElement inputElement)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(inputElement);
+
+        if (driver is not IJavaScriptExecutor javaScriptExecutor)
+        {
+            return;
+        }
+
+        javaScriptExecutor.ExecuteScript(
+            """
+            const element = arguments[0];
+            if (!element) {
+                return;
+            }
+
+            if (typeof element.focus === 'function') {
+                element.focus({ preventScroll: true });
+            }
+
+            if (typeof element.setSelectionRange === 'function') {
+                const value = element.value ?? '';
+                element.setSelectionRange(value.length, value.length);
+                return;
+            }
+
+            if (!element.isContentEditable) {
+                return;
+            }
+
+            const selection = window.getSelection();
+            if (!selection) {
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            """,
+            inputElement);
     }
 
     private static void ClearActiveBrowserInput(IWebElement activeElement)

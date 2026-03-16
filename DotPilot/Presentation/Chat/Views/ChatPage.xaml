@@ -46,7 +46,7 @@
 
         <controls:ChatConversationView />
         <controls:ChatComposer Grid.Row="1"
-                               SendBehavior="{Binding ComposerSendBehavior}" />
+                               Tag="{Binding ComposerSendBehavior}" />
       </Grid>
 
       <controls:ChatInfoPanel Grid.Column="2" />

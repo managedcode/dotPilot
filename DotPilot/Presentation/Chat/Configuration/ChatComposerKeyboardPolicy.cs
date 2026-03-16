@@ -24,6 +24,19 @@ public static class ChatComposerKeyboardPolicy
             _ => ChatComposerKeyboardAction.SendMessage,
         };
     }
+
+    public static bool ShouldHandleInComposer(
+        ComposerSendBehavior behavior,
+        ChatComposerKeyboardAction action,
+        bool hasModifier)
+    {
+        return action switch
+        {
+            ChatComposerKeyboardAction.SendMessage => true,
+            ChatComposerKeyboardAction.InsertNewLine => behavior is ComposerSendBehavior.EnterSends || hasModifier,
+            _ => false,
+        };
+    }
 }
 
 public enum ChatComposerKeyboardAction
