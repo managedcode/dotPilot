@@ -18,6 +18,8 @@ public sealed class DesktopSleepPreventionService : IDisposable
     private readonly Lock gate = new();
     private Process? inhibitorProcess;
     private bool isSleepPreventionActive;
+    private bool isSleepPreventionPending;
+    private long stateVersion;
 
     public DesktopSleepPreventionService(
         ISessionActivityMonitor sessionActivityMonitor,
@@ -71,12 +73,10 @@ public sealed class DesktopSleepPreventionService : IDisposable
 
     private void AcquireSleepPrevention()
     {
-        lock (gate)
+        var acquisition = TryBeginAcquisition();
+        if (!acquisition.ShouldAcquire)
         {
-            if (isSleepPreventionActive)
-            {
-                return;
-            }
+            return;
         }
 
         try
@@ -84,24 +84,28 @@ public sealed class DesktopSleepPreventionService : IDisposable
             if (OperatingSystem.IsWindows())
             {
                 AcquireWindowsSleepPrevention();
-                SetActiveState("SetThreadExecutionState");
+                CompleteWindowsAcquisition(acquisition.Version, "SetThreadExecutionState");
                 return;
             }
 
             if (OperatingSystem.IsMacOS())
             {
-                SetProcessState(StartMacOsInhibitorProcess());
+                CompleteProcessAcquisition(acquisition.Version, StartMacOsInhibitorProcess());
                 return;
             }
 
             if (OperatingSystem.IsLinux())
             {
-                SetProcessState(StartLinuxInhibitorProcess());
+                CompleteProcessAcquisition(acquisition.Version, StartLinuxInhibitorProcess());
+                return;
             }
+
+            CancelPendingAcquisition(acquisition.Version);
         }
         catch (Exception exception)
         {
             ShellSleepPreventionLog.AcquireFailed(logger, exception);
+            CancelPendingAcquisition(acquisition.Version);
             ReleaseSleepPrevention();
         }
     }
@@ -109,24 +113,28 @@ public sealed class DesktopSleepPreventionService : IDisposable
     private void ReleaseSleepPrevention()
     {
         Process? processToStop;
+        bool shouldReleaseWindows;
         bool wasActive;
 
         lock (gate)
         {
-            if (!isSleepPreventionActive && inhibitorProcess is null)
+            stateVersion++;
+            if (!isSleepPreventionActive && !isSleepPreventionPending && inhibitorProcess is null)
             {
                 return;
             }
 
-            if (OperatingSystem.IsWindows() && isSleepPreventionActive)
-            {
-                ReleaseWindowsSleepPrevention();
-            }
-
+            shouldReleaseWindows = OperatingSystem.IsWindows() && isSleepPreventionActive;
             processToStop = inhibitorProcess;
             inhibitorProcess = null;
             wasActive = isSleepPreventionActive;
             isSleepPreventionActive = false;
+            isSleepPreventionPending = false;
+        }
+
+        if (shouldReleaseWindows)
+        {
+            ReleaseWindowsSleepPrevention();
         }
 
         StopProcess(processToStop);
@@ -139,27 +147,77 @@ public sealed class DesktopSleepPreventionService : IDisposable
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void SetProcessState(Process process)
+    private (bool ShouldAcquire, long Version) TryBeginAcquisition()
     {
         lock (gate)
         {
-            inhibitorProcess = process;
-            isSleepPreventionActive = true;
+            if (isSleepPreventionActive || isSleepPreventionPending)
+            {
+                return (false, stateVersion);
+            }
+
+            stateVersion++;
+            isSleepPreventionPending = true;
+            return (true, stateVersion);
+        }
+    }
+
+    private void CompleteProcessAcquisition(long version, Process process)
+    {
+        var acquired = false;
+        lock (gate)
+        {
+            if (isSleepPreventionPending && !isSleepPreventionActive && version == stateVersion)
+            {
+                inhibitorProcess = process;
+                isSleepPreventionActive = true;
+                isSleepPreventionPending = false;
+                acquired = true;
+            }
+        }
+
+        if (!acquired)
+        {
+            StopProcess(process);
+            return;
         }
 
         ShellSleepPreventionLog.Acquired(logger, process.ProcessName);
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void SetActiveState(string mechanism)
+    private void CompleteWindowsAcquisition(long version, string mechanism)
     {
+        var acquired = false;
         lock (gate)
         {
-            isSleepPreventionActive = true;
+            if (isSleepPreventionPending && !isSleepPreventionActive && version == stateVersion)
+            {
+                isSleepPreventionActive = true;
+                isSleepPreventionPending = false;
+                acquired = true;
+            }
+        }
+
+        if (!acquired)
+        {
+            ReleaseWindowsSleepPrevention();
+            return;
         }
 
         ShellSleepPreventionLog.Acquired(logger, mechanism);
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CancelPendingAcquisition(long version)
+    {
+        lock (gate)
+        {
+            if (isSleepPreventionPending && !isSleepPreventionActive && version == stateVersion)
+            {
+                isSleepPreventionPending = false;
+            }
+        }
     }
 
     private static void AcquireWindowsSleepPrevention()

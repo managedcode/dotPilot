@@ -101,6 +101,34 @@ public sealed class ChatModelTests
     }
 
     [Test]
+    public async Task RefreshInvalidatesTheFleetProviderSnapshotAfterProviderChanges()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(ChatModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        await using var fixture = await CreateFixtureAsync();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
+
+        var initialBoard = await model.FleetBoard;
+        initialBoard.Should().NotBeNull();
+        initialBoard!.Providers.Should().Contain(provider =>
+            provider.DisplayName == "Codex" &&
+            provider.StatusLabel == "Disabled");
+
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        await model.Refresh(CancellationToken.None);
+
+        var refreshedBoard = await model.FleetBoard;
+        refreshedBoard.Should().NotBeNull();
+        refreshedBoard!.Providers.Should().Contain(provider =>
+            provider.DisplayName == "Codex" &&
+            provider.StatusLabel == "Ready");
+    }
+
+    [Test]
     public async Task FleetBoardShowsTheActiveSessionWhileStreamingAndClearsAfterCompletion()
     {
         await using var fixture = await CreateFixtureAsync();
