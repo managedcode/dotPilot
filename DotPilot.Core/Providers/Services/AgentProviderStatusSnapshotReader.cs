@@ -105,14 +105,14 @@ internal static class AgentProviderStatusSnapshotReader
             }
             else
             {
-                installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
-                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
-
                 var metadata = await ResolveMetadataAsync(profile, executablePath, cancellationToken).ConfigureAwait(false);
-                installedVersion = ResolveInstalledVersion(
-                    installedVersion,
-                    metadata.InstalledVersion,
-                    profile.CommandName);
+                installedVersion = metadata.InstalledVersion;
+                if (!LooksLikeInstalledVersion(installedVersion, profile.CommandName))
+                {
+                    installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
+                }
+
+                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
                 suggestedModelName = ResolveSuggestedModel(profile.DefaultModelName, metadata.SuggestedModelName);
                 supportedModelNames = ResolveSupportedModels(
                     profile.DefaultModelName,
@@ -193,21 +193,6 @@ internal static class AgentProviderStatusSnapshotReader
         return string.IsNullOrWhiteSpace(suggestedModelName)
             ? defaultModelName
             : suggestedModelName;
-    }
-
-    private static string? ResolveInstalledVersion(
-        string? probedInstalledVersion,
-        string? discoveredInstalledVersion,
-        string commandName)
-    {
-        if (LooksLikeInstalledVersion(discoveredInstalledVersion, commandName))
-        {
-            return discoveredInstalledVersion;
-        }
-
-        return string.IsNullOrWhiteSpace(probedInstalledVersion)
-            ? discoveredInstalledVersion
-            : probedInstalledVersion;
     }
 
     private static bool LooksLikeInstalledVersion(string? installedVersion, string commandName)

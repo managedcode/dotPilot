@@ -60,7 +60,7 @@ public sealed class StartupWorkspaceHydrationTests
             hydration.IsHydrating.Should().BeFalse();
             hydration.IsReady.Should().BeFalse();
 
-            Directory.Delete(databasePath);
+            await DeleteDirectoryWithRetryAsync(databasePath);
 
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 
@@ -71,7 +71,7 @@ public sealed class StartupWorkspaceHydrationTests
         {
             if (Directory.Exists(rootPath))
             {
-                Directory.Delete(rootPath, recursive: true);
+                await DeleteDirectoryWithRetryAsync(rootPath);
             }
         }
     }
@@ -102,6 +102,31 @@ public sealed class StartupWorkspaceHydrationTests
         public ValueTask DisposeAsync()
         {
             return Provider.DisposeAsync();
+        }
+    }
+
+    private static async Task DeleteDirectoryWithRetryAsync(string path)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                await Task.Delay(100);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 4)
+            {
+                await Task.Delay(100);
+            }
         }
     }
 }

@@ -639,7 +639,32 @@ public sealed class AgentSessionServiceTests
             await _provider.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(_tempRootPath) && Directory.Exists(_tempRootPath))
             {
-                Directory.Delete(_tempRootPath, recursive: true);
+                await DeleteDirectoryWithRetryAsync(_tempRootPath);
+            }
+        }
+    }
+
+    private static async Task DeleteDirectoryWithRetryAsync(string path)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                await Task.Delay(100);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 4)
+            {
+                await Task.Delay(100);
             }
         }
     }
