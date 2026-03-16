@@ -5,41 +5,33 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DotPilot.Tests.Workspace;
 
 [NonParallelizable]
-public sealed class AgentWorkspaceStateTests
+public sealed class StartupWorkspaceHydrationTests
 {
     [Test]
-    public async Task RepeatedWorkspaceReadsReuseTheHydratedProviderSnapshotUntilManualRefresh()
+    public async Task EnsureHydratedAsyncWarmsProviderStatusForSubsequentWorkspaceReads()
     {
-        using var commandScope = CodexCliTestScope.Create(nameof(AgentWorkspaceStateTests));
+        using var commandScope = CodexCliTestScope.Create(nameof(StartupWorkspaceHydrationTests));
         commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: 0);
         commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
 
         await using var fixture = CreateFixture();
+        var hydration = fixture.Provider.GetRequiredService<IStartupWorkspaceHydration>();
 
-        var initialWorkspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        initialWorkspace.Providers
-            .Single(provider => provider.Kind == AgentProviderKind.Codex)
-            .InstalledVersion
-            .Should()
-            .Be("1.0.0");
+        await hydration.EnsureHydratedAsync(CancellationToken.None);
+
+        commandScope.ReadInvocationCount("codex").Should().Be(1);
 
         commandScope.WriteCountingVersionCommand("codex", "codex version 2.0.0", delayMilliseconds: 0);
         commandScope.WriteCodexMetadata("gpt-5.1", "gpt-5.1");
 
-        var cachedWorkspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        cachedWorkspace.Providers
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+
+        workspace.Providers
             .Single(provider => provider.Kind == AgentProviderKind.Codex)
             .InstalledVersion
             .Should()
             .Be("1.0.0");
         commandScope.ReadInvocationCount("codex").Should().Be(1);
-
-        var refreshedWorkspace = (await fixture.WorkspaceState.RefreshWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
-        refreshedWorkspace.Providers
-            .Single(provider => provider.Kind == AgentProviderKind.Codex)
-            .InstalledVersion
-            .Should()
-            .Be("2.0.0");
     }
 
     private static TestFixture CreateFixture()
@@ -54,16 +46,20 @@ public sealed class AgentWorkspaceStateTests
         });
 
         var provider = services.BuildServiceProvider();
-        return new TestFixture(provider, provider.GetRequiredService<IAgentWorkspaceState>());
+        return new TestFixture(
+            provider,
+            provider.GetRequiredService<IAgentWorkspaceState>());
     }
 
     private sealed class TestFixture(ServiceProvider provider, IAgentWorkspaceState workspaceState) : IAsyncDisposable
     {
+        public ServiceProvider Provider { get; } = provider;
+
         public IAgentWorkspaceState WorkspaceState { get; } = workspaceState;
 
         public ValueTask DisposeAsync()
         {
-            return provider.DisposeAsync();
+            return Provider.DisposeAsync();
         }
     }
 }

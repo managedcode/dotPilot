@@ -2,59 +2,60 @@ namespace DotPilot.Presentation.Controls;
 
 public sealed partial class AgentBasicInfoSection : UserControl
 {
+    public static readonly DependencyProperty ProviderSelectionChangedCommandProperty =
+        DependencyProperty.Register(
+            nameof(ProviderSelectionChangedCommand),
+            typeof(ICommand),
+            typeof(AgentBasicInfoSection),
+            new PropertyMetadata(null));
+
+    public static readonly DependencyProperty SelectModelCommandProperty =
+        DependencyProperty.Register(
+            nameof(SelectModelCommand),
+            typeof(ICommand),
+            typeof(AgentBasicInfoSection),
+            new PropertyMetadata(null));
+
     public AgentBasicInfoSection()
     {
         InitializeComponent();
     }
 
-    public bool IsBrowserHead => OperatingSystem.IsBrowser();
+    public ICommand? ProviderSelectionChangedCommand
+    {
+        get => (ICommand?)GetValue(ProviderSelectionChangedCommandProperty);
+        set => SetValue(ProviderSelectionChangedCommandProperty, value);
+    }
 
-    public bool IsDesktopHead => !IsBrowserHead;
+    public ICommand? SelectModelCommand
+    {
+        get => (ICommand?)GetValue(SelectModelCommandProperty);
+        set => SetValue(SelectModelCommandProperty, value);
+    }
+
+    public bool IsBrowserHead => OperatingSystem.IsBrowser();
 
     private void OnProviderSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (sender is not ComboBox comboBox)
-        {
-            return;
-        }
-
-        AgentProviderKind? selectedProviderKind = e.AddedItems.OfType<AgentProviderOption>().FirstOrDefault()?.Kind;
-        selectedProviderKind ??= comboBox.SelectedValue as AgentProviderKind?;
-        if (selectedProviderKind is null &&
-            comboBox.SelectedItem is AgentProviderOption selectedProvider)
-        {
-            selectedProviderKind = selectedProvider.Kind;
-        }
-
-        _ = comboBox.DispatcherQueue.TryEnqueue(() =>
-        {
-            BrowserConsoleDiagnostics.Info(
-                $"[DotPilot.AgentBuilder] Provider selection changed. Provider={selectedProviderKind?.ToString() ?? "<null>"}.");
-            BoundCommandBridge.Execute(comboBox.Tag as ICommand, selectedProviderKind);
-        });
+        var provider = e.AddedItems.OfType<AgentProviderOption>().FirstOrDefault();
+        BrowserConsoleDiagnostics.Info(
+            $"[DotPilot.AgentBuilder] Provider selection changed. Provider={provider?.Kind.ToString() ?? "<null>"}.");
+        BoundCommandBridge.Execute(ProviderSelectionChangedCommand, provider);
     }
 
     private void OnProviderQuickSelectButtonClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button)
-        {
-            return;
-        }
-
+        var provider = (sender as FrameworkElement)?.DataContext as AgentProviderOption;
         BrowserConsoleDiagnostics.Info(
-            $"[DotPilot.AgentBuilder] Provider quick-select clicked. Provider={button.CommandParameter?.ToString() ?? "<null>"}.");
-        BoundCommandBridge.Execute(button.Tag as ICommand, button.CommandParameter);
+            $"[DotPilot.AgentBuilder] Provider quick-select clicked. Provider={provider?.Kind.ToString() ?? "<null>"}.");
+        BoundCommandBridge.Execute(ProviderSelectionChangedCommand, provider);
     }
 
     private void OnModelQuickSelectButtonClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button)
-        {
-            return;
-        }
-
+        var model = (sender as FrameworkElement)?.DataContext as AgentModelOption;
         BrowserConsoleDiagnostics.Info(
-            $"[DotPilot.AgentBuilder] Model quick-select clicked. Model={button.CommandParameter?.ToString() ?? "<null>"}.");
-        BoundCommandBridge.Execute(button.Tag as ICommand, button.CommandParameter);
+            $"[DotPilot.AgentBuilder] Model quick-select clicked. Model={model?.DisplayName ?? "<null>"}.");
+        BoundCommandBridge.Execute(SelectModelCommand, model);
     }
 }

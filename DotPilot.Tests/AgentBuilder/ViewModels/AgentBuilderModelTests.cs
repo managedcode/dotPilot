@@ -1,5 +1,5 @@
-using DotPilot.Core.ChatSessions;
 using DotPilot.Core.AgentBuilder;
+using DotPilot.Core.ChatSessions;
 using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,10 +25,9 @@ public sealed class AgentBuilderModelTests
         await model.AgentRequest.SetAsync("Create a repository reviewer", CancellationToken.None);
         await model.GenerateAgentDraft(CancellationToken.None);
 
-        var builder = (await model.Builder)!;
-        builder.ProviderDisplayName.Should().Be("Codex");
-        builder.SuggestedModelName.Should().Be("gpt-5.4");
-        builder.CanCreateAgent.Should().BeTrue();
+        (await model.BuilderProviderDisplayName).Should().Be("Codex");
+        (await model.BuilderSuggestedModelName).Should().Be("gpt-5.4");
+        (await model.BuilderCanCreateAgent).Should().BeTrue();
         (await model.ModelName).Should().Be("gpt-5.4");
         (await model.AgentName).Should().Be("Repository Reviewer Agent");
 
@@ -42,7 +41,7 @@ public sealed class AgentBuilderModelTests
         workspace.Sessions.Should().Contain(session => session.Title == "Session with Repository Reviewer Agent");
         workspace.SelectedSessionId.Should().NotBeNull();
         fixture.RequestedRoutes.Should().Contain(ShellRoute.Chat);
-        (await model.Builder)!.StatusMessage.Should().Contain("ready for local desktop execution");
+        (await model.BuilderStatusMessage).Should().Contain("ready for local desktop execution");
     }
 
     [Test]
@@ -63,17 +62,15 @@ public sealed class AgentBuilderModelTests
                 false),
             CancellationToken.None);
 
-        var builder = (await model.Builder)!;
-
-        builder.ProviderDisplayName.Should().Be("GitHub Copilot");
-        builder.ProviderCommandName.Should().Be("copilot");
-        builder.ProviderVersionLabel.Should().Be("Version 0.0.421");
-        builder.HasProviderVersion.Should().BeTrue();
-        builder.SuggestedModelName.Should().Be("gpt-5");
-        builder.SupportedModelNames.Should().ContainInOrder("gpt-5", "claude-opus-4.6");
-        builder.HasSupportedModels.Should().BeTrue();
-        builder.StatusMessage.Should().Be("GitHub Copilot CLI is available on PATH.");
-        builder.CanCreateAgent.Should().BeFalse();
+        (await model.BuilderProviderDisplayName).Should().Be("GitHub Copilot");
+        (await model.BuilderProviderCommandName).Should().Be("copilot");
+        (await model.BuilderProviderVersionLabel).Should().Be("Version 0.0.421");
+        (await model.BuilderHasProviderVersion).Should().BeTrue();
+        (await model.BuilderSuggestedModelName).Should().Be("gpt-5");
+        (await model.BuilderSupportedModelNames).Should().ContainInOrder("gpt-5", "claude-opus-4.6");
+        (await model.BuilderHasSupportedModels).Should().BeTrue();
+        (await model.BuilderStatusMessage).Should().Be("GitHub Copilot CLI is available on PATH.");
+        (await model.BuilderCanCreateAgent).Should().BeFalse();
     }
 
     [Test]
@@ -95,8 +92,8 @@ public sealed class AgentBuilderModelTests
         var surface = await model.Surface;
         surface!.ShowEditor.Should().BeTrue();
         (await model.AgentName).Should().Be("New agent");
-        (await model.Builder)!.ProviderDisplayName.Should().Be("Codex");
-        (await model.Builder)!.SuggestedModelName.Should().Be("gpt-5.4");
+        (await model.BuilderProviderDisplayName).Should().Be("Codex");
+        (await model.BuilderSuggestedModelName).Should().Be("gpt-5.4");
         (await model.OperationMessage).Should().Be("Manual draft ready. Adjust the profile before saving.");
     }
 
@@ -110,11 +107,10 @@ public sealed class AgentBuilderModelTests
         await model.OpenCreateAgent(CancellationToken.None);
         await model.BuildManually(CancellationToken.None);
 
-        var builder = (await model.Builder)!;
-        builder.ProviderDisplayName.Should().Be("Codex");
-        builder.SuggestedModelName.Should().Be("gpt-5");
-        builder.ModelHelperText.Should().Be("Choose one of the supported models for this provider. Suggested: gpt-5.");
-        builder.CanCreateAgent.Should().BeFalse();
+        (await model.BuilderProviderDisplayName).Should().Be("Codex");
+        (await model.BuilderSuggestedModelName).Should().Be("gpt-5");
+        (await model.BuilderModelHelperText).Should().Be("Choose one of the supported models for this provider. Suggested: gpt-5.");
+        (await model.BuilderCanCreateAgent).Should().BeFalse();
         (await model.ModelName).Should().Be("gpt-5");
     }
 
@@ -193,7 +189,7 @@ public sealed class AgentBuilderModelTests
     }
 
     [Test]
-    public async Task BuilderProjectionUsesSelectedProviderKindWhenThePreviousProviderStateIsStale()
+    public async Task HandleProviderSelectionChangedUsesProviderKindParameterWhenNoProviderOptionIsProvided()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
@@ -212,31 +208,16 @@ public sealed class AgentBuilderModelTests
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.BuildManually(CancellationToken.None);
-        await model.SelectedProvider.UpdateAsync(
-            _ => new AgentProviderOption(
-                AgentProviderKind.Debug,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                [],
-                null,
-                false),
-            CancellationToken.None);
-        await model.SelectedProviderKind.SetAsync(AgentProviderKind.ClaudeCode, CancellationToken.None);
+        await model.HandleProviderSelectionChanged(AgentProviderKind.ClaudeCode, CancellationToken.None);
 
-        var builder = await model.Builder;
-
-        builder.Should().NotBeNull();
-
-        builder!.ProviderDisplayName.Should().Be("Claude Code");
-        builder.SuggestedModelName.Should().Be("claude-opus-4-6");
+        (await model.BuilderProviderDisplayName).Should().Be("Claude Code");
+        (await model.BuilderSuggestedModelName).Should().Be("claude-opus-4-6");
         (await model.SelectedProvider).Should().NotBeNull();
         (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.ClaudeCode);
     }
 
     [Test]
-    public async Task BuilderProjectionPrefersTheSelectedProviderWhenTheProviderKindStateIsStale()
+    public async Task HandleProviderSelectionChangedUsesTheProvidedProviderWhenThePreviousProviderRemainsPopulated()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
         commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
@@ -255,8 +236,10 @@ public sealed class AgentBuilderModelTests
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.BuildManually(CancellationToken.None);
-        await model.SelectedProvider.UpdateAsync(
-            _ => new AgentProviderOption(
+        (await model.BuilderProviderDisplayName).Should().Be("Codex");
+
+        await model.HandleProviderSelectionChanged(
+            new AgentProviderOption(
                 AgentProviderKind.ClaudeCode,
                 "Claude Code",
                 "claude",
@@ -266,13 +249,14 @@ public sealed class AgentBuilderModelTests
                 "2.0.75",
                 true),
             CancellationToken.None);
-        await model.SelectedProviderKind.SetAsync(AgentProviderKind.Codex, CancellationToken.None);
 
-        var builder = await model.Builder;
+        (await model.SelectedProvider).Should().NotBeNull();
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.ClaudeCode);
+        (await model.SelectedProviderKind).Should().Be(AgentProviderKind.ClaudeCode);
+        (await model.ModelName).Should().Be("claude-opus-4-6");
 
-        builder.Should().NotBeNull();
-        builder!.ProviderDisplayName.Should().Be("Claude Code");
-        builder.SuggestedModelName.Should().Be("claude-opus-4-6");
+        (await model.BuilderProviderDisplayName).Should().Be("Claude Code");
+        (await model.BuilderSuggestedModelName).Should().Be("claude-opus-4-6");
     }
 
     [Test]

@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:presentation="using:DotPilot.Presentation"
              x:Name="Root"
+             SelectProviderCommand="{Binding SelectProviderCommand}"
+             ToggleSelectedProviderCommand="{Binding ToggleSelectedProviderCommand}"
+             ExecuteProviderActionCommand="{Binding ExecuteProviderActionCommand}"
              AutomationProperties.AutomationId="SettingsShell">
   <Grid ColumnSpacing="18">
     <Grid.ColumnDefinitions>
@@ -163,8 +166,8 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="presentation:ProviderStatusItem">
                             <Button AutomationProperties.AutomationId="{x:Bind AutomationId}"
-                                    Command="{Binding DataContext.SelectProviderCommand, ElementName=Root}"
-                                    CommandParameter="{Binding}"
+                                    Click="OnProviderButtonClick"
+                                    Tag="{x:Bind}"
                                     Margin="0,0,0,10"
                                     Style="{StaticResource SettingsNavButtonStyle}">
                               <Grid ColumnSpacing="10">
@@ -281,8 +284,8 @@
 
                               <Button Grid.Column="1"
                                       AutomationProperties.AutomationId="ProviderActionButton"
-                                      Command="{Binding DataContext.ExecuteProviderActionCommand, ElementName=Root}"
-                                      CommandParameter="{Binding}"
+                                      Click="OnProviderActionButtonClick"
+                                      Tag="{x:Bind}"
                                       Style="{StaticResource InlineActionButtonStyle}"
                                       VerticalAlignment="Center">
                                 <TextBlock Text="Copy" />
@@ -301,7 +304,7 @@
                     </Grid.ColumnDefinitions>
 
                     <Button AutomationProperties.AutomationId="ToggleProviderButton"
-                            Command="{Binding ToggleSelectedProviderCommand}"
+                            Click="OnToggleProviderButtonClick"
                             IsEnabled="{Binding CanToggleSelectedProvider}"
                             Style="{StaticResource AccentActionButtonStyle}">
                       <TextBlock Text="{Binding ToggleActionLabel}" />

@@ -79,6 +79,10 @@ internal sealed class AgentSessionService(
                 providers,
                 sessionItems.Length > 0 ? sessionItems[0].Id : null));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             AgentSessionServiceLog.WorkspaceLoadFailed(logger, exception);
@@ -123,6 +127,10 @@ internal sealed class AgentSessionService(
                 snapshot.Participants.Count);
 
             return Result<SessionTranscriptSnapshot>.Succeed(snapshot);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -791,12 +799,14 @@ internal sealed class AgentSessionService(
         bool forceRefresh,
         CancellationToken cancellationToken)
     {
-        _ = forceRefresh;
-        return await providerStatusReader.ReadAsync(cancellationToken);
+        return forceRefresh
+            ? await providerStatusReader.RefreshAsync(cancellationToken)
+            : await providerStatusReader.ReadAsync(cancellationToken);
     }
 
-    private static void InvalidateProviderStatusSnapshot()
+    private void InvalidateProviderStatusSnapshot()
     {
+        providerStatusReader.Invalidate();
     }
 
     private async Task NormalizeLegacyAgentProfilesAsync(

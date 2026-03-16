@@ -37,7 +37,6 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string AgentProviderClaudeCodeOptionAutomationId = "AgentProviderOption_ClaudeCode";
     private const string AgentProviderCodexOptionAutomationId = "AgentProviderOption_Codex";
     private const string AgentSelectedProviderTextAutomationId = "AgentSelectedProviderText";
-    private const string AgentModelGpt5OptionAutomationId = "AgentModelOption_gpt5";
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
     private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
@@ -47,6 +46,8 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ChatStartNewButtonAutomationId = "ChatStartNewButton";
     private const string ChatTitleTextAutomationId = "ChatTitleText";
     private const string ChatMessageTextAutomationId = "ChatMessageText";
+    private const string ChatActivityItemAutomationId = "ChatActivityItem";
+    private const string ChatActivityLabelAutomationId = "ChatActivityLabel";
     private const string ChatRecentChatItemAutomationId = "ChatRecentChatItem";
     private const string ToggleProviderButtonAutomationId = "ToggleProviderButton";
     private const string SaveAgentButtonAutomationId = "SaveAgentButton";
@@ -100,6 +101,9 @@ public sealed class GivenChatSessionsShell : TestBase
 
         ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
         PressEnterAutomationElement(ChatComposerInputAutomationId);
+        WaitForElement(ChatActivityItemAutomationId);
+        WaitForTextContains(ChatActivityLabelAutomationId, "status", ScreenTransitionTimeout);
+        WaitForTextContains(ChatActivityLabelAutomationId, "tool", ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
 
@@ -174,7 +178,9 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AgentBasicInfoSectionAutomationId);
         WaitForTextContains(AgentSelectedProviderTextAutomationId, "Codex", ScreenTransitionTimeout);
 
-        ClickActionAutomationElement(AgentProviderClaudeCodeOptionAutomationId);
+        ClickActionAutomationElement(
+            AgentProviderClaudeCodeOptionAutomationId,
+            () => HasTextContaining(AgentSelectedProviderTextAutomationId, "Claude Code"));
 
         WaitForTextContains(AgentSelectedProviderTextAutomationId, "Claude Code", ScreenTransitionTimeout);
 
@@ -186,7 +192,7 @@ public sealed class GivenChatSessionsShell : TestBase
     {
         await Task.CompletedTask;
 
-        EnsureProviderEnabled(CodexProviderEntryAutomationId);
+        EnsureProviderEnabled(CodexProviderEntryAutomationId, "Codex");
 
         TapAutomationElement(AgentsNavButtonAutomationId);
         WaitForElement(AgentBuilderScreenAutomationId);
@@ -196,8 +202,9 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AgentBasicInfoSectionAutomationId);
 
         ReplaceTextAutomationElement("AgentNameInput", "UI Codex Agent");
-        ClickActionAutomationElement(AgentProviderCodexOptionAutomationId);
-        ClickActionAutomationElement(AgentModelGpt5OptionAutomationId);
+        ClickActionAutomationElement(
+            AgentProviderCodexOptionAutomationId,
+            () => HasTextContaining(AgentSelectedProviderTextAutomationId, "Codex"));
         ReplaceTextAutomationElement("AgentDescriptionInput", "UI-created Codex agent.");
         ReplaceTextAutomationElement("AgentSystemPromptInput", "Answer briefly.");
 
@@ -232,6 +239,36 @@ public sealed class GivenChatSessionsShell : TestBase
         TakeScreenshot("chat_message_send_behavior");
     }
 
+    [Test]
+    public async Task WhenEnterAddsNewLineThenModifierEnterStillSendsTheMessage()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        TapAutomationElement(ProvidersNavButtonAutomationId);
+        WaitForElement(SettingsScreenAutomationId);
+        ClickActionAutomationElement(SettingsSectionMessagesButtonAutomationId);
+        WaitForElement(ComposerBehaviorSectionAutomationId);
+        ClickActionAutomationElement(ComposerBehaviorEnterInsertsNewLineButtonAutomationId);
+        WaitForTextContains(ComposerBehaviorCurrentHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+
+        TapAutomationElement(ChatNavButtonAutomationId);
+        EnsureOnChatScreen();
+        WaitForTextContains(ChatComposerHintAutomationId, "Enter adds a new line.", ScreenTransitionTimeout);
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressModifierEnterAutomationElement(ChatComposerInputAutomationId);
+        WaitForElement(ChatActivityItemAutomationId);
+        WaitForTextContains(ChatActivityLabelAutomationId, "status", ScreenTransitionTimeout);
+        WaitForTextContains(ChatActivityLabelAutomationId, "tool", ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
+
+        TakeScreenshot("chat_shift_enter_send_behavior");
+    }
+
     private void EnsureOnChatScreen()
     {
         if (TryWaitForElement(ChatScreenAutomationId, InitialScreenProbeTimeout))
@@ -245,21 +282,46 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(ChatComposerInputAutomationId);
     }
 
-    private void EnsureProviderEnabled(string providerEntryAutomationId)
+    private void EnsureProviderEnabled(string providerEntryAutomationId, string providerDisplayName)
     {
         EnsureOnChatScreen();
         TapAutomationElement(ProvidersNavButtonAutomationId);
         WaitForElement(SettingsScreenAutomationId);
         WaitForElement(ProviderListAutomationId);
-        TapAutomationElement(providerEntryAutomationId);
+        ClickActionAutomationElement(
+            providerEntryAutomationId,
+            () => HasTextContaining(SelectedProviderTitleAutomationId, providerDisplayName));
         WaitForElement(ToggleProviderButtonAutomationId);
 
         var toggleText = ReadPrimaryText(ToggleProviderButtonAutomationId);
         if (toggleText.Contains("Enable provider", StringComparison.Ordinal))
         {
-            ClickActionAutomationElement(ToggleProviderButtonAutomationId);
+            ClickActionAutomationElement(
+                ToggleProviderButtonAutomationId,
+                () => HasTextContaining(ToggleProviderButtonAutomationId, "Disable provider"));
             WaitForTextContains(ToggleProviderButtonAutomationId, "Disable provider", ScreenTransitionTimeout);
         }
+    }
+
+    private bool HasTextContaining(string automationId, string expectedText)
+    {
+        var texts = App.Query(automationId)
+            .Select(result => NormalizeText(result.Text))
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .ToArray();
+        if (texts.Any(text => text.Contains(expectedText, StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        if (TryReadBrowserInputValue(automationId, out var inputValue) &&
+            NormalizeText(inputValue).Contains(expectedText, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return TryReadBrowserAutomationTexts(automationId, out var browserTexts) &&
+            browserTexts.Any(text => NormalizeText(text).Contains(expectedText, StringComparison.Ordinal));
     }
 
     private string ReadPrimaryText(string automationId)

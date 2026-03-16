@@ -360,6 +360,11 @@ public class TestBase
                 {
                     TryScrollBrowserAutomationElementIntoView(automationId);
 
+                    if (TryActivateBrowserAutomationElement(automationId))
+                    {
+                        return;
+                    }
+
                     try
                     {
                         App.Tap(automationId);
@@ -369,11 +374,6 @@ public class TestBase
                     catch (Exception exception)
                     {
                         HarnessLog.Write($"Uno.UITest tap failed for '{automationId}': {exception.Message}");
-                    }
-
-                    if (TryActivateBrowserAutomationElement(automationId))
-                    {
-                        return;
                     }
 
                     if (TryClickBrowserAutomationElementAtCenter(automationId))
@@ -479,17 +479,35 @@ public class TestBase
 
     protected void ClickActionAutomationElement(string automationId, bool expectElementToDisappear = false)
     {
+        ClickActionAutomationElement(automationId, effectObserved: null, expectElementToDisappear);
+    }
+
+    protected void ClickActionAutomationElement(
+        string automationId,
+        Func<bool>? effectObserved,
+        bool expectElementToDisappear = false)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
         if (Constants.CurrentPlatform == UITestPlatform.Browser)
         {
             TryScrollBrowserAutomationElementIntoView(automationId);
 
+            if (TryActivateBrowserAutomationElement(automationId))
+            {
+                if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
+                {
+                    return;
+                }
+
+                HarnessLog.Write($"Action '{automationId}' remained visible after keyboard activation; trying Uno.UITest tap.");
+            }
+
             try
             {
                 App.Tap(automationId);
                 HarnessLog.Write($"Uno.UITest action tap outcome for '{automationId}': tapped");
-                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
                 {
                     return;
                 }
@@ -503,7 +521,7 @@ public class TestBase
 
             if (TryPerformBrowserClickAction(automationId))
             {
-                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
                 {
                     return;
                 }
@@ -513,7 +531,7 @@ public class TestBase
 
             if (TryClickBrowserAutomationElement(automationId))
             {
-                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
                 {
                     return;
                 }
@@ -523,22 +541,12 @@ public class TestBase
 
             if (TryClickBrowserAutomationElementAtCenter(automationId))
             {
-                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
                 {
                     return;
                 }
 
                 HarnessLog.Write($"Action '{automationId}' remained visible after center-point click; trying keyboard activation.");
-            }
-
-            if (TryActivateBrowserAutomationElement(automationId))
-            {
-                if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
-                {
-                    return;
-                }
-
-                HarnessLog.Write($"Action '{automationId}' remained visible after keyboard activation; trying coordinate tap.");
             }
 
             try
@@ -549,7 +557,7 @@ public class TestBase
                     var target = matches[0];
                     App.TapCoordinates(target.Rect.CenterX, target.Rect.CenterY);
                     HarnessLog.Write($"Coordinate action tap outcome for '{automationId}': tapped");
-                    if (!expectElementToDisappear || WaitForAutomationElementToDisappear(automationId))
+                    if (DidBrowserActionTakeEffect(automationId, effectObserved, expectElementToDisappear))
                     {
                         return;
                     }
@@ -562,6 +570,60 @@ public class TestBase
         }
 
         TapAutomationElement(automationId);
+    }
+
+    private bool DidBrowserActionTakeEffect(
+        string automationId,
+        Func<bool>? effectObserved,
+        bool expectElementToDisappear)
+    {
+        if (effectObserved is not null)
+        {
+            return WaitForActionEffect(effectObserved);
+        }
+
+        if (!expectElementToDisappear)
+        {
+            return true;
+        }
+
+        return WaitForAutomationElementToDisappear(automationId);
+    }
+
+    private static bool WaitForActionEffect(Func<bool> effectObserved)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow.Add(PostClickTransitionProbeTimeout);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            try
+            {
+                if (effectObserved())
+                {
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (StaleElementReferenceException)
+            {
+            }
+
+            Task.Delay(QueryRetryFrequency).GetAwaiter().GetResult();
+        }
+
+        try
+        {
+            return effectObserved();
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+        catch (StaleElementReferenceException)
+        {
+            return false;
+        }
     }
 
     private bool WaitForAutomationElementToDisappear(string automationId)
@@ -584,12 +646,24 @@ public class TestBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
-        if (TryPressEnterBrowserInput(automationId))
+        if (TryPressEnterBrowserInput(automationId, useModifier: false))
         {
             return;
         }
 
         App.EnterText(automationId, Keys.Enter);
+    }
+
+    protected void PressModifierEnterAutomationElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (TryPressEnterBrowserInput(automationId, useModifier: true))
+        {
+            return;
+        }
+
+        App.EnterText(automationId, ComposeEnterSequence(useModifier: true));
     }
 
     protected void SelectComboBoxAutomationElementOption(string automationId, string optionText)
@@ -1530,7 +1604,7 @@ public class TestBase
             inputElement);
     }
 
-    private bool TryPressEnterBrowserInput(string automationId)
+    private bool TryPressEnterBrowserInput(string automationId, bool useModifier)
     {
         if (Constants.CurrentPlatform != UITestPlatform.Browser || _app is null)
         {
@@ -1554,6 +1628,7 @@ public class TestBase
             }
 
             var escapedAutomationId = automationId.Replace("'", "\\'", StringComparison.Ordinal);
+            var controlModifier = useModifier ? "true" : "false";
             var outcome = javaScriptExecutor.ExecuteScript(
                 string.Concat(
                     """
@@ -1643,8 +1718,34 @@ public class TestBase
                             key: 'Enter',
                             code: 'Enter',
                             keyCode: 13,
-                            which: 13
+                            which: 13,
+                            shiftKey: false,
+                            ctrlKey: 
+                    """,
+                    controlModifier,
+                    """
                         };
+
+                        if (
+                    """,
+                    controlModifier,
+                    """
+                        ) {
+                            const modifierDownInit = {
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true,
+                                key: 'Control',
+                                code: 'ControlLeft',
+                                keyCode: 17,
+                                which: 17,
+                                shiftKey: false,
+                                ctrlKey: true
+                            };
+
+                            input.dispatchEvent(new KeyboardEvent('keydown', modifierDownInit));
+                            host.dispatchEvent(new KeyboardEvent('keydown', modifierDownInit));
+                        }
 
                         input.dispatchEvent(new KeyboardEvent('keydown', eventInit));
                         input.dispatchEvent(new KeyboardEvent('keypress', eventInit));
@@ -1652,11 +1753,34 @@ public class TestBase
                         host.dispatchEvent(new KeyboardEvent('keydown', eventInit));
                         host.dispatchEvent(new KeyboardEvent('keypress', eventInit));
                         host.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+
+                        if (
+                    """,
+                    controlModifier,
+                    """
+                        ) {
+                            const modifierUpInit = {
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true,
+                                key: 'Control',
+                                code: 'ControlLeft',
+                                keyCode: 17,
+                                which: 17,
+                                shiftKey: false,
+                                ctrlKey: false
+                            };
+
+                            input.dispatchEvent(new KeyboardEvent('keyup', modifierUpInit));
+                            host.dispatchEvent(new KeyboardEvent('keyup', modifierUpInit));
+                        }
+
                         return 'pressed';
                     })();
                     """));
 
-            HarnessLog.Write($"Browser input enter outcome for '{automationId}': {outcome}.");
+            HarnessLog.Write(
+                $"Browser input {(useModifier ? "modifier+enter" : "enter")} outcome for '{automationId}': {outcome}.");
             if (!string.Equals(
                     Convert.ToString(outcome, System.Globalization.CultureInfo.InvariantCulture),
                     "pressed",
@@ -1665,15 +1789,34 @@ public class TestBase
                 return false;
             }
 
+            if (useModifier)
+            {
+                return true;
+            }
+
             var inputElement = TryResolveBrowserInputElement(driver, automationId);
-            inputElement?.SendKeys(Keys.Enter);
+            if (inputElement is null)
+            {
+                return false;
+            }
+
+            inputElement.SendKeys(Keys.Enter);
+
             return true;
         }
         catch (Exception exception)
         {
-            HarnessLog.Write($"Browser input enter failed for '{automationId}': {exception.Message}");
+            HarnessLog.Write(
+                $"Browser input {(useModifier ? "modifier+enter" : "enter")} failed for '{automationId}': {exception.Message}");
             return false;
         }
+    }
+
+    private static string ComposeEnterSequence(bool useModifier)
+    {
+        return useModifier
+            ? string.Concat(Keys.Control, Keys.Enter, Keys.Null)
+            : Keys.Enter;
     }
 
     private static void ClearActiveBrowserInput(IWebElement activeElement)

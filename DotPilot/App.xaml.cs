@@ -14,6 +14,8 @@ public partial class App : Application
     private const string BuilderCreatedMarker = "Uno host builder created.";
     private const string NavigateStartedMarker = "Navigating to shell.";
     private const string NavigateCompletedMarker = "Shell navigation completed.";
+    private const string StartupHydrationStartedMarker = "Startup workspace hydration started.";
+    private const string StartupHydrationCompletedMarker = "Startup workspace hydration completed.";
     private const string DotPilotCategoryName = "DotPilot";
 #if !__WASM__
     private const string CenterMethodName = "Center";
@@ -120,11 +122,15 @@ public partial class App : Application
             WriteStartupMarker(NavigateStartedMarker);
             Host = await builder.NavigateAsync<Shell>();
             WriteStartupMarker(NavigateCompletedMarker);
+            WriteStartupMarker(StartupHydrationStartedMarker);
+            var startupHydration = Host.Services.GetRequiredService<IStartupWorkspaceHydration>();
+            await startupHydration.EnsureHydratedAsync(CancellationToken.None);
+            WriteStartupMarker(StartupHydrationCompletedMarker);
             ServicesReady?.Invoke(this, EventArgs.Empty);
             var appLogger = Host.Services.GetRequiredService<ILogger<App>>();
             AppLog.StartupMarker(
                 appLogger,
-                NavigateCompletedMarker);
+                StartupHydrationCompletedMarker);
 #if !__WASM__
             CenterDesktopWindow(MainWindow);
 #endif

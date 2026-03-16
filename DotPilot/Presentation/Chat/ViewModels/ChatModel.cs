@@ -87,6 +87,9 @@ public partial record ChatModel
             _sessionRefresh.Raise();
             await EnsureSelectedChatAsync(cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception exception)
         {
             ChatModelLog.Failure(logger, exception);
@@ -126,6 +129,9 @@ public partial record ChatModel
             await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
             _workspaceRefresh.Raise();
             _sessionRefresh.Raise();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
@@ -219,6 +225,9 @@ public partial record ChatModel
                 await FeedbackMessage.SetAsync(string.Empty, cancellationToken);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception exception)
         {
             ChatModelLog.Failure(logger, exception);
@@ -244,6 +253,10 @@ public partial record ChatModel
                 .ToImmutableArray();
             await EnsureSelectedChatAsync(workspace, sessions, cancellationToken);
             return sessions;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

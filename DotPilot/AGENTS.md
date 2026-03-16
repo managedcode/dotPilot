@@ -49,6 +49,8 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Do not hide distinct product features under one presentation umbrella directory such as `Presentation/AgentSessions`; keep `Chat`, `AgentBuilder`, `Settings`, `Shell`, and shared infrastructure in explicit feature roots.
 - Inside each presentation feature root, keep `Models`, `Views`, `ViewModels`, `Controls`, and `Configuration` explicit instead of mixing page, view-model, model, and policy files together at the top level.
 - The chat composer must expose an operator setting for send behavior with exactly two modes: `Enter` sends while `Enter` with modifiers inserts a new line, or `Enter` inserts a new line while `Enter` with modifiers sends; do not hardcode only one behavior.
+- Tool calls, thinking/status updates, and other live agent activity must render inline in the main chat transcript in a compact Codex-like flow; do not split that activity into a separate side surface or force the operator to reconstruct the run from disconnected panels.
+- While the active chat is streaming new transcript rows, the conversation viewport must auto-scroll to the latest activity by default so tool calls, status lines, and assistant output stay visible without manual scrolling.
 - Prefer declarative `Uno.Extensions.Navigation` in XAML via `uen:Navigation.Request` over page code-behind navigation calls.
 - Keep business logic, persistence, networking workflows, and non-UI orchestration out of page code-behind.
 - Do not cast `DataContext` to concrete screen models or call their methods from control/page code-behind; if a framework event needs bridging, expose a bindable command or presentation-safe abstraction instead of coupling the view to a specific view-model type.
@@ -59,6 +61,7 @@ Stack: `.NET 10`, `Uno Platform`, `Uno.Extensions.Navigation`, `Uno Toolkit`, de
 - Treat desktop window sizing and positioning as an app-startup responsibility in `App.xaml.cs`.
 - For local UI debugging on this machine, run the real desktop head and prefer local `Uno` app tooling or MCP inspection over `browserwasm` reproduction unless the task is specifically about `DotPilot.UITests`.
 - Do not let ordinary view-model binding or section switching trigger duplicate provider CLI probes or log expected async cancellation as failures; the shell should stay quiet and reactive during normal navigation.
+- App startup may use a dedicated splash/loading state to hydrate provider readiness and installed CLI metadata once before the main shell becomes interactive; after that, the presentation layer should reuse the startup snapshot and only request reprobes on explicit refresh or provider-setting changes.
 - Prefer `Microsoft Agent Framework` for orchestration, sessions, workflows, HITL, MCP-aware runtime features, and OpenTelemetry-based observability hooks.
 - Keep the prompt-to-agent interpreter outside the page layer: the Uno shell should collect the user prompt and render the generated draft, while the runtime or a dedicated system-agent orchestration service decides agent name, description, tools, providers, and policy-compliant defaults.
 - Persist durable chat/session/operator state outside the UI layer, using `EF Core` with `SQLite` for the local desktop store when data must survive restarts.

@@ -37,6 +37,73 @@ public sealed class AgentProviderStatusReaderTests
     }
 
     [Test]
+    public async Task ReadAsyncReusesTheCachedSnapshotUntilItIsInvalidated()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: 0);
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+
+        await using var fixture = CreateFixture();
+        var reader = fixture.Provider.GetRequiredService<IAgentProviderStatusReader>();
+
+        var initialSnapshot = await reader.ReadAsync(CancellationToken.None);
+        initialSnapshot
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("1.0.0");
+        commandScope.ReadInvocationCount("codex").Should().Be(1);
+
+        commandScope.WriteCountingVersionCommand("codex", "codex version 2.0.0", delayMilliseconds: 0);
+        commandScope.WriteCodexMetadata("gpt-5.1", "gpt-5.1");
+
+        var cachedSnapshot = await reader.ReadAsync(CancellationToken.None);
+        cachedSnapshot
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("1.0.0");
+        commandScope.ReadInvocationCount("codex").Should().Be(1);
+
+        reader.Invalidate();
+
+        var refreshedSnapshot = await reader.ReadAsync(CancellationToken.None);
+        refreshedSnapshot
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("2.0.0");
+    }
+
+    [Test]
+    public async Task InvalidateDuringAnActiveProbeForcesTheNextReadToStartANewProbe()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: 300);
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+
+        await using var fixture = CreateFixture();
+        var reader = fixture.Provider.GetRequiredService<IAgentProviderStatusReader>();
+
+        var initialReadTask = reader.ReadAsync(CancellationToken.None).AsTask();
+        await Task.Delay(75);
+
+        reader.Invalidate();
+        commandScope.WriteCountingVersionCommand("codex", "codex version 2.0.0", delayMilliseconds: 0);
+        commandScope.WriteCodexMetadata("gpt-5.1", "gpt-5.1");
+
+        var refreshedSnapshot = await reader.ReadAsync(CancellationToken.None);
+        refreshedSnapshot
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("2.0.0");
+
+        var initialSnapshot = await initialReadTask;
+        initialSnapshot.Should().NotBeEmpty();
+    }
+
+    [Test]
     public async Task EnabledCodexProviderReportsReadyRuntimeAndCliMetadata()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));

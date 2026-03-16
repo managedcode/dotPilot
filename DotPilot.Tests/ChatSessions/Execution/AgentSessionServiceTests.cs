@@ -310,6 +310,48 @@ public sealed class AgentSessionServiceTests
                 StringComparison.Ordinal));
     }
 
+    [Test]
+    public async Task GetWorkspaceAsyncReusesCachedProviderSnapshotAfterWarmRead()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        await using var fixture = CreateFixture();
+
+        var initialWorkspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        initialWorkspace.Providers
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("1.0.0");
+
+        commandScope.WriteCountingVersionCommand("codex", "codex version 2.0.0", delayMilliseconds: 300);
+        commandScope.WriteCodexMetadata("gpt-5.1", "gpt-5.1");
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        var cachedWorkspace = (await fixture.Service.GetWorkspaceAsync(cancellationSource.Token)).ShouldSucceed();
+        cachedWorkspace.Providers
+            .Single(provider => provider.Kind == AgentProviderKind.Codex)
+            .InstalledVersion
+            .Should()
+            .Be("1.0.0");
+    }
+
+    [Test]
+    public async Task GetSessionAsyncPropagatesCallerCancellation()
+    {
+        await using var fixture = CreateFixture();
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Cancellation Agent");
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Cancellation session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        using var cancellationSource = new CancellationTokenSource();
+        await cancellationSource.CancelAsync();
+
+        _ = Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            _ = await fixture.Service.GetSessionAsync(session.Session.Id, cancellationSource.Token));
+    }
+
     private static async Task<AgentProfileSummary> EnableDebugAndCreateAgentAsync(
         IAgentSessionService service,
         string name)

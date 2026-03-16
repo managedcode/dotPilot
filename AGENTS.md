@@ -186,6 +186,7 @@ For this app:
 - When agent conversations must survive restarts, persist the full `AgentSession` plus chat history through an Agent Framework history/storage provider backed by a local desktop folder; do not reduce durable conversation state to transcript text rows only
 - Do not add cache layers for provider CLIs, model catalogs, workspace projections, or similar environment state unless the user explicitly asks for caching; prefer direct reads from the current source of truth
 - Current repository policy is stricter than the default: do not keep provider-status caches, workspace/session in-memory mirrors, or app-preference caches at all unless the user explicitly asks to bring a specific cache back
+- The current explicit exception is startup readiness hydration: the app may show a splash/loading state at launch, probe installed provider CLIs and related metadata once during that startup window, and then reuse that startup snapshot until an explicit refresh or provider-setting change invalidates it
 - Provider CLI probing must not rerun as a side effect of ordinary screen binding or MVUX state re-evaluation; normal shell loads should share one in-flight probe and only reprobe on explicit refresh or provider-setting changes
 - Expected cancellation from state re-evaluation or navigation must not be logged as a product failure; reserve failure logs for real errors, not superseded async loads
 - Runtime and orchestration flows must emit structured `ILogger` logs for provider readiness, agent creation, session creation, send execution, and failure paths; ad hoc console-only startup traces are not enough to debug the product
@@ -391,6 +392,7 @@ Ask first:
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.
+- When one requested slice is complete and verified, commit it before switching to the next GitHub issue so each backlog step stays isolated and reviewable.
 - Keep `DotPilot` feeling like a fast desktop control plane: startup, navigation, and visible UI reactions should be prompt, and agents should remove unnecessary waits instead of normalizing slow web-style loading behavior.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.

@@ -50,18 +50,17 @@
                      FontWeight="Medium"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
                      Text="Provider" />
-          <Border Style="{StaticResource BuilderInputSurfaceStyle}"
-                  Visibility="{Binding IsDesktopHead, ElementName=Root}">
+          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
             <ComboBox x:Name="ProviderCombo"
                       AutomationProperties.AutomationId="AgentProviderCombo"
                       SelectionChanged="OnProviderSelectionChanged"
                       Style="{StaticResource BuilderComboBoxStyle}"
                       DisplayMemberPath="DisplayName"
                       ItemsSource="{Binding Providers}"
-                      SelectedValue="{Binding SelectedProviderKind, Mode=TwoWay}"
-                      SelectedValuePath="Kind" />
+                      SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
           </Border>
-          <ItemsControl AutomationProperties.AutomationId="AgentProviderBrowserOptions"
+          <ItemsControl x:Name="ProviderBrowserOptions"
+                        AutomationProperties.AutomationId="AgentProviderBrowserOptions"
                         ItemsSource="{Binding Providers}"
                         Visibility="{Binding IsBrowserHead, ElementName=Root}">
             <ItemsControl.ItemsPanel>
@@ -74,7 +73,6 @@
               <DataTemplate x:DataType="presentation:AgentProviderOption">
                 <Button AutomationProperties.AutomationId="{x:Bind SelectionAutomationId}"
                         Click="OnProviderQuickSelectButtonClick"
-                        CommandParameter="{x:Bind Kind}"
                         Style="{StaticResource InlineActionButtonStyle}">
                   <TextBlock Text="{x:Bind DisplayName}" />
                 </Button>
@@ -90,17 +88,17 @@
                      FontWeight="Medium"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
                      Text="Model" />
-          <Border Style="{StaticResource BuilderInputSurfaceStyle}"
-                  Visibility="{Binding IsDesktopHead, ElementName=Root}">
+          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
             <ComboBox AutomationProperties.AutomationId="AgentModelInput"
-                      IsEnabled="{Binding Builder.HasSupportedModels}"
-                      ItemsSource="{Binding Builder.SupportedModelNames}"
-                      PlaceholderText="{Binding Builder.SuggestedModelName}"
+                      IsEnabled="{Binding BuilderHasSupportedModels}"
+                      ItemsSource="{Binding BuilderSupportedModelNames}"
+                      PlaceholderText="{Binding BuilderSuggestedModelName}"
                       SelectedItem="{Binding ModelName, Mode=TwoWay}"
                       Style="{StaticResource BuilderComboBoxStyle}" />
           </Border>
-          <ItemsControl AutomationProperties.AutomationId="AgentModelBrowserOptions"
-                        ItemsSource="{Binding Builder.SupportedModels}"
+          <ItemsControl x:Name="ModelBrowserOptions"
+                        AutomationProperties.AutomationId="AgentModelBrowserOptions"
+                        ItemsSource="{Binding BuilderSupportedModels}"
                         Visibility="{Binding IsBrowserHead, ElementName=Root}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -112,7 +110,6 @@
               <DataTemplate x:DataType="presentation:AgentModelOption">
                 <Button AutomationProperties.AutomationId="{x:Bind SelectionAutomationId}"
                         Click="OnModelQuickSelectButtonClick"
-                        CommandParameter="{x:Bind DisplayName}"
                         Style="{StaticResource InlineActionButtonStyle}">
                   <TextBlock Text="{x:Bind DisplayName}" />
                 </Button>
@@ -122,7 +119,7 @@
           <TextBlock AutomationProperties.AutomationId="AgentSuggestedModelText"
                      FontSize="11.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{Binding Builder.ModelHelperText}"
+                     Text="{Binding BuilderModelHelperText}"
                      TextWrapping="WrapWholeWords" />
         </StackPanel>
 
@@ -137,18 +134,18 @@
           <TextBlock AutomationProperties.AutomationId="AgentSelectedProviderText"
                      FontSize="13"
                      FontWeight="SemiBold"
-                     Text="{Binding Builder.ProviderDisplayName}" />
+                     Text="{Binding BuilderProviderDisplayName}" />
           <TextBlock FontSize="11.5"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{Binding Builder.ProviderStatusSummary}"
+                     Text="{Binding BuilderProviderStatusSummary}"
                      TextWrapping="WrapWholeWords" />
           <TextBlock FontSize="11.5"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="{Binding Builder.ProviderCommandName}" />
+                     Text="{Binding BuilderProviderCommandName}" />
           <TextBlock FontSize="11.5"
                      Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="{Binding Builder.ProviderVersionLabel}"
-                     Visibility="{Binding Builder.HasProviderVersion}" />
+                     Text="{Binding BuilderProviderVersionLabel}"
+                     Visibility="{Binding BuilderHasProviderVersion}" />
         </StackPanel>
       </Grid>
     </StackPanel>

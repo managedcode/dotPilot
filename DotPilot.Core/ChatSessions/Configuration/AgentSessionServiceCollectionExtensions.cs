@@ -24,6 +24,7 @@ public static class AgentSessionServiceCollectionExtensions
         services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<IAgentSessionService, AgentSessionService>();
         services.AddSingleton<IAgentWorkspaceState, AgentWorkspaceState>();
+        services.AddSingleton<IStartupWorkspaceHydration, StartupWorkspaceHydration>();
         return services;
     }
 

@@ -59,7 +59,7 @@
           <TextBlock AutomationProperties.AutomationId="AgentCreateHelperMessage"
                      FontSize="12"
                      Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{Binding Builder.StatusMessage}"
+                     Text="{Binding BuilderStatusMessage}"
                      TextWrapping="WrapWholeWords" />
           <TextBlock AutomationProperties.AutomationId="AgentCreateStatusMessage"
                      FontSize="12"

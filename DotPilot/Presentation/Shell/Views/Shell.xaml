@@ -171,5 +171,40 @@
                       HorizontalContentAlignment="Stretch"
                       VerticalContentAlignment="Stretch" />
     </Grid>
+
+    <Grid AutomationProperties.AutomationId="StartupSplashScreen"
+          Visibility="{Binding StartupOverlayVisibility}">
+      <Border Background="{StaticResource AppShellBackgroundBrush}"
+              Opacity="0.76" />
+      <Border Style="{StaticResource GlassPanelStyle}"
+              Width="420"
+              MaxWidth="420"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="24">
+        <StackPanel Spacing="14">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="14">
+            <ProgressRing Width="28"
+                          Height="28"
+                          IsActive="True" />
+            <StackPanel Spacing="4">
+              <TextBlock FontSize="20"
+                         FontWeight="SemiBold"
+                         Text="{Binding StartupTitle}" />
+              <TextBlock Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding StartupSummary}"
+                         TextWrapping="WrapWholeWords" />
+            </StackPanel>
+          </StackPanel>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <TextBlock Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="This runs once at startup and the app reuses the hydrated provider snapshot until you refresh it."
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </Page>

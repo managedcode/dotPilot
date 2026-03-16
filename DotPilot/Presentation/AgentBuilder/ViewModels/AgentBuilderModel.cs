@@ -55,6 +55,19 @@ public partial record AgentBuilderModel(
         new(AgentBuilderSurfaceKind.PromptComposer, PromptTitle, PromptSubtitle, true, string.Empty);
     private static readonly AgentBuilderSurface EditorSurface =
         new(AgentBuilderSurfaceKind.Editor, PromptTitle, EditorSubtitle, true, SaveActionLabel);
+    private static readonly AgentBuilderView EmptyBuilderView =
+        new(
+            EmptyProviderDisplayName,
+            EmptyProviderStatusSummary,
+            EmptyProviderCommandName,
+            string.Empty,
+            false,
+            string.Empty,
+            [],
+            false,
+            EmptyModelHelperText,
+            EmptyProviderStatusSummary,
+            false);
     private AsyncCommand? _openCreateAgentCommand;
     private AsyncCommand? _returnToCatalogCommand;
     private AsyncCommand? _buildManuallyCommand;
@@ -87,11 +100,37 @@ public partial record AgentBuilderModel(
 
     public IState<AgentProviderKind> SelectedProviderKind => State.Value(this, static () => AgentProviderKind.Debug);
 
+    public IState<string> BuilderProviderDisplayName => State.Value(this, static () => EmptyProviderDisplayName);
+
+    public IState<string> BuilderProviderStatusSummary => State.Value(this, static () => EmptyProviderStatusSummary);
+
+    public IState<string> BuilderProviderCommandName => State.Value(this, static () => EmptyProviderCommandName);
+
+    public IState<string> BuilderProviderVersionLabel => State.Value(this, static () => string.Empty);
+
+    public IState<bool> BuilderHasProviderVersion => State.Value(this, static () => false);
+
+    public IState<string> BuilderSuggestedModelName => State.Value(this, static () => string.Empty);
+
+    public IState<IReadOnlyList<string>> BuilderSupportedModelNames =>
+        State.Value<AgentBuilderModel, IReadOnlyList<string>>(this, static () => Array.Empty<string>());
+
+    public IState<IReadOnlyList<AgentModelOption>> BuilderSupportedModels =>
+        State.Value<AgentBuilderModel, IReadOnlyList<AgentModelOption>>(this, static () => Array.Empty<AgentModelOption>());
+
+    public IState<bool> BuilderHasSupportedModels => State.Value(this, static () => false);
+
+    public IState<string> BuilderModelHelperText => State.Value(this, static () => EmptyModelHelperText);
+
+    public IState<string> BuilderStatusMessage => State.Value(this, static () => EmptyProviderStatusSummary);
+
+    public IState<bool> BuilderCanCreateAgent => State.Value(this, static () => false);
+
     public IState<bool> CanGenerateDraft => State.Async(this, LoadCanGenerateDraftAsync);
 
     public IState<bool> CanSaveAgent => State.Async(this, LoadCanSaveAgentAsync);
 
-    public IState<AgentBuilderView> Builder => State.Async(this, LoadBuilderAsync);
+    public IState<AgentBuilderView> Builder => State.Value(this, static () => EmptyBuilderView);
 
     public ICommand OpenCreateAgentCommand =>
         _openCreateAgentCommand ??= new AsyncCommand(
@@ -133,6 +172,9 @@ public partial record AgentBuilderModel(
         await ModelName.SetAsync(string.Empty, cancellationToken);
         await SystemPrompt.SetAsync(string.Empty, cancellationToken);
         await OperationMessage.SetAsync(string.Empty, cancellationToken);
+        await SelectedProvider.UpdateAsync(_ => EmptySelectedProvider, cancellationToken);
+        await SelectedProviderKind.UpdateAsync(_ => AgentProviderKind.Debug, cancellationToken);
+        await ApplyBuilderViewAsync(EmptyBuilderView, cancellationToken);
         await Surface.UpdateAsync(_ => PromptSurface, cancellationToken);
     }
 
@@ -171,25 +213,8 @@ public partial record AgentBuilderModel(
         AgentProviderOption? provider,
         CancellationToken cancellationToken)
     {
-        if (provider is null || IsEmptySelectedProvider(provider))
-        {
-            return;
-        }
-
-        var previousProvider = (await SelectedProvider) ?? EmptySelectedProvider;
-        var currentModelName = (await ModelName) ?? string.Empty;
-        var previousSuggestedModel = ResolveSuggestedModelName(previousProvider);
-        var nextSuggestedModel = ResolveSuggestedModelName(provider);
-        var shouldUpdateModel = string.IsNullOrWhiteSpace(currentModelName) ||
-            string.Equals(currentModelName, previousSuggestedModel, StringComparison.Ordinal) ||
-            !SupportsModel(provider, currentModelName);
-
-        await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
-        await SelectedProviderKind.UpdateAsync(_ => provider.Kind, cancellationToken);
-        if (shouldUpdateModel)
-        {
-            await ModelName.UpdateAsync(_ => nextSuggestedModel, cancellationToken);
-        }
+        await SetSelectedProviderStateAsync(provider, synchronizeModel: true, refreshBuilder: false, cancellationToken);
+        await RefreshBuilderAsync(provider, cancellationToken);
     }
 
     public async ValueTask HandleProviderSelectionChanged(
@@ -221,6 +246,7 @@ public partial record AgentBuilderModel(
         }
 
         await ModelName.UpdateAsync(_ => modelName.Trim(), cancellationToken);
+        await RefreshBuilderAsync(cancellationToken);
     }
 
     private async ValueTask SubmitAgentDraftCore(string? promptOverride, CancellationToken cancellationToken)
@@ -453,34 +479,6 @@ public partial record AgentBuilderModel(
             !string.IsNullOrWhiteSpace(agentName);
     }
 
-    private async ValueTask<AgentBuilderView> LoadBuilderAsync(CancellationToken cancellationToken)
-    {
-        var selectedProvider = await ResolveSelectedProviderAsync(cancellationToken);
-        var suggestedModelName = ResolveSuggestedModelName(selectedProvider);
-        var providerVersionLabel = string.IsNullOrWhiteSpace(selectedProvider.InstalledVersion)
-            ? string.Empty
-            : VersionPrefix + selectedProvider.InstalledVersion;
-        var modelHelperText = string.IsNullOrWhiteSpace(suggestedModelName)
-            ? EmptyModelHelperText
-            : string.Format(
-                System.Globalization.CultureInfo.InvariantCulture,
-                SuggestedModelHelperCompositeFormat,
-                suggestedModelName);
-
-        return new AgentBuilderView(
-            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderDisplayName : selectedProvider.DisplayName,
-            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderStatusSummary : selectedProvider.StatusSummary,
-            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderCommandName : selectedProvider.CommandName,
-            providerVersionLabel,
-            !string.IsNullOrWhiteSpace(providerVersionLabel),
-            suggestedModelName,
-            ResolveSupportedModelNames(selectedProvider),
-            ResolveSupportedModelNames(selectedProvider).Count > 0,
-            modelHelperText,
-            ResolveStatusMessage(selectedProvider),
-            await CanSaveAgent);
-    }
-
     private async ValueTask ApplyDraftAsync(AgentPromptDraft draft, CancellationToken cancellationToken)
     {
         await AgentName.SetAsync(draft.Name, cancellationToken);
@@ -501,6 +499,7 @@ public partial record AgentBuilderModel(
 
         await HandleSelectedProviderChanged(provider, cancellationToken);
         await ModelName.SetAsync(ResolveDraftModelName(draft, provider), cancellationToken);
+        await RefreshBuilderAsync(cancellationToken);
     }
 
     private async ValueTask EnsureSelectedProviderAsync(
@@ -510,8 +509,13 @@ public partial record AgentBuilderModel(
         var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
         var selectedProviderKind = await SelectedProviderKind;
         var resolvedProvider = IsEmptySelectedProvider(selectedProvider)
-            ? FindProviderByKind(providers, selectedProviderKind)
+            ? EmptySelectedProvider
             : FindProviderByKind(providers, selectedProvider.Kind);
+
+        if (IsEmptySelectedProvider(resolvedProvider))
+        {
+            resolvedProvider = FindProviderByKind(providers, selectedProviderKind);
+        }
 
         if (IsEmptySelectedProvider(resolvedProvider))
         {
@@ -523,39 +527,171 @@ public partial record AgentBuilderModel(
             resolvedProvider = providers[0];
         }
 
-        if (!Equals(selectedProvider, resolvedProvider))
+        if (!Equals(selectedProvider, resolvedProvider) || selectedProviderKind != resolvedProvider.Kind)
         {
-            await HandleSelectedProviderChanged(resolvedProvider, cancellationToken);
+            await SetSelectedProviderStateAsync(
+                resolvedProvider,
+                synchronizeModel: true,
+                refreshBuilder: false,
+                cancellationToken);
         }
+    }
+
+    private async ValueTask SetSelectedProviderStateAsync(
+        AgentProviderOption? provider,
+        bool synchronizeModel,
+        bool refreshBuilder,
+        CancellationToken cancellationToken)
+    {
+        if (provider is null || IsEmptySelectedProvider(provider))
+        {
+            return;
+        }
+
+        var previousProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        var currentModelName = (await ModelName) ?? string.Empty;
+        var previousSuggestedModel = ResolveSuggestedModelName(previousProvider);
+        var nextSuggestedModel = ResolveSuggestedModelName(provider);
+        var shouldUpdateModel = synchronizeModel && (
+            string.IsNullOrWhiteSpace(currentModelName) ||
+            string.Equals(currentModelName, previousSuggestedModel, StringComparison.Ordinal) ||
+            !SupportsModel(provider, currentModelName));
+
+        await SelectedProvider.UpdateAsync(_ => provider, cancellationToken);
+        await SelectedProviderKind.UpdateAsync(_ => provider.Kind, cancellationToken);
+        if (shouldUpdateModel)
+        {
+            await ModelName.UpdateAsync(_ => nextSuggestedModel, cancellationToken);
+        }
+
+        if (refreshBuilder)
+        {
+            await RefreshBuilderAsync(cancellationToken);
+        }
+    }
+
+    private async ValueTask RefreshBuilderAsync(CancellationToken cancellationToken)
+    {
+        var builder = await CreateBuilderViewAsync(providerOverride: null, cancellationToken);
+        await ApplyBuilderViewAsync(builder, cancellationToken);
+    }
+
+    private async ValueTask RefreshBuilderAsync(
+        AgentProviderOption? providerOverride,
+        CancellationToken cancellationToken)
+    {
+        var builder = await CreateBuilderViewAsync(providerOverride, cancellationToken);
+        await ApplyBuilderViewAsync(builder, cancellationToken);
+    }
+
+    private async ValueTask ApplyBuilderViewAsync(AgentBuilderView builder, CancellationToken cancellationToken)
+    {
+        await BuilderProviderDisplayName.UpdateAsync(_ => builder.ProviderDisplayName, cancellationToken);
+        await BuilderProviderStatusSummary.UpdateAsync(_ => builder.ProviderStatusSummary, cancellationToken);
+        await BuilderProviderCommandName.UpdateAsync(_ => builder.ProviderCommandName, cancellationToken);
+        await BuilderProviderVersionLabel.UpdateAsync(_ => builder.ProviderVersionLabel, cancellationToken);
+        await BuilderHasProviderVersion.UpdateAsync(_ => builder.HasProviderVersion, cancellationToken);
+        await BuilderSuggestedModelName.UpdateAsync(_ => builder.SuggestedModelName, cancellationToken);
+        await BuilderSupportedModelNames.UpdateAsync(_ => builder.SupportedModelNames, cancellationToken);
+        await BuilderSupportedModels.UpdateAsync(_ => builder.SupportedModels, cancellationToken);
+        await BuilderHasSupportedModels.UpdateAsync(_ => builder.HasSupportedModels, cancellationToken);
+        await BuilderModelHelperText.UpdateAsync(_ => builder.ModelHelperText, cancellationToken);
+        await BuilderStatusMessage.UpdateAsync(_ => builder.StatusMessage, cancellationToken);
+        await BuilderCanCreateAgent.UpdateAsync(_ => builder.CanCreateAgent, cancellationToken);
+        await Builder.UpdateAsync(_ => builder, cancellationToken);
+    }
+
+    private async ValueTask<AgentBuilderView> CreateBuilderViewAsync(
+        AgentProviderOption? providerOverride,
+        CancellationToken cancellationToken)
+    {
+        var selectedProvider = providerOverride ?? (await SelectedProvider) ?? EmptySelectedProvider;
+        if (IsEmptySelectedProvider(selectedProvider))
+        {
+            selectedProvider = await ResolveSelectedProviderAsync(cancellationToken);
+        }
+
+        var suggestedModelName = ResolveSuggestedModelName(selectedProvider);
+        var supportedModelNames = ResolveSupportedModelNames(selectedProvider);
+        var providerVersionLabel = string.IsNullOrWhiteSpace(selectedProvider.InstalledVersion)
+            ? string.Empty
+            : VersionPrefix + selectedProvider.InstalledVersion;
+        var modelHelperText = string.IsNullOrWhiteSpace(suggestedModelName)
+            ? EmptyModelHelperText
+            : string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                SuggestedModelHelperCompositeFormat,
+                suggestedModelName);
+
+        return new AgentBuilderView(
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderDisplayName : selectedProvider.DisplayName,
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderStatusSummary : selectedProvider.StatusSummary,
+            IsEmptySelectedProvider(selectedProvider) ? EmptyProviderCommandName : selectedProvider.CommandName,
+            providerVersionLabel,
+            !string.IsNullOrWhiteSpace(providerVersionLabel),
+            suggestedModelName,
+            supportedModelNames,
+            supportedModelNames.Count > 0,
+            modelHelperText,
+            ResolveStatusMessage(selectedProvider),
+            !IsEmptySelectedProvider(selectedProvider) &&
+            selectedProvider.CanCreateAgents &&
+            !string.IsNullOrWhiteSpace((await AgentName) ?? string.Empty));
     }
 
     private async ValueTask<AgentProviderOption> ResolveSelectedProviderAsync(CancellationToken cancellationToken)
     {
         var selectedProvider = (await SelectedProvider) ?? EmptySelectedProvider;
+        var providers = await Providers;
         if (!IsEmptySelectedProvider(selectedProvider))
         {
-            return selectedProvider;
+            var resolvedSelectedProvider = FindProviderByKind(providers, selectedProvider.Kind);
+            if (!IsEmptySelectedProvider(resolvedSelectedProvider))
+            {
+                if (!Equals(selectedProvider, resolvedSelectedProvider) ||
+                    await SelectedProviderKind != resolvedSelectedProvider.Kind)
+                {
+                    await SetSelectedProviderStateAsync(
+                        resolvedSelectedProvider,
+                        synchronizeModel: true,
+                        refreshBuilder: false,
+                        cancellationToken);
+                }
+
+                return resolvedSelectedProvider;
+            }
         }
 
         var selectedProviderKind = await SelectedProviderKind;
-        var providers = await Providers;
         var resolvedProvider = FindProviderByKind(providers, selectedProviderKind);
         if (!IsEmptySelectedProvider(resolvedProvider))
         {
-            await HandleSelectedProviderChanged(resolvedProvider, cancellationToken);
+            await SetSelectedProviderStateAsync(
+                resolvedProvider,
+                synchronizeModel: true,
+                refreshBuilder: false,
+                cancellationToken);
             return resolvedProvider;
         }
 
         var creatableProvider = FindFirstCreatableProvider(providers);
         if (!IsEmptySelectedProvider(creatableProvider))
         {
-            await HandleSelectedProviderChanged(creatableProvider, cancellationToken);
+            await SetSelectedProviderStateAsync(
+                creatableProvider,
+                synchronizeModel: true,
+                refreshBuilder: false,
+                cancellationToken);
             return creatableProvider;
         }
 
         if (providers.Count > 0)
         {
-            await HandleSelectedProviderChanged(providers[0], cancellationToken);
+            await SetSelectedProviderStateAsync(
+                providers[0],
+                synchronizeModel: true,
+                refreshBuilder: false,
+                cancellationToken);
             return providers[0];
         }
 

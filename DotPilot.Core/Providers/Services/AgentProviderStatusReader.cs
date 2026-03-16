@@ -12,13 +12,16 @@ internal sealed class AgentProviderStatusReader(
 {
     private const string MissingValue = "<none>";
     private readonly object activeReadSync = new();
+    private IReadOnlyList<ProviderStatusDescriptor>? cachedSnapshot;
     private Task<IReadOnlyList<ProviderStatusDescriptor>>? activeReadTask;
+    private long activeReadGeneration = -1;
+    private long snapshotGeneration;
 
     public async ValueTask<IReadOnlyList<ProviderStatusDescriptor>> ReadAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var readTask = GetOrStartActiveRead();
+            var readTask = GetOrStartActiveRead(forceRefresh: false);
             return await readTask.WaitAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -30,33 +33,100 @@ internal sealed class AgentProviderStatusReader(
             AgentProviderStatusReaderLog.ReadFailed(logger, exception);
             throw;
         }
-        finally
+    }
+
+    public async ValueTask<IReadOnlyList<ProviderStatusDescriptor>> RefreshAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            ClearCompletedActiveRead();
+            var readTask = GetOrStartActiveRead(forceRefresh: true);
+            return await readTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            AgentProviderStatusReaderLog.ReadFailed(logger, exception);
+            throw;
         }
     }
 
-    private Task<IReadOnlyList<ProviderStatusDescriptor>> GetOrStartActiveRead()
+    public void Invalidate()
     {
         lock (activeReadSync)
         {
-            if (activeReadTask is { IsCompleted: false })
+            snapshotGeneration++;
+            cachedSnapshot = null;
+        }
+    }
+
+    private Task<IReadOnlyList<ProviderStatusDescriptor>> GetOrStartActiveRead(bool forceRefresh)
+    {
+        Task<IReadOnlyList<ProviderStatusDescriptor>>? activeTask;
+        long generation;
+
+        lock (activeReadSync)
+        {
+            if (!forceRefresh && cachedSnapshot is { } snapshot)
+            {
+                return Task.FromResult(snapshot);
+            }
+
+            if (!forceRefresh &&
+                activeReadTask is { IsCompleted: false } &&
+                activeReadGeneration == snapshotGeneration)
             {
                 return activeReadTask;
             }
 
-            activeReadTask = ReadFromCurrentSourcesAsync();
-            return activeReadTask;
+            if (forceRefresh)
+            {
+                snapshotGeneration++;
+                cachedSnapshot = null;
+            }
+
+            generation = snapshotGeneration;
+            activeReadGeneration = generation;
+            activeReadTask = CreateReadTask(generation);
+            activeTask = activeReadTask;
         }
+
+        return activeTask;
     }
 
-    private void ClearCompletedActiveRead()
+    private Task<IReadOnlyList<ProviderStatusDescriptor>> CreateReadTask(long generation)
     {
-        lock (activeReadSync)
+        Task<IReadOnlyList<ProviderStatusDescriptor>>? readTask = null;
+        readTask = ReadAndCacheAsync();
+        return readTask;
+
+        async Task<IReadOnlyList<ProviderStatusDescriptor>> ReadAndCacheAsync()
         {
-            if (activeReadTask is { IsCompleted: true })
+            try
             {
-                activeReadTask = null;
+                var snapshot = await ReadFromCurrentSourcesAsync();
+                lock (activeReadSync)
+                {
+                    if (generation == snapshotGeneration)
+                    {
+                        cachedSnapshot = snapshot;
+                    }
+                }
+
+                return snapshot;
+            }
+            finally
+            {
+                lock (activeReadSync)
+                {
+                    if (ReferenceEquals(activeReadTask, readTask))
+                    {
+                        activeReadTask = null;
+                        activeReadGeneration = -1;
+                    }
+                }
             }
         }
     }

@@ -94,7 +94,48 @@
       </StackPanel>
     </DataTemplate>
 
+    <DataTemplate x:Key="ActivityMessageTemplate"
+                  x:DataType="presentation:ChatTimelineItem">
+      <Grid Margin="0,0,0,14"
+            MaxWidth="760"
+            AutomationProperties.AutomationId="ChatActivityItem">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Style="{StaticResource StatusChipStyle}"
+                VerticalAlignment="Top"
+                Padding="8,3">
+          <TextBlock AutomationProperties.AutomationId="ChatActivityLabel"
+                     FontSize="10.5"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{x:Bind AccentLabel}" />
+        </Border>
+
+        <TextBlock Grid.Column="1"
+                   Margin="10,0,0,0"
+                   AutomationProperties.AutomationId="ChatMessageText"
+                   FontSize="12.5"
+                   Foreground="{StaticResource AppSecondaryTextBrush}"
+                   LineHeight="18"
+                   Text="{x:Bind Content}"
+                   TextWrapping="WrapWholeWords" />
+
+        <TextBlock Grid.Column="2"
+                   Margin="12,0,0,0"
+                   VerticalAlignment="Top"
+                   FontSize="10.5"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="{x:Bind Timestamp}" />
+      </Grid>
+    </DataTemplate>
+
     <controls:ChatMessageTemplateSelector x:Key="ChatMessageTemplateSelector"
+                                          ActivityTemplate="{StaticResource ActivityMessageTemplate}"
                                           IncomingTemplate="{StaticResource IncomingMessageTemplate}"
                                           OutgoingTemplate="{StaticResource OutgoingMessageTemplate}" />
   </UserControl.Resources>
@@ -147,11 +188,13 @@
     <Border Grid.Row="1"
             Style="{StaticResource ChatSurfacePanelStyle}"
             Padding="0">
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <ScrollViewer x:Name="ConversationScrollViewer"
+                    VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="22,20,22,22"
                     AutomationProperties.AutomationId="ChatMessagesRegion"
                     Spacing="18">
-          <ItemsControl AutomationProperties.AutomationId="ChatMessagesList"
+          <ItemsControl x:Name="MessagesList"
+                        AutomationProperties.AutomationId="ChatMessagesList"
                         ItemTemplateSelector="{StaticResource ChatMessageTemplateSelector}"
                         ItemsSource="{Binding ActiveSession.Messages}" />
         </StackPanel>

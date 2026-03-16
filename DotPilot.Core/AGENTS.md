@@ -42,6 +42,7 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
 - keep this structure SOLID at the folder and project level too: cohesive feature slices stay together, but once a slice becomes too large or too independent, it should graduate into its own project instead of turning `DotPilot.Core` into mud
 - Keep provider-independent testing seams real and deterministic so CI can validate core flows without external CLIs.
 - Keep provider readiness probing explicit and coalesced: ordinary workspace reads may share one in-flight CLI probe, but normal navigation must not fan out into repeated PATH/version probing loops.
+- The approved caching exception in this project is startup readiness hydration: Core may keep one startup-owned provider/CLI snapshot after the initial splash-time probe, but it must invalidate that snapshot on explicit refresh or provider preference changes instead of drifting into a long-lived opaque cache layer.
 - Treat superseded async loads as cancellation, not failure; Core services should not emit error-level noise for expected state invalidation or navigation churn.
 
 ## Local Commands

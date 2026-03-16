@@ -25,7 +25,7 @@
   </Style>
 
   <Style x:Key="ChatComposerTextBoxStyle" TargetType="TextBox">
-    <Setter Property="AcceptsReturn" Value="True" />
+    <Setter Property="AcceptsReturn" Value="False" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

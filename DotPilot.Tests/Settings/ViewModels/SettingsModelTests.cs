@@ -115,6 +115,25 @@ public sealed class SettingsModelTests
             .Should().Be(ComposerSendBehavior.EnterInsertsNewLine);
     }
 
+    [Test]
+    public async Task RefreshIgnoresCancellationDuringProviderProbe()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        _ = await model.Providers;
+
+        commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: 300);
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await model.Refresh(cancellationSource.Token);
+
+        (await model.StatusMessage).Should().BeOneOf(string.Empty, "Provider readiness refreshed.");
+    }
+
     private static TestFixture CreateFixture()
     {
         var services = new ServiceCollection();

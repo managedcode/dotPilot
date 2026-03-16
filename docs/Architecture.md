@@ -9,6 +9,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns contract-shaped folders such as `ControlPlaneDomain` and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
+- **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
 - **Extraction rule:** large non-UI features start in `DotPilot.Core`, but once a slice becomes big enough to need its own boundary, it should move into a dedicated DLL that references `DotPilot.Core`, while the desktop app references that feature DLL directly.
 - **Solution-shape rule:** solution folders may group projects by stable categories such as libraries and tests, but extracted subsystems must still keep their own files, namespaces, and project-local rules inside their real project directory.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
@@ -70,19 +71,28 @@ flowchart LR
 ```mermaid
 flowchart TD
   Ui["Uno shell"]
+  Splash["Startup splash + shell overlay"]
   ViewModels["MVUX screen models + generated view-model proxies"]
   Service["IAgentSessionService"]
+  Hydration["Startup workspace hydration"]
   ProjectionStore["EF Core + SQLite projections"]
   SessionStore["Folder AgentSession + chat history"]
   ProviderCatalog["Provider catalog + readiness probe"]
+  ProviderSnapshot["Startup-owned provider snapshot"]
   ProviderClient["Provider SDK / IChatClient or debug client"]
   Stream["SessionStreamEntry updates"]
 
   Ui --> ViewModels
+  Ui --> Splash
+  Splash --> Hydration
+  Hydration --> Service
+  Hydration --> ProviderCatalog
   ViewModels --> Service
   Service --> ProjectionStore
   Service --> SessionStore
   Service --> ProviderCatalog
+  Service --> ProviderSnapshot
+  ProviderCatalog --> ProviderSnapshot
   ProviderCatalog --> ProviderClient
   Service --> ProviderClient
   ProviderClient --> Stream

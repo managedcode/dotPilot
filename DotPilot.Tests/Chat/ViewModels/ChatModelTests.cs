@@ -1,5 +1,6 @@
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
+using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.Chat;
@@ -44,6 +45,18 @@ public sealed class ChatModelTests
             message.Content.Contains("Debug provider received: hello from model", StringComparison.Ordinal));
         activeSession.Messages.Should().Contain(message =>
             message.Content.Contains("Debug workflow finished", StringComparison.Ordinal));
+        activeSession.Messages.Should().Contain(message =>
+            message.Kind == SessionStreamEntryKind.ToolStarted &&
+            string.Equals(message.AccentLabel, "tool", StringComparison.Ordinal) &&
+            message.Content.Contains("Preparing local debug workflow", StringComparison.Ordinal));
+        activeSession.Messages.Should().Contain(message =>
+            message.Kind == SessionStreamEntryKind.ToolCompleted &&
+            string.Equals(message.AccentLabel, "tool", StringComparison.Ordinal) &&
+            message.Content.Contains("Debug workflow finished", StringComparison.Ordinal));
+        activeSession.Messages.Should().Contain(message =>
+            message.Kind == SessionStreamEntryKind.Status &&
+            string.Equals(message.AccentLabel, "status", StringComparison.Ordinal) &&
+            message.Content.Contains("Running Debug Agent with Debug Provider", StringComparison.Ordinal));
         activeSession.StatusSummary.Should().Be("Debug Agent · Debug Provider");
     }
 
@@ -66,6 +79,25 @@ public sealed class ChatModelTests
         activeSession.Should().NotBeNull();
         activeSession!.Title.Should().Be("Session with Repository Reviewer Agent");
         activeSession.StatusSummary.Should().Be("Repository Reviewer Agent · Debug Provider");
+    }
+
+    [Test]
+    public async Task RefreshIgnoresCancellationDuringWorkspaceProbe()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(ChatModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        await using var fixture = await CreateFixtureAsync();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
+
+        _ = await model.RecentChats;
+
+        commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: 300);
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await model.Refresh(cancellationSource.Token);
+
+        (await model.FeedbackMessage).Should().BeEmpty();
     }
 
     private static async Task<TestFixture> CreateFixtureAsync()

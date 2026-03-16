@@ -268,3 +268,24 @@ internal static partial class AgentSessionServiceLog
         Message = "Session send failed. SessionId={SessionId} AgentId={AgentId}.")]
     public static partial void SendFailed(ILogger logger, Exception exception, SessionId sessionId, Guid agentId);
 }
+
+internal static partial class StartupWorkspaceHydrationLog
+{
+    [LoggerMessage(
+        EventId = 1300,
+        Level = LogLevel.Information,
+        Message = "Starting startup workspace hydration.")]
+    public static partial void HydrationStarted(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1301,
+        Level = LogLevel.Information,
+        Message = "Startup workspace hydration completed.")]
+    public static partial void HydrationCompleted(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1302,
+        Level = LogLevel.Error,
+        Message = "Startup workspace hydration failed.")]
+    public static partial void HydrationFailed(ILogger logger, Exception exception);
+}

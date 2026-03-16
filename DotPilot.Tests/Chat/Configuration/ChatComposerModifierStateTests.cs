@@ -68,4 +68,35 @@ public sealed class ChatComposerModifierStateTests
 
         state.HasPressedModifier.Should().BeFalse();
     }
+
+    [Test]
+    public void HasPressedModifierOrCurrentStateUsesTrackedStateBeforeFallbackProbe()
+    {
+        var state = new ChatComposerModifierState();
+        state.RegisterKeyDown(VirtualKey.LeftShift);
+
+        var hasModifier = state.HasPressedModifierOrCurrentState(_ => false);
+
+        hasModifier.Should().BeTrue();
+    }
+
+    [Test]
+    public void HasPressedModifierOrCurrentStateUsesCurrentKeyboardProbeWhenNothingIsTracked()
+    {
+        var state = new ChatComposerModifierState();
+
+        var hasModifier = state.HasPressedModifierOrCurrentState(key => key is VirtualKey.Control);
+
+        hasModifier.Should().BeTrue();
+    }
+
+    [Test]
+    public void HasPressedModifierOrCurrentStateReturnsFalseWhenTrackedStateAndProbeAreEmpty()
+    {
+        var state = new ChatComposerModifierState();
+
+        var hasModifier = state.HasPressedModifierOrCurrentState(_ => false);
+
+        hasModifier.Should().BeFalse();
+    }
 }

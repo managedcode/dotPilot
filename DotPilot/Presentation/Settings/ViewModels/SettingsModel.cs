@@ -154,6 +154,9 @@ public partial record SettingsModel
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync(RefreshCompletedMessage, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception exception)
         {
             SettingsModelLog.Failure(logger, exception);
@@ -193,6 +196,9 @@ public partial record SettingsModel
             _workspaceRefresh.Raise();
             await StatusMessage.SetAsync($"{updated.DisplayName} updated.", cancellationToken);
             workspaceProjectionNotifier.Publish();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {

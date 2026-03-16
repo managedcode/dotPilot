@@ -1,5 +1,7 @@
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
+using Windows.UI.Core;
 
 namespace DotPilot.Presentation.Controls;
 
@@ -36,7 +38,7 @@ public sealed partial class ChatComposer : UserControl
         var action = ChatComposerKeyboardPolicy.Resolve(
             behavior: SendBehavior,
             isEnterKey: e.Key is VirtualKey.Enter,
-            hasModifier: _modifierState.HasPressedModifier);
+            hasModifier: HasEffectiveModifierPressed());
         if (action is ChatComposerKeyboardAction.SendMessage)
         {
             ExecuteSubmitAction(textBox);
@@ -130,5 +132,23 @@ public sealed partial class ChatComposer : UserControl
         textBox.SelectionStart = insertionIndex + NewLineValue.Length;
         textBox.SelectionLength = 0;
         SynchronizeComposerText(textBox);
+    }
+
+    private bool HasEffectiveModifierPressed()
+    {
+        return _modifierState.HasPressedModifierOrCurrentState(IsModifierKeyPressed);
+    }
+
+    private static bool IsModifierKeyPressed(VirtualKey key)
+    {
+        try
+        {
+            return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & CoreVirtualKeyStates.Down)
+                == CoreVirtualKeyStates.Down;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

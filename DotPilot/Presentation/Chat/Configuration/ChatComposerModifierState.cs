@@ -4,9 +4,41 @@ namespace DotPilot.Presentation;
 
 public sealed class ChatComposerModifierState
 {
+    private static readonly VirtualKey[] SupportedModifierKeys =
+    [
+        VirtualKey.Shift,
+        VirtualKey.Control,
+        VirtualKey.Menu,
+        VirtualKey.LeftWindows,
+        VirtualKey.RightWindows,
+    ];
+
     private readonly Dictionary<VirtualKey, int> pressedModifierKeys = [];
 
     public bool HasPressedModifier => pressedModifierKeys.Count > 0;
+
+    public bool HasPressedModifierOrCurrentState(Func<VirtualKey, bool>? isCurrentlyPressed)
+    {
+        if (HasPressedModifier)
+        {
+            return true;
+        }
+
+        if (isCurrentlyPressed is null)
+        {
+            return false;
+        }
+
+        foreach (var key in SupportedModifierKeys)
+        {
+            if (isCurrentlyPressed(key))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public void RegisterKeyDown(VirtualKey key)
     {
