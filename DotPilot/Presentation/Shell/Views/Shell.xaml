@@ -1,0 +1,237 @@
+﻿<Page x:Class="DotPilot.Presentation.Shell"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:utu="using:Uno.Toolkit.UI"
+      mc:Ignorable="d"
+      d:DesignHeight="300"
+      d:DesignWidth="400"
+      Background="Transparent">
+  <Grid Background="{StaticResource AppShellBackgroundBrush}">
+    <Canvas IsHitTestVisible="False">
+      <Ellipse Width="420"
+               Height="380"
+               Canvas.Left="-180"
+               Canvas.Top="560"
+               Fill="{StaticResource AnalyticsAvatarBrush}"
+               Opacity="0.08" />
+      <Ellipse Width="640"
+               Height="580"
+               Canvas.Left="1150"
+               Canvas.Top="-200"
+               Fill="{StaticResource UserAvatarBrush}"
+               Opacity="0.07" />
+    </Canvas>
+
+    <Grid utu:SafeArea.Insets="VisibleBounds"
+          Margin="14"
+          ColumnSpacing="20">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="248" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource GlassPanelStyle}"
+              Padding="0">
+        <Grid AutomationProperties.AutomationId="AppSidebar">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <StackPanel Margin="16,18,16,0"
+                      AutomationProperties.AutomationId="AppSidebarBrand"
+                      Orientation="Horizontal"
+                      Spacing="12">
+            <Border Width="38"
+                    Height="38"
+                    Background="{StaticResource AppPrimaryTextBrush}"
+                    CornerRadius="12">
+              <TextBlock HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         FontFamily="{StaticResource AppAccentFontFamily}"
+                         FontSize="11.5"
+                         Foreground="{StaticResource AppAccentBrush}"
+                         Text="dp" />
+            </Border>
+            <TextBlock VerticalAlignment="Center"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppPrimaryTextBrush}">
+              <Run Text="dot" />
+              <Run FontWeight="Normal"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Pilot" />
+            </TextBlock>
+          </StackPanel>
+
+          <StackPanel Grid.Row="1"
+                      Margin="12,22,12,0"
+                      AutomationProperties.AutomationId="AppSidebarNavigation"
+                      Spacing="6">
+            <Button x:Name="ChatNavButton"
+                    AutomationProperties.AutomationId="ChatNavButton"
+                    Click="OnChatNavButtonClick"
+                    Style="{StaticResource SidebarButtonStyle}">
+              <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <SymbolIcon VerticalAlignment="Center"
+                            Symbol="Comment" />
+                <TextBlock VerticalAlignment="Center"
+                           Grid.Column="1"
+                           Text="Chat" />
+              </Grid>
+            </Button>
+
+            <Button x:Name="AgentsNavButton"
+                    AutomationProperties.AutomationId="AgentsNavButton"
+                    Click="OnAgentsNavButtonClick"
+                    Style="{StaticResource SidebarButtonStyle}">
+              <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <SymbolIcon VerticalAlignment="Center"
+                            Symbol="Contact" />
+                <TextBlock VerticalAlignment="Center"
+                           Grid.Column="1"
+                           Text="Agents" />
+              </Grid>
+            </Button>
+
+            <Button x:Name="ProvidersNavButton"
+                    AutomationProperties.AutomationId="ProvidersNavButton"
+                    Click="OnProvidersNavButtonClick"
+                    Style="{StaticResource SidebarButtonStyle}">
+              <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <SymbolIcon VerticalAlignment="Center"
+                            Symbol="Setting" />
+                <TextBlock VerticalAlignment="Center"
+                           Grid.Column="1"
+                           Text="Providers" />
+              </Grid>
+            </Button>
+          </StackPanel>
+
+          <Rectangle Grid.Row="2"
+                     Margin="12,20,12,20"
+                     VerticalAlignment="Bottom"
+                     Style="{StaticResource SectionDividerStyle}" />
+
+          <StackPanel Grid.Row="3">
+            <Rectangle Margin="12,0,12,0"
+                       Style="{StaticResource SectionDividerStyle}" />
+            <Grid Margin="12,16,8,16"
+                  AutomationProperties.AutomationId="AppSidebarProfile"
+                  ColumnSpacing="10">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <Border Width="34"
+                      Height="34"
+                      Background="{StaticResource UserAvatarBrush}"
+                      CornerRadius="17">
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           Text="L" />
+              </Border>
+
+              <StackPanel Grid.Column="1"
+                          Spacing="0">
+                <TextBlock FontSize="12"
+                           FontWeight="SemiBold"
+                           Text="Local operator" />
+                <TextBlock FontSize="11"
+                           Foreground="{StaticResource AppMutedTextBrush}"
+                           Text="Local runtime" />
+                <Border x:Name="AppSidebarLiveSessionIndicator"
+                        Margin="0,8,0,0"
+                        Padding="8,6"
+                        Background="{StaticResource AppInputSurfaceBrush}"
+                        BorderBrush="{StaticResource AppOutlineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="{Binding LiveSessionIndicatorVisibility}"
+                        AutomationProperties.AutomationId="AppSidebarLiveSessionIndicator">
+                  <StackPanel Spacing="2">
+                    <TextBlock x:Name="AppSidebarLiveSessionTitle"
+                               FontSize="10.5"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppPrimaryTextBrush}"
+                               Text="{Binding LiveSessionIndicatorTitle}"
+                               AutomationProperties.AutomationId="AppSidebarLiveSessionTitle" />
+                    <TextBlock x:Name="AppSidebarLiveSessionSummary"
+                               FontSize="10.5"
+                               Foreground="{StaticResource AppMutedTextBrush}"
+                               Text="{Binding LiveSessionIndicatorSummary}"
+                               TextWrapping="WrapWholeWords"
+                               AutomationProperties.AutomationId="AppSidebarLiveSessionSummary" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <ContentControl x:Name="ContentHost"
+                      Grid.Column="1"
+                      HorizontalContentAlignment="Stretch"
+                      VerticalContentAlignment="Stretch" />
+    </Grid>
+
+    <Grid x:Name="StartupSplashScreen"
+          AutomationProperties.AutomationId="StartupSplashScreen"
+          Visibility="{Binding StartupOverlayVisibility}">
+      <Border Background="{StaticResource AppShellBackgroundBrush}"
+              Opacity="0.76" />
+      <Border Style="{StaticResource GlassPanelStyle}"
+              Width="420"
+              MaxWidth="420"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="24">
+        <StackPanel Spacing="14">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="14">
+            <ProgressRing Width="28"
+                          Height="28"
+                          IsActive="True" />
+            <StackPanel Spacing="4">
+              <TextBlock x:Name="StartupSplashTitleText"
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Text="{Binding StartupTitle}" />
+              <TextBlock x:Name="StartupSplashSummaryText"
+                         Foreground="{StaticResource AppMutedTextBrush}"
+                         Text="{Binding StartupSummary}"
+                         TextWrapping="WrapWholeWords" />
+            </StackPanel>
+          </StackPanel>
+
+          <Rectangle Style="{StaticResource SectionDividerStyle}" />
+
+          <TextBlock Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="This runs once at startup and the app reuses the hydrated provider snapshot until you refresh it."
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</Page>

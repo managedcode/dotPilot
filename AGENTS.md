@@ -22,9 +22,6 @@ This file defines how AI agents work in this solution.
 - Projects or modules with local `AGENTS.md` files:
   - `DotPilot`
   - `DotPilot.Core`
-  - `DotPilot.Runtime`
-  - `DotPilot.Runtime.Host`
-  - `DotPilot.ReleaseTool`
   - `DotPilot.Tests`
   - `DotPilot.UITests`
 - Shared solution artifacts:
@@ -143,24 +140,65 @@ For this app:
 - prefer the newest stable `.NET 10` and `C#` language features that are supported by the pinned SDK and do not weaken readability, determinism, or analyzability
 - the repo-root lowercase `.editorconfig` is the source of truth for formatting, naming, style, and analyzer severity
 - local and CI build commands must pass `-warnaserror`; warnings are not an acceptable "green" build state in this repository
+- do not run unit tests, UI tests, or coverage commands unless the user explicitly asks for test execution in the current turn; structural refactors and exploratory work should stop at code organization until the operator requests verification
 - do not run parallel `dotnet` or `MSBuild` work that shares the same checkout, target outputs, or NuGet package cache; the multi-target Uno app must build serially in CI to avoid `Uno.Resizetizer` file-lock failures
 - do not commit user-specific local paths, usernames, or machine-specific identifiers in tests, docs, snapshots, or fixtures; use neutral synthetic values so the repo stays portable and does not leak personal machine details
+- keep local planning artifacts and analyzer scratch files out of git history: ignore `*.plan.md` and `CodeMetricsConfig.txt`, and do not commit or re-stage them because they are operator-local working files
 - quality gates should prefer analyzer-backed build failures over separate one-off CI tools; for overloaded methods and maintainability drift, enable build-time analyzers such as `CA1502` instead of adding a formatting-only gate
 - `Directory.Build.props` owns the shared analyzer and warning policy for future projects
 - `Directory.Packages.props` owns centrally managed package versions
 - `global.json` pins the .NET SDK and Uno SDK version used by the app and tests
 - `DotPilot/DotPilot.csproj` keeps `GenerateDocumentationFile=true` with `CS1591` suppressed so `IDE0005` stays enforceable in CI across all target frameworks without inventing command-line-only build flags
+- solution folders in `DotPilot.slnx` are allowed when they provide stable project categories such as `Libraries` and `Tests`; use them to keep the IDE readable, but keep project directory names, `.csproj` names, and namespaces honest to the real extracted subsystem
+- project extraction must stay structurally honest: once a subsystem becomes its own DLL, keep its files, namespaces, local `AGENTS.md`, and direct app references inside that subsystem instead of leaving half of it behind in `DotPilot.Core`
+- when a library already names the subsystem, do not add a duplicate same-name root folder inside it; expose its real slices directly from the project root instead of nesting them again under another copy of the subsystem name
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
-- keep the Uno app project presentation-only; domain, runtime host, orchestration, integrations, and persistence code must live in separate class-library projects so UI composition does not mix with feature implementation
+- `DotPilot.Core` is the default home for non-UI code, but once a feature becomes large enough to deserve an architectural boundary, extract it into its own DLL instead of bloating `DotPilot.Core`
+- do not create or reintroduce generic project, folder, namespace, or product language named `Runtime` unless the user explicitly asks for that exact boundary; the default non-UI home is `DotPilot.Core`, and vague runtime naming is considered architectural noise in this repo
+- every new large feature DLL must reference `DotPilot.Core` for shared abstractions and contracts, and the desktop app should reference that feature DLL explicitly instead of dragging the feature back into the UI project
+- when a feature slice grows beyond a few files, split it into responsibility-based subfolders that mirror the slice's real concerns such as chat, drafting, providers, persistence, settings, or tests; do not leave large flat file dumps that force unrelated code to coexist in one directory
+- do not hide multiple real features under one umbrella folder such as `AgentSessions` when the code actually belongs to distinct features like `Chat`, `AgentBuilder`, `Settings`, `Providers`, or `Workspace`; use explicit feature roots and keep logs, models, services, and tests under the feature that owns them
+- inside each feature root, keep structural subfolders explicit: models go under `Models`, configuration and defaults under `Configuration` or `Composition`, views under `Views`, view-models under `ViewModels`, diagnostics under `Diagnostics`, and service/runtime types under a responsibility-specific folder; do not leave those file kinds mixed together at the feature root
+- when a feature exposes commands, public interfaces, or specialized runtime contracts, put them in visible folders such as `Commands`, `Interfaces`, and other role-specific folders; do not bury them inside a generic `Contracts` folder where their role disappears from the tree
+- keep the Uno app project presentation-only; domain, host, orchestration, integrations, and persistence code must live outside the UI project in class-library code so UI composition does not mix with feature implementation
+- UI-facing shell and application-configuration types belong in `DotPilot`; `DotPilot.Core` stays the shared non-UI contract/application layer, while any future large subsystem should move into its own DLL only when it earns a clear architectural boundary
+- UI-only preferences, keyboard behavior options, and other shell interaction settings belong in `DotPilot`, not in `DotPilot.Core`; `Core` must not own models or contracts that exist only to drive presentation behavior
 - when the user asks to implement an epic, the delivery branch and PR must cover all of that epic's direct child issues that belong to the requested scope, not just one child issue with a partial close-out
 - epic implementation PRs must include automated tests for every direct child issue they claim to cover, plus the broader runtime and UI regressions required by the touched flows
 - do not claim an epic is implemented unless every direct child issue in the requested scope is both realized in code and covered by automated tests; partial coverage is not an acceptable close-out
 - structure both `DotPilot.Tests` and `DotPilot.UITests` by vertical slice and explicit harness boundaries; do not keep test files in one flat project-root pile
-- the first embedded Orleans runtime cut must use `UseLocalhostClustering` together with in-memory Orleans grain storage and in-memory reminders; do not introduce remote clustering or external durable stores until a later backlog item explicitly requires them, and keep durable resume/replay outside Orleans storage until the cluster topology is intentionally upgraded
 - GitHub is the backlog, not the product: use issues and PRs only to drive task scope and traceability, and never copy GitHub issue text, labels, workflow language, or tracker metadata into production code, runtime snapshots, or user-facing UI
 - never claim an epic is complete until its current GitHub scope is verified against the live issue graph; check which issues are real children versus issues that merely depend on the epic or belong to a different parent epic
 - Desktop responsiveness is a product requirement: avoid synchronous probe, filesystem, network, or process work on UI-facing construction and navigation paths so the app stays fast and immediately reactive
+- Prefer a thin desktop presentation layer over UI-owned orchestration: long-running work, background coordination, and durable session state should live in `DotPilot.Core` services and persistence boundaries, while the Uno UI mainly renders state and forwards operator commands
+- Uno controls and page code-behind must not cast `DataContext` to concrete view-model/model types or invoke orchestration methods directly; route framework events through bindable commands, attached behaviors, dependency properties, or other presentation-safe seams so the view stays decoupled from runtime logic
 - Do not invent a repo-specific product framing such as "workbench" unless the active issue or feature spec explicitly uses it; implement the app features described in the backlog instead of turning internal implementation language into the product narrative
+- The primary product IA is a desktop chat client for local agents: session list, active session transcript, terminal-like streaming activity, agent management, and provider settings must be the default mental model instead of workbench, issue-tracking, domain-browser, or toolchain-center concepts
+- Agent creation must be prompt-first: the default operator flow is to describe the desired agent in natural language and let the product generate a draft agent definition, prompt, description, and tool set instead of forcing low-level manual configuration first
+- When the product creates or configures agents, workflows, or similar runtime assets from operator intent, route that intent through a built-in system agent or equivalent orchestration tool that understands the available providers, tools, and policies instead of scattering that decision logic across UI forms
+- The product must always have a sensible default system agent path: a fresh app state should not leave the operator without an obvious usable agent, and runtime defaults should pick an available provider/model combination or degrade to the deterministic debug agent without blocking the UI
+- The deterministic debug provider is an internal fallback, not an operator-facing authoring choice: do not surface it as a selectable provider or suggested model in the `New agent` creation flow; if no real provider is enabled or installed, send the operator to provider settings instead of defaulting the form to debug
+- Do not invent agent roles, tool catalogs, skill catalogs, or capability tags in code or UI unless the product has a real backing registry and runtime path for them; absent a real implementation, leave those selections out of the product surface.
+- User-facing UI must not expose backlog numbers, issue labels, workstream labels, "workbench", "domain", or similar internal planning and architecture language unless a feature explicitly exists to show source-control metadata
+- Provider integrations should stay SDK-first: when Codex, Claude Code, GitHub Copilot, or debug/test providers already expose an `IChatClient`-style abstraction, build agent orchestration on top of that instead of inventing parallel request/result wrappers without a clear gap
+- Do not leave Uno binding on reflection fallback: when the shell binds to view models or option models, annotate or shape those types so the generated metadata provider can resolve them without runtime reflection warnings or performance loss
+- Persist app models and durable session state through `SQLite` plus `EF Core` when the data must survive restarts; do not keep the core chat/session experience trapped in seed data or transient in-memory catalogs
+- When agent conversations must survive restarts, persist the full `AgentSession` plus chat history through an Agent Framework history/storage provider backed by a local desktop folder; do not reduce durable conversation state to transcript text rows only
+- Do not add cache layers for provider CLIs, model catalogs, workspace projections, or similar environment state unless the user explicitly asks for caching; prefer direct reads from the current source of truth
+- Current repository policy is stricter than the default: do not keep provider-status caches, workspace/session in-memory mirrors, or app-preference caches at all unless the user explicitly asks to bring a specific cache back
+- The current explicit exception is startup readiness hydration: the app may show a splash/loading state at launch, probe installed provider CLIs and related metadata once during that startup window, and then reuse that startup snapshot until an explicit refresh or provider-setting change invalidates it
+- Provider CLI probing must not rerun as a side effect of ordinary screen binding or MVUX state re-evaluation; normal shell loads should share one in-flight probe and only reprobe on explicit refresh or provider-setting changes
+- Expected cancellation from state re-evaluation or navigation must not be logged as a product failure; reserve failure logs for real errors, not superseded async loads
+- Runtime and orchestration flows must emit structured `ILogger` logs for provider readiness, agent creation, session creation, send execution, and failure paths; ad hoc console-only startup traces are not enough to debug the product
+- When the runtime uses `Microsoft Agent Framework`, prefer agent or run-scope middleware for detailed lifecycle logging and correlation instead of scattering ad hoc logging around UI callbacks or provider shims
+- UI-facing view models must stay projection-only: do not keep orchestration, provider probing, session loading pipelines, or other runtime coordination in the Uno presentation layer when the same work can live in `DotPilot.Core` services
+- Desktop navigation and tab/menu switching must stay structurally simple: do not introduce background refresh loops or in-memory cache projections as a default optimization path
+- Agent-management UX must be proven end-to-end: prompt-first creation, default-agent availability, provider enable/disable or readiness changes, and starting a chat with an agent all require real `DotPilot.UITests` coverage instead of unit-only verification
+- The desktop app is one shell, not three unrelated page layouts: keep one stable left navigation rail/app chrome across chat, agents, and providers, and switch the main content state instead of rebuilding different sidebars per screen
+- Shell geometry must stay visually stable across primary screens: do not let the left rail width, footer block, nav button sizing, or page chrome jump between `Chat`, `Agents`, and `Providers`
+- Do not fill the shell with duplicated explanatory copy or hardcoded decorative text blocks that restate the same information in multiple panes; prefer concise, task-oriented labels and let the main content carry the active workflow
+- Do not ship placeholder-looking UI chrome such as ASCII pseudo-icons, swollen capsule buttons, or duplicated provider/agent cards just to make state visible; use consistent desktop controls and one clear source of truth per surface
+- Do not keep legacy product slices alive during a rewrite: when `Workbench`, `ToolchainCenter`, legacy runtime demos, or similar prototype surfaces are being replaced, remove them instead of leaving a parallel legacy path in the codebase
 - GitHub Actions workflows must use descriptive names and filenames that reflect their purpose; do not use a generic `ci.yml` catch-all because build validation and release automation are separate operator flows
 - GitHub Actions must be split into at least one validation workflow for normal builds/tests and one release workflow for CI-driven version resolution, release-note generation, desktop publishing, and GitHub Release publication
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
@@ -174,6 +212,7 @@ For this app:
 - prefer MIT-licensed GitHub and NuGet dependencies when they materially accelerate delivery and align with the current architecture
 - prefer official `.NET` AI evaluation libraries under `Microsoft.Extensions.AI.Evaluation*` for response-quality, tool-usage, and safety evaluation instead of custom or third-party evaluation stacks by default
 - prefer `Microsoft Agent Framework` telemetry and observability patterns with OpenTelemetry-first instrumentation and optional Azure Monitor or Foundry export later
+- Treat the built-in MCP server as the canonical capability surface of `dotPilot`: operator-visible actions and automations should be exposed as properly defined MCP tools on the app-owned server, and agents must discover and invoke those tools through the shared MCP gateway instead of bypassing it with ad hoc internal calls
 
 ### Project AGENTS Policy
 
@@ -308,6 +347,7 @@ Local `AGENTS.md` files may tighten these values, but they must not loosen them 
 - Every class, object, module, and service MUST have a clear single responsibility and explicit boundaries.
 - SOLID is mandatory.
 - SRP and strong cohesion are mandatory for files, types, and functions.
+- project structure must also follow SOLID and cohesion rules: keep related code together, keep unrelated responsibilities apart, and introduce a project boundary when a feature has become too large or too independent to stay clean inside `DotPilot.Core`
 - Prefer composition over inheritance unless inheritance is explicitly justified.
 - Large files, types, functions, and deep nesting are design smells. Split them or document a justified exception under `exception_policy`.
 - Hardcoded values are forbidden.
@@ -348,9 +388,11 @@ Ask first:
 
 ### Likes
 
+- Keep regression coverage tied to real operator flows: when agent creation changes, tests should cover creating an agent, choosing a valid provider model, and sending at least one message through the resulting session path.
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.
+- When one requested slice is complete and verified, commit it before switching to the next GitHub issue so each backlog step stays isolated and reviewable.
 - Keep `DotPilot` feeling like a fast desktop control plane: startup, navigation, and visible UI reactions should be prompt, and agents should remove unnecessary waits instead of normalizing slow web-style loading behavior.
 - Keep the root `AGENTS.md` at the repository root.
 - Keep the repo-local agent skill directory limited to current `mcaf-*` skills.
@@ -363,7 +405,7 @@ Ask first:
 - Keep validation and release GitHub Actions separate, with descriptive names and filenames instead of a generic `ci.yml`.
 - Keep the validation workflow focused on build and automated test feedback, and keep release responsibilities in a dedicated workflow that bumps versioning, publishes desktop artifacts, and creates the GitHub Release with feature notes.
 - Keep `dotPilot` positioned as a general agent control plane, not a coding-only shell.
-- Reuse the current Uno desktop shell direction instead of replacing it with a wholly different layout when evolving the product.
+- Keep the visible product direction aligned with desktop chat apps such as Codex and Claude: sessions first, chat first, streaming first, with repo and git actions as optional utilities inside a session instead of the primary navigation model.
 - Keep provider integrations SDK-first where good typed SDKs already exist.
 - Keep evaluation and observability aligned with official Microsoft `.NET` AI guidance when building agent-quality and trust features.
 
@@ -378,3 +420,5 @@ Ask first:
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
 - Planning `MLXSharp` into the first product wave before it is ready for real use.
+- Letting internal implementation labels such as `Workbench`, issue numbers, or architecture slice names leak into the visible product wording or navigation when the app should behave like a clean desktop chat client.
+- Leaving deprecated product slices, pages, view models, or contracts in place "for later cleanup" after the replacement direction is already chosen.

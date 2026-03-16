@@ -1,3 +1,3 @@
 var UnoAppManifest = {
     displayName: "DotPilot"
-}
+};

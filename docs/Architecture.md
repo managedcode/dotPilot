@@ -1,27 +1,25 @@
 # Architecture Overview
 
-Goal: give humans and agents a fast map of the active `DotPilot` solution, the current `Uno Platform` shell, the foundation contracts from epic `#11`, the workbench foundation for epic `#13`, the Toolchain Center for epic `#14`, and the local-first runtime foundation for epic `#12`.
+Goal: give humans and agents a fast map of the shipped `DotPilot` direction: a local-first desktop chat app for agent sessions.
 
 This file is the required start-here architecture map for non-trivial tasks.
 
 ## Summary
 
-- **System:** `DotPilot` is a `.NET 10` `Uno Platform` desktop-first application that is evolving from a static prototype into a local-first control plane for agent operations.
-- **Presentation boundary:** [../DotPilot/](../DotPilot/) is now the presentation host only. It owns XAML, routing, desktop startup, and UI composition, while non-UI feature logic moves into separate DLLs.
-- **Workbench boundary:** epic [#13](https://github.com/managedcode/dotPilot/issues/13) is landing as a `Workbench` slice that will provide repository navigation, file inspection, artifact and log inspection, and a unified settings shell without moving that behavior into page code-behind.
-- **Toolchain Center boundary:** epic [#14](https://github.com/managedcode/dotPilot/issues/14) now lives as a `ToolchainCenter` slice. [../DotPilot.Core/Features/ToolchainCenter](../DotPilot.Core/Features/ToolchainCenter) defines the readiness, diagnostics, configuration, action, and polling contracts; [../DotPilot.Runtime/Features/ToolchainCenter](../DotPilot.Runtime/Features/ToolchainCenter) probes local provider CLIs for `Codex`, `Claude Code`, and `GitHub Copilot`; the Uno app surfaces the slice through the settings shell.
-- **Foundation contract boundary:** epic [#11](https://github.com/managedcode/dotPilot/issues/11) is represented through [../DotPilot.Core/Features/ControlPlaneDomain](../DotPilot.Core/Features/ControlPlaneDomain) and [../DotPilot.Core/Features/RuntimeCommunication](../DotPilot.Core/Features/RuntimeCommunication). These slices define the shared agent/session/tool model and the `ManagedCode.Communication` result/problem language that later runtime work reuses.
-- **Runtime foundation boundary:** [../DotPilot.Core/](../DotPilot.Core/) owns issue-aligned contracts, typed identifiers, grain interfaces, traffic-policy snapshots, and session-archive contracts; [../DotPilot.Runtime/](../DotPilot.Runtime/) owns provider-independent runtime implementations such as the deterministic turn engine, `Microsoft Agent Framework` orchestration client, and local archive persistence; [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/) owns the embedded Orleans host, explicit grain traffic policy, and initial grain implementations for desktop targets.
-- **Domain slice boundary:** issue [#22](https://github.com/managedcode/dotPilot/issues/22) now lives in `DotPilot.Core/Features/ControlPlaneDomain`, which defines the shared agent, session, fleet, provider, runtime, approval, artifact, telemetry, and evaluation model that later slices reuse.
-- **Communication slice boundary:** issue [#23](https://github.com/managedcode/dotPilot/issues/23) lives in `DotPilot.Core/Features/RuntimeCommunication`, which defines the shared `ManagedCode.Communication` result/problem language for runtime public boundaries.
-- **Runtime-host slice boundary:** epic [#12](https://github.com/managedcode/dotPilot/issues/12) now builds on the epic `#11` foundation contracts through the `RuntimeFoundation` slice, which sequences issues `#22`, `#23`, `#24`, `#25`, `#26`, and `#27` behind a stable contract surface instead of mixing runtime work into the Uno app.
-- **Automated verification:** [../DotPilot.Tests/](../DotPilot.Tests/) covers API-style and contract flows through the new DLL boundaries; [../DotPilot.UITests/](../DotPilot.UITests/) covers the visible workbench flow, Toolchain Center, and runtime-foundation UI surface. Provider-independent flows must pass in CI through deterministic or environment-agnostic checks, while provider-specific checks can run only when the matching toolchain is available.
+- **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create or edit an agent profile, start or resume a session, send a message, and watch streaming status/tool output in the transcript while the chat info panel surfaces a compact fleet board for live-session visibility and provider health.
+- **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
+- **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns contract-shaped folders such as `ControlPlaneDomain` and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
+- **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
+- **Live-session desktop rule:** while a session is actively generating, `DotPilot.Core` owns the live-session signal and the desktop host may hold a bounded sleep-prevention lock; the shell must show that state so the operator knows why the machine is being kept awake.
+- **Extraction rule:** large non-UI features start in `DotPilot.Core`, but once a slice becomes big enough to need its own boundary, it should move into a dedicated DLL that references `DotPilot.Core`, while the desktop app references that feature DLL directly.
+- **Solution-shape rule:** solution folders may group projects by stable categories such as libraries and tests, but extracted subsystems must still keep their own files, namespaces, and project-local rules inside their real project directory.
+- **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
 
 ## Scoping
 
-- **In scope for the current repository state:** the Uno workbench shell, the `DotPilot.Core`, `DotPilot.Runtime`, and `DotPilot.Runtime.Host` libraries, the epic `#11` foundation-contract slices, the embedded Orleans host for local desktop runtime state, and the automated validation boundaries around them.
-- **In scope for future implementation:** provider adapters, durable persistence beyond the current local session archive, telemetry, evaluation, Git tooling, and local runtimes.
-- **Out of scope in the current slice:** remote workers, remote clustering, external durable storage providers, and cloud-only control-plane services.
+- **In scope for the active rewrite:** chat-first session UX, provider readiness/settings, agent creation, local persistence via `SQLite`, local folder-backed `AgentSession` and chat-history storage, deterministic debug provider, transcript/tool streaming, and optional repo/git utilities inside a session.
+- **In scope for later slices:** multi-agent sessions, richer workflow composition, provider-specific live execution, session export/replay, and deeper git/worktree utilities.
+- **Out of scope in the current repository slice:** remote workers, distributed runtime topology, cloud persistence, multi-user identity, and external durable stores.
 
 ## Diagrams
 
@@ -32,291 +30,145 @@ flowchart LR
   Root["dotPilot repository root"]
   Governance["AGENTS.md"]
   Architecture["docs/Architecture.md"]
-  Adr1["ADR-0001 control-plane direction"]
-  Adr3["ADR-0003 vertical slices + UI-only app"]
-  Feature["agent-control-plane-experience.md"]
-  Toolchains["toolchain-center.md"]
-  Ui["DotPilot Uno UI host"]
-  Core["DotPilot.Core contracts"]
-  Runtime["DotPilot.Runtime services"]
-  Host["DotPilot.Runtime.Host Orleans silo"]
+  Ui["DotPilot Uno desktop shell"]
+  Core["DotPilot.Core contracts + shared application code"]
   Unit["DotPilot.Tests"]
   UiTests["DotPilot.UITests"]
 
   Root --> Governance
   Root --> Architecture
-  Root --> Adr1
-  Root --> Adr3
-  Root --> Feature
-  Root --> Toolchains
   Root --> Ui
   Root --> Core
-  Root --> Runtime
-  Root --> Host
   Root --> Unit
   Root --> UiTests
   Ui --> Core
-  Ui --> Runtime
-  Ui --> Host
-  Host --> Core
   Unit --> Ui
   Unit --> Core
-  Unit --> Runtime
-  Unit --> Host
+  UiTests --> Ui
 ```
 
-### Workbench foundation slice for epic #13
-
-```mermaid
-flowchart TD
-  Epic["#13 Desktop workbench"]
-  Shell["#28 Primary workbench shell"]
-  Tree["#29 Repository tree"]
-  File["#30 File surface + diff review"]
-  Dock["#31 Artifact dock + runtime console"]
-  Settings["#32 Settings shell"]
-  CoreSlice["DotPilot.Core/Features/Workbench"]
-  RuntimeSlice["DotPilot.Runtime/Features/Workbench"]
-  UiSlice["MainPage + SettingsPage + workbench controls"]
-
-  Epic --> Shell
-  Epic --> Tree
-  Epic --> File
-  Epic --> Dock
-  Epic --> Settings
-  Shell --> CoreSlice
-  Tree --> CoreSlice
-  File --> CoreSlice
-  Dock --> CoreSlice
-  Settings --> CoreSlice
-  CoreSlice --> RuntimeSlice
-  RuntimeSlice --> UiSlice
-```
-
-### Toolchain Center slice for epic #14
-
-```mermaid
-flowchart TD
-  Epic["#14 Provider toolchain center"]
-  UiIssue["#33 Toolchain Center UI"]
-  Codex["#34 Codex readiness"]
-  Claude["#35 Claude Code readiness"]
-  Copilot["#36 GitHub Copilot readiness"]
-  Diagnostics["#37 Connection diagnostics"]
-  Config["#38 Provider configuration"]
-  Polling["#39 Background polling"]
-  CoreSlice["DotPilot.Core/Features/ToolchainCenter"]
-  RuntimeSlice["DotPilot.Runtime/Features/ToolchainCenter"]
-  UiSlice["SettingsViewModel + ToolchainCenterPanel"]
-
-  Epic --> UiIssue
-  Epic --> Codex
-  Epic --> Claude
-  Epic --> Copilot
-  Epic --> Diagnostics
-  Epic --> Config
-  Epic --> Polling
-  UiIssue --> CoreSlice
-  Codex --> CoreSlice
-  Claude --> CoreSlice
-  Copilot --> CoreSlice
-  Diagnostics --> CoreSlice
-  Config --> CoreSlice
-  Polling --> CoreSlice
-  CoreSlice --> RuntimeSlice
-  RuntimeSlice --> UiSlice
-```
-
-### Foundation contract slices for epic #11
-
-```mermaid
-flowchart TD
-  Epic["#11 Desktop control-plane foundation"]
-  Domain["#22 Domain contracts"]
-  Comm["#23 Communication contracts"]
-  DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
-  CommunicationSlice["DotPilot.Core/Features/RuntimeCommunication"]
-  RuntimeContracts["DotPilot.Core/Features/RuntimeFoundation"]
-  DeterministicClient["DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient"]
-  Tests["DotPilot.Tests contract coverage"]
-
-  Epic --> Domain
-  Epic --> Comm
-  Domain --> DomainSlice
-  Comm --> CommunicationSlice
-  DomainSlice --> RuntimeContracts
-  CommunicationSlice --> RuntimeContracts
-  CommunicationSlice --> DeterministicClient
-  DomainSlice --> DeterministicClient
-  DeterministicClient --> Tests
-  RuntimeContracts --> Tests
-```
-
-### Runtime foundation slice for epic #12
-
-```mermaid
-flowchart TD
-  Epic["#12 Embedded agent runtime host"]
-  Foundation["#11 Foundation contracts"]
-  Domain["#22 Domain contracts"]
-  Comm["#23 Communication contracts"]
-  Host["#24 Embedded Orleans host"]
-  MAF["#25 Agent Framework runtime"]
-  Policy["#26 Grain traffic policy"]
-  Sessions["#27 Session persistence and resume"]
-  DomainSlice["DotPilot.Core/Features/ControlPlaneDomain"]
-  CommunicationSlice["DotPilot.Core/Features/RuntimeCommunication"]
-  CoreSlice["DotPilot.Core/Features/RuntimeFoundation"]
-  RuntimeSlice["DotPilot.Runtime/Features/RuntimeFoundation"]
-  HostSlice["DotPilot.Runtime.Host/Features/RuntimeFoundation"]
-  UiSlice["DotPilot runtime panel + banner"]
-
-  Foundation --> Domain
-  Foundation --> Comm
-  Domain --> DomainSlice
-  Comm --> CommunicationSlice
-  DomainSlice --> CommunicationSlice
-  CommunicationSlice --> CoreSlice
-  Epic --> Host
-  Epic --> MAF
-  Epic --> Policy
-  Epic --> Sessions
-  Host --> HostSlice
-  Policy --> HostSlice
-  Policy --> CoreSlice
-  HostSlice --> CoreSlice
-  MAF --> RuntimeSlice
-  Sessions --> RuntimeSlice
-  Sessions --> CoreSlice
-  RuntimeSlice --> HostSlice
-  CoreSlice --> UiSlice
-  HostSlice --> UiSlice
-  RuntimeSlice --> UiSlice
-```
-
-### Current composition flow
+### Operator flow
 
 ```mermaid
 flowchart LR
-  App["DotPilot/App.xaml.cs"]
-  Views["MainPage + SecondPage + SettingsShell + RuntimeFoundationPanel + ToolchainCenterPanel"]
-  ViewModels["MainViewModel + SecondViewModel + SettingsViewModel"]
-  Catalog["RuntimeFoundationCatalog"]
-  Toolchains["ToolchainCenterCatalog"]
-  BrowserClient["DeterministicAgentRuntimeClient"]
-  DesktopClient["AgentFrameworkRuntimeClient"]
-  Archive["RuntimeSessionArchiveStore"]
-  Traffic["EmbeddedRuntimeTrafficPolicyCatalog"]
-  ToolchainProbe["ToolchainCommandProbe + provider profiles"]
-  EmbeddedHost["UseDotPilotEmbeddedRuntime + Orleans silo"]
-  Contracts["Typed IDs + contracts"]
-  Grains["Session / Workspace / Fleet / Policy / Artifact grains"]
+  Settings["Settings"]
+  Providers["Provider readiness + install actions"]
+  AgentCreate["Create or edit agent profile"]
+  SessionList["Session list"]
+  Session["Active session"]
+  Stream["Streaming transcript + status + tool activity"]
+  Fleet["Fleet board + live session monitor"]
+  Git["Optional repo/git actions"]
 
-  App --> ViewModels
-  Views --> ViewModels
-  ViewModels --> Catalog
-  ViewModels --> Toolchains
-  Catalog --> BrowserClient
-  Catalog --> DesktopClient
-  Catalog --> Contracts
-  Toolchains --> ToolchainProbe
-  Toolchains --> Contracts
-  App --> EmbeddedHost
-  DesktopClient --> Archive
-  DesktopClient --> EmbeddedHost
-  EmbeddedHost --> Traffic
-  EmbeddedHost --> Grains
-  EmbeddedHost --> Contracts
-  Traffic --> Contracts
+  Settings --> Providers
+  Providers --> AgentCreate
+  AgentCreate --> SessionList
+  SessionList --> Session
+  Session --> Stream
+  Session --> Fleet
+  Session --> Git
+```
+
+### Runtime flow
+
+```mermaid
+flowchart TD
+  Ui["Uno shell"]
+  Splash["Startup splash + shell overlay"]
+  ViewModels["MVUX screen models + generated view-model proxies"]
+  Service["IAgentSessionService"]
+  Hydration["Startup workspace hydration"]
+  LiveActivity["Session activity monitor"]
+  WakeLock["Desktop sleep prevention host"]
+  ProjectionStore["EF Core + SQLite projections"]
+  SessionStore["Folder AgentSession + chat history"]
+  ProviderCatalog["Provider catalog + readiness probe"]
+  ProviderSnapshot["Startup-owned provider snapshot"]
+  ProviderClient["Provider SDK / IChatClient or debug client"]
+  Stream["SessionStreamEntry updates"]
+
+  Ui --> ViewModels
+  Ui --> Splash
+  Splash --> Hydration
+  Hydration --> Service
+  Hydration --> ProviderCatalog
+  ViewModels --> Service
+  Service --> ProjectionStore
+  Service --> SessionStore
+  Service --> LiveActivity
+  Service --> ProviderCatalog
+  Service --> ProviderSnapshot
+  LiveActivity --> WakeLock
+  LiveActivity --> ViewModels
+  WakeLock --> ViewModels
+  ProviderCatalog --> ProviderSnapshot
+  ProviderCatalog --> ProviderClient
+  Service --> ProviderClient
+  ProviderClient --> Stream
+  Stream --> ViewModels
+```
+
+### Persistence and resume shape
+
+```mermaid
+sequenceDiagram
+  participant UI as Uno UI
+  participant Service as AgentSessionService
+  participant DB as SQLite projections
+  participant FS as Local folder AgentSession/history store
+  participant Provider as Provider SDK / Debug Client
+
+  UI->>Service: CreateAgentAsync(...) or UpdateAgentAsync(...)
+  Service->>DB: Save or update agent profile
+  UI->>Service: CreateSessionAsync(...)
+  Service->>DB: Save session + initial status entry
+  Service->>FS: Create/persist opaque AgentSession
+  UI->>Service: SendMessageAsync(...)
+  Service->>DB: Save user message
+  Service->>Provider: Run / stream
+  Provider-->>Service: Streaming updates
+  Service->>DB: Persist transcript entries
+  Service->>FS: Persist ChatHistoryProvider state + serialized AgentSession
+  Service-->>UI: SessionStreamEntry updates
 ```
 
 ## Navigation Index
 
-### Planning and decision docs
+### Planning and governance
 
 - `Solution governance` — [../AGENTS.md](../AGENTS.md)
-- `Primary architecture decision` — [ADR-0001](./ADR/ADR-0001-agent-control-plane-architecture.md)
-- `Vertical-slice solution decision` — [ADR-0003](./ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
-- `Feature spec` — [Agent Control Plane Experience](./Features/agent-control-plane-experience.md)
-- `Issue #13 feature doc` — [Workbench Foundation](./Features/workbench-foundation.md)
-- `Issue #14 feature doc` — [Toolchain Center](./Features/toolchain-center.md)
-- `Issue #22 feature doc` — [Control Plane Domain Model](./Features/control-plane-domain-model.md)
-- `Issue #23 feature doc` — [Runtime Communication Contracts](./Features/runtime-communication-contracts.md)
-- `Issue #24 feature doc` — [Embedded Orleans Host](./Features/embedded-orleans-host.md)
-- `Issues #25-#27 feature doc` — [Embedded Runtime Orchestration](./Features/embedded-runtime-orchestration.md)
+- `Uno app rules` — [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
+- `Core rules` — [../DotPilot.Core/AGENTS.md](../DotPilot.Core/AGENTS.md)
+- `Test rules` — [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md), [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
 
 ### Modules
 
 - `Production Uno app` — [../DotPilot/](../DotPilot/)
-- `Contracts and typed identifiers` — [../DotPilot.Core/](../DotPilot.Core/)
-- `Provider-independent runtime services` — [../DotPilot.Runtime/](../DotPilot.Runtime/)
-- `Embedded Orleans runtime host` — [../DotPilot.Runtime.Host/](../DotPilot.Runtime.Host/)
-- `Unit and API-style tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
+- `Core contracts and shared application code` — [../DotPilot.Core/](../DotPilot.Core/)
+- `Unit and integration-style tests` — [../DotPilot.Tests/](../DotPilot.Tests/)
 - `UI tests` — [../DotPilot.UITests/](../DotPilot.UITests/)
-- `Shared build and analyzer policy` — [../Directory.Build.props](../Directory.Build.props), [../Directory.Packages.props](../Directory.Packages.props), [../global.json](../global.json), and [../.editorconfig](../.editorconfig)
 
 ### High-signal code paths
 
-- `Application startup and composition` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
-- `Chat workbench view model` — [../DotPilot/Presentation/MainViewModel.cs](../DotPilot/Presentation/MainViewModel.cs)
-- `Settings view model` — [../DotPilot/Presentation/SettingsViewModel.cs](../DotPilot/Presentation/SettingsViewModel.cs)
-- `Agent builder view model` — [../DotPilot/Presentation/SecondViewModel.cs](../DotPilot/Presentation/SecondViewModel.cs)
-- `Toolchain Center panel` — [../DotPilot/Presentation/Controls/ToolchainCenterPanel.xaml](../DotPilot/Presentation/Controls/ToolchainCenterPanel.xaml)
-- `Reusable runtime panel` — [../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml](../DotPilot/Presentation/Controls/RuntimeFoundationPanel.xaml)
-- `Toolchain Center contracts` — [../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterContracts.cs](../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterContracts.cs)
-- `Toolchain Center issue catalog` — [../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterIssues.cs](../DotPilot.Core/Features/ToolchainCenter/ToolchainCenterIssues.cs)
-- `Shell configuration contract` — [../DotPilot.Core/Features/ApplicationShell/AppConfig.cs](../DotPilot.Core/Features/ApplicationShell/AppConfig.cs)
-- `Runtime foundation contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationContracts.cs)
-- `Embedded runtime host contracts` — [../DotPilot.Core/Features/RuntimeFoundation/EmbeddedRuntimeHostContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/EmbeddedRuntimeHostContracts.cs)
-- `Traffic policy contracts` — [../DotPilot.Core/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicyContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicyContracts.cs)
-- `Session archive contracts` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeSessionArchiveContracts.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeSessionArchiveContracts.cs)
-- `Runtime communication problems` — [../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs](../DotPilot.Core/Features/RuntimeCommunication/RuntimeCommunicationProblems.cs)
-- `Control-plane domain contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/SessionExecutionContracts.cs)
-- `Provider and tool contracts` — [../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs](../DotPilot.Core/Features/ControlPlaneDomain/ProviderAndToolContracts.cs)
-- `Runtime issue catalog` — [../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs](../DotPilot.Core/Features/RuntimeFoundation/RuntimeFoundationIssues.cs)
-- `Toolchain Center catalog implementation` — [../DotPilot.Runtime/Features/ToolchainCenter/ToolchainCenterCatalog.cs](../DotPilot.Runtime/Features/ToolchainCenter/ToolchainCenterCatalog.cs)
-- `Toolchain snapshot factory` — [../DotPilot.Runtime/Features/ToolchainCenter/ToolchainProviderSnapshotFactory.cs](../DotPilot.Runtime/Features/ToolchainCenter/ToolchainProviderSnapshotFactory.cs)
-- `Runtime catalog implementation` — [../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs](../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeFoundationCatalog.cs)
-- `Deterministic test client` — [../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs](../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentRuntimeClient.cs)
-- `Agent Framework client` — [../DotPilot.Runtime/Features/RuntimeFoundation/AgentFrameworkRuntimeClient.cs](../DotPilot.Runtime/Features/RuntimeFoundation/AgentFrameworkRuntimeClient.cs)
-- `Deterministic turn engine` — [../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentTurnEngine.cs](../DotPilot.Runtime/Features/RuntimeFoundation/DeterministicAgentTurnEngine.cs)
-- `Session archive store` — [../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeSessionArchiveStore.cs](../DotPilot.Runtime/Features/RuntimeFoundation/RuntimeSessionArchiveStore.cs)
-- `Provider toolchain probing` — [../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs](../DotPilot.Runtime/Features/RuntimeFoundation/ProviderToolchainProbe.cs)
-- `Embedded host builder` — [../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeHostBuilderExtensions.cs](../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeHostBuilderExtensions.cs)
-- `Embedded traffic policy` — [../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicy.cs](../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicy.cs)
-- `Embedded traffic-policy catalog` — [../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicyCatalog.cs](../DotPilot.Runtime.Host/Features/RuntimeFoundation/EmbeddedRuntimeTrafficPolicyCatalog.cs)
-- `Initial Orleans grains` — [../DotPilot.Runtime.Host/Features/RuntimeFoundation/SessionGrain.cs](../DotPilot.Runtime.Host/Features/RuntimeFoundation/SessionGrain.cs)
+- `Application startup and route registration` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
+- `Chat shell route` — [../DotPilot/Presentation/Chat/Views/ChatPage.xaml](../DotPilot/Presentation/Chat/Views/ChatPage.xaml)
+- `Chat info panel + fleet board` — [../DotPilot/Presentation/Chat/Controls/ChatInfoPanel.xaml](../DotPilot/Presentation/Chat/Controls/ChatInfoPanel.xaml), [../DotPilot/Presentation/Chat/Controls/ChatFleetBoard.xaml](../DotPilot/Presentation/Chat/Controls/ChatFleetBoard.xaml)
+- `Agent creation route` — [../DotPilot/Presentation/AgentBuilder/Views/AgentBuilderPage.xaml](../DotPilot/Presentation/AgentBuilder/Views/AgentBuilderPage.xaml)
+- `Settings shell` — [../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml](../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml)
+- `Active contracts` — [../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs](../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs)
+- `Active commands` — [../DotPilot.Core/ChatSessions/Commands/](../DotPilot.Core/ChatSessions/Commands/)
+- `Session service interface` — [../DotPilot.Core/ChatSessions/Interfaces/IAgentSessionService.cs](../DotPilot.Core/ChatSessions/Interfaces/IAgentSessionService.cs)
+- `Session application service` — [../DotPilot.Core/ChatSessions/Execution/AgentSessionService.cs](../DotPilot.Core/ChatSessions/Execution/AgentSessionService.cs)
+- `Provider readiness catalog` — [../DotPilot.Core/Providers/Configuration/AgentSessionProviderCatalog.cs](../DotPilot.Core/Providers/Configuration/AgentSessionProviderCatalog.cs)
+- `UI end-to-end flow` — [../DotPilot.UITests/ChatSessions/Flows/GivenChatSessionsShell.cs](../DotPilot.UITests/ChatSessions/Flows/GivenChatSessionsShell.cs)
 
-## Dependency Rules
+## Review Focus
 
-- `DotPilot` owns XAML, routing, and startup composition only.
-- `DotPilot.Core` owns non-UI contracts and typed identifiers arranged by feature slice.
-- `DotPilot.Runtime` owns provider-independent runtime implementations and future integration seams, but not XAML or page logic.
-- `DotPilot.Runtime.Host` owns the embedded Orleans silo, localhost clustering, in-memory runtime state, and initial grain implementations for desktop targets only.
-- `DotPilot.Tests` validates contracts, composition, deterministic runtime behavior, and conditional provider-availability checks through public boundaries.
-- `DotPilot.UITests` validates the visible workbench shell, runtime-foundation panel, and agent-builder flow through the browser-hosted UI.
-
-## Key Decisions
-
-- The Uno app must remain a presentation-only host instead of becoming a dump for runtime logic.
-- Feature work should land as vertical slices with isolated contracts and implementations, not as shared horizontal folders.
-- Epic `#11` establishes the reusable contract and communication foundation before epic `#12` begins embedded runtime-host work.
-- Epic `#12` now has a first local-first Orleans host cut in `DotPilot.Runtime.Host`, and it intentionally uses localhost clustering plus in-memory storage/reminders before any remote or durable runtime topology is introduced.
-- The desktop runtime path now uses `Microsoft Agent Framework` for orchestration, while the browser path keeps the deterministic in-repo client for CI-safe coverage.
-- `#26` currently uses an explicit traffic-policy catalog plus Mermaid graph output instead of `ManagedCode.Orleans.Graph`, because the public `ManagedCode.Orleans.Graph` package is pinned to Orleans `9.x` and is not compatible with this repository's Orleans `10.0.1` baseline.
-- Epic `#14` makes external-provider toolchain readiness explicit before session creation, so install, auth, diagnostics, and configuration state stays visible instead of being inferred later.
-- CI must stay meaningful without external provider CLIs by using the in-repo deterministic runtime client.
-- Real provider checks may run only when the corresponding toolchain is present and discoverable.
-
-## Known Repository Risks
-
-- Provider-dependent validation for real `Codex`, `Claude Code`, and `GitHub Copilot` toolchains is intentionally environment-gated; the deterministic runtime client is the mandatory CI baseline for agent-flow verification.
-
-## Where To Go Next
-
-- Editing the Uno app shell: [../DotPilot/AGENTS.md](../DotPilot/AGENTS.md)
-- Editing contracts: [../DotPilot.Core/AGENTS.md](../DotPilot.Core/AGENTS.md)
-- Editing runtime services: [../DotPilot.Runtime/AGENTS.md](../DotPilot.Runtime/AGENTS.md)
-- Editing the embedded runtime host: [../DotPilot.Runtime.Host/AGENTS.md](../DotPilot.Runtime.Host/AGENTS.md)
-- Editing unit and API-style tests: [../DotPilot.Tests/AGENTS.md](../DotPilot.Tests/AGENTS.md)
-- Editing UI tests: [../DotPilot.UITests/AGENTS.md](../DotPilot.UITests/AGENTS.md)
+- Keep the product framed as a chat-first local-agent client, not as a backlog-shaped workbench.
+- Replace seed-data assumptions with real provider, agent, session, transcript, and durable runtime state.
+- Keep repo/git operations as optional tools inside a session, not as the app's primary information architecture.
+- Keep presentation models long-lived and projection-only so desktop navigation stays memory-hot instead of rehydrating each screen from scratch.
+- Prefer provider SDKs and `IChatClient`-style abstractions over custom parallel request/result wrappers unless a concrete gap forces an adapter layer.
+- Keep the persistence split explicit:
+  - `SQLite` for operator-facing projections and settings
+  - local folder-backed `AgentSession` plus chat history for agent continuity

@@ -1,0 +1,69 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.AgentPromptStartSection"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             FontFamily="{StaticResource AppBodyFontFamily}">
+  <Border Style="{StaticResource BuilderSectionStyle}"
+          AutomationProperties.AutomationId="AgentPromptStartSection">
+    <StackPanel Spacing="16">
+      <StackPanel Spacing="8">
+        <Border Width="40"
+                Height="40"
+                Background="{StaticResource AppDarkSurfaceBrush}"
+                CornerRadius="12">
+          <SymbolIcon HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Foreground="White"
+                      Symbol="Edit" />
+        </Border>
+        <TextBlock FontSize="20"
+                   FontWeight="SemiBold"
+                   Text="Describe the agent you want" />
+        <TextBlock MaxWidth="560"
+                   FontSize="12"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Describe the job once. dotPilot drafts the profile, provider, and model for review."
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
+
+      <Border Style="{StaticResource BuilderSummaryCardStyle}"
+              MinHeight="168">
+        <TextBox x:Name="PromptInput"
+                 AutomationProperties.AutomationId="AgentPromptInput"
+                 AcceptsReturn="True"
+                 Style="{StaticResource BuilderTextBoxStyle}"
+                 PlaceholderText="e.g. Create a repository reviewer agent that explains code changes, reads local files, and checks git diff before answering."
+                 Text="{Binding AgentRequest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 TextWrapping="Wrap" />
+      </Border>
+
+      <TextBlock AutomationProperties.AutomationId="AgentPromptStatusMessage"
+                 FontSize="12"
+                 Foreground="{StaticResource AppMutedTextBrush}"
+                 Text="{Binding OperationMessage}"
+                 TextWrapping="WrapWholeWords" />
+
+      <Grid ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Button x:Name="GenerateAgentButton"
+                AutomationProperties.AutomationId="GenerateAgentButton"
+                Click="OnGenerateAgentButtonClick"
+                Tag="{Binding GenerateAgentDraftCommand}"
+                Style="{StaticResource AccentActionButtonStyle}">
+          <TextBlock Text="Generate agent" />
+        </Button>
+
+        <Button Grid.Column="1"
+                AutomationProperties.AutomationId="BuildManuallyButton"
+                Click="OnBuildManuallyButtonClick"
+                Tag="{Binding BuildManuallyCommand}"
+                Style="{StaticResource SecondaryActionButtonStyle}">
+          <TextBlock Text="Build manually" />
+        </Button>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

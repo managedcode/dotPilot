@@ -29,11 +29,9 @@ We will use these architectural defaults for implementation work going forward:
    - desktop startup
    - app composition
 2. Non-UI feature work moves into separate class libraries:
-   - `DotPilot.Core` for contracts, typed identifiers, and public slice interfaces
-   - `DotPilot.Runtime` for provider-independent runtime implementations and future host integration seams
-   - `DotPilot.Runtime.Host` for the embedded Orleans silo and desktop-only runtime-host lifecycle
-3. Feature code must be organized as vertical slices under `Features/<FeatureName>/...`, not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
-4. Epic `#11` establishes the shared `ControlPlaneDomain` and `RuntimeCommunication` slices, and epic `#12` builds on that foundation through the `RuntimeFoundation` slice. Issue `#24` is implemented through a desktop-only `DotPilot.Runtime.Host` project that uses localhost clustering plus in-memory storage/reminders before any remote or durable topology is introduced.
+   - `DotPilot.Core` for contracts, typed identifiers, public slice interfaces, provider integration, persistence, and local desktop session runtime infrastructure
+3. Feature code must be organized as vertical slices under top-level feature folders such as `ChatSessions/`, `Providers/`, or `AgentBuilder/`, not under an extra `Features/` wrapper and not as shared horizontal `Services`, `Models`, or `Helpers` buckets.
+4. The active core slices are `ChatSessions`, `AgentBuilder`, and `Providers`, built around provider readiness, durable agent profiles, durable sessions, transcript streaming, and local persistence.
 5. CI-safe agent-flow verification must use a deterministic in-repo runtime client as a first-class implementation of the same public contracts, not a mock or hand-wired test double.
 6. Tests that require real `Codex`, `Claude Code`, or `GitHub Copilot` toolchains may run only when the corresponding toolchain is available; their absence must not weaken the provider-independent baseline.
 
@@ -43,21 +41,14 @@ We will use these architectural defaults for implementation work going forward:
 flowchart LR
   Ui["DotPilot Uno UI host"]
   Core["DotPilot.Core"]
-  Runtime["DotPilot.Runtime"]
-  Host["DotPilot.Runtime.Host"]
-  TestClient["Deterministic test client"]
+  TestClient["Deterministic debug provider"]
   ProviderChecks["Conditional provider checks"]
-  Future["Future Orleans + Agent Framework slices"]
+  Future["Future multi-agent session slices"]
 
   Ui --> Core
-  Ui --> Runtime
-  Ui --> Host
-  Host --> Core
-  Runtime --> TestClient
-  Runtime --> ProviderChecks
+  Core --> TestClient
+  Core --> ProviderChecks
   Future --> Core
-  Future --> Runtime
-  Future --> Host
 ```
 
 ## Alternatives Considered
@@ -86,23 +77,23 @@ CI does not guarantee those toolchains, so the repo would lose an honest agent-f
 
 - The Uno app gets cleaner and stays focused on operator-facing concerns.
 - Future slices can land without merging unrelated feature logic into shared buckets.
-- Contracts from epic `#11` become reusable across UI, runtime, and tests before epic `#12` begins live runtime integration.
+- Contracts from the shared domain and `AgentSessions` slice become reusable across UI, runtime, and tests before broader live-provider integration expands.
 - CI keeps a real provider-independent verification path through the deterministic runtime client.
-- The embedded Orleans host can evolve without leaking server-only dependencies into browserwasm or the presentation project.
+- The local desktop session runtime can evolve inside `DotPilot.Core` without leaking UI concerns into the presentation project.
 
 ### Negative
 
-- The solution now has more projects and local governance files to maintain.
+- The single non-UI project is denser, so folder discipline matters more.
 - Some pre-existing non-UI files in the app project may need follow-up cleanup as more slices move out.
 - The deterministic client adds maintenance work even though it is not a live provider adapter.
 
 ## Implementation Impact
 
-- Add `DotPilot.Core` and `DotPilot.Runtime` with local `AGENTS.md` files.
-- Update `docs/Architecture.md` to show the new module map and runtime-foundation slice.
-- Surface the runtime-foundation slice in the UI so the new boundary is visible and testable.
-- Add API-style tests for contracts and the deterministic client.
-- Add UI tests for the runtime-foundation elements and full workbench flow.
+- Keep `DotPilot.Core` as the single non-UI project with a local `AGENTS.md` file.
+- Update `docs/Architecture.md` to show the new module map and `AgentSessions` slice.
+- Surface the session/settings/chat flow in the UI so the new boundary is visible and testable.
+- Add API-style tests for contracts and the deterministic debug provider.
+- Add UI tests for the provider-settings, agent-creation, and streaming session flow.
 
 ## References
 

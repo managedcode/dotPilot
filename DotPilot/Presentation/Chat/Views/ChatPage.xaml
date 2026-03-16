@@ -1,0 +1,55 @@
+<Page x:Class="DotPilot.Presentation.ChatPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="using:DotPilot.Presentation.Controls"
+      Background="Transparent"
+      FontFamily="{StaticResource AppBodyFontFamily}">
+  <Grid AutomationProperties.AutomationId="ChatScreen"
+        MaxWidth="1380"
+        RowSpacing="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid AutomationProperties.AutomationId="ChatScreenHeader">
+      <StackPanel Spacing="4">
+        <TextBlock AutomationProperties.AutomationId="ChatPageTitle"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Text="Chat" />
+        <TextBlock FontSize="12.5"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Sessions, transcript, and live activity."
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1"
+          AutomationProperties.AutomationId="ChatLayout"
+          ColumnSpacing="16"
+          RowSpacing="16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="272" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="296" />
+      </Grid.ColumnDefinitions>
+
+      <controls:ChatSessionRail />
+
+      <Grid Grid.Column="1"
+            RowSpacing="18">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <controls:ChatConversationView />
+        <controls:ChatComposer Grid.Row="1"
+                               Tag="{Binding ComposerSendBehavior}" />
+      </Grid>
+
+      <controls:ChatInfoPanel Grid.Column="2" />
+    </Grid>
+  </Grid>
+</Page>

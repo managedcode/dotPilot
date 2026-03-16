@@ -1,0 +1,86 @@
+<Page x:Class="DotPilot.Presentation.AgentBuilderPage"
+      x:Name="RootPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="using:DotPilot.Presentation.Controls"
+      Background="Transparent"
+      FontFamily="{StaticResource AppBodyFontFamily}">
+  <Page.Resources>
+    <DataTemplate x:Key="AgentCatalogSurfaceTemplate">
+      <controls:AgentCatalogSection DataContext="{Binding DataContext, ElementName=RootPage}"
+                                    OpenCreateAgentCommand="{Binding DataContext.OpenCreateAgentCommand, ElementName=RootPage}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="AgentPromptSurfaceTemplate">
+      <controls:AgentPromptStartSection DataContext="{Binding DataContext, ElementName=RootPage}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="AgentEditorSurfaceTemplate">
+      <StackPanel DataContext="{Binding DataContext, ElementName=RootPage}"
+                  Spacing="18">
+        <Border Style="{StaticResource MetricCardStyle}"
+                BorderBrush="{StaticResource AppSuccessBrush}">
+          <TextBlock AutomationProperties.AutomationId="AgentEditorStatusMessage"
+                     FontSize="12.5"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{Binding OperationMessage}"
+                     TextWrapping="WrapWholeWords" />
+        </Border>
+
+        <controls:AgentBasicInfoSection />
+
+        <controls:AgentPromptSection />
+      </StackPanel>
+    </DataTemplate>
+
+    <controls:AgentBuilderSurfaceTemplateSelector x:Key="AgentBuilderSurfaceTemplateSelector"
+                                                  CatalogTemplate="{StaticResource AgentCatalogSurfaceTemplate}"
+                                                  PromptTemplate="{StaticResource AgentPromptSurfaceTemplate}"
+                                                  EditorTemplate="{StaticResource AgentEditorSurfaceTemplate}" />
+  </Page.Resources>
+
+  <Grid AutomationProperties.AutomationId="AgentBuilderScreen"
+        MaxWidth="1380">
+    <Grid RowSpacing="16">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Spacing="4">
+            <TextBlock AutomationProperties.AutomationId="AgentsPageTitle"
+                       FontSize="24"
+                       FontWeight="SemiBold"
+                       Text="{Binding Surface.Title}" />
+            <TextBlock FontSize="12.5"
+                       MaxWidth="760"
+                       Foreground="{StaticResource AppMutedTextBrush}"
+                       Text="{Binding Surface.Subtitle}"
+                       TextWrapping="WrapWholeWords" />
+          </StackPanel>
+
+          <Button Grid.Column="1"
+                  AutomationProperties.AutomationId="AgentBackButton"
+                  Command="{Binding ReturnToCatalogCommand}"
+                  Style="{StaticResource SecondaryActionButtonStyle}"
+                  Visibility="{Binding Surface.ShowBackButton}">
+            <TextBlock Text="Back to agents" />
+          </Button>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <ContentControl Content="{Binding Surface.Kind}"
+                          ContentTemplateSelector="{StaticResource AgentBuilderSurfaceTemplateSelector}" />
+        </ScrollViewer>
+    </Grid>
+  </Grid>
+</Page>

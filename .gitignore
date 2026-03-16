@@ -112,6 +112,10 @@ artifacts/
 *.svclog
 *.scc
 
+# Local planning and metrics scratch files
+CodeMetricsConfig.txt
+*.plan.md
+
 # Chutzpah Test files
 _Chutzpah*
 

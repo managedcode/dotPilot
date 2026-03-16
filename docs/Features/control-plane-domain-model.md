@@ -2,7 +2,7 @@
 
 ## Summary
 
-Issue [#22](https://github.com/managedcode/dotPilot/issues/22) defines the first stable domain contracts that later runtime, communication, Orleans, and orchestration slices will share. The goal is to keep these shapes broad enough for coding and non-coding agents while staying serialization-safe and independent from the Uno UI host.
+Issue [#22](https://github.com/managedcode/dotPilot/issues/22) defines the first stable domain contracts that later runtime, communication, and orchestration slices will share. The goal is to keep these shapes broad enough for coding and non-coding agents while staying serialization-safe and independent from the Uno UI host.
 
 ## Scope
 
@@ -15,7 +15,6 @@ Issue [#22](https://github.com/managedcode/dotPilot/issues/22) defines the first
 
 ### Out Of Scope
 
-- Orleans grain implementations
 - live provider execution or SDK adapters
 - transport contracts for issue `#23`
 

@@ -1,6 +1,6 @@
-namespace DotPilot.Models;
+namespace DotPilot;
 
-public record AppConfig
+public sealed record AppConfig
 {
     public string? Environment { get; init; }
 }

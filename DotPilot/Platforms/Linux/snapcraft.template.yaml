@@ -1,0 +1,40 @@
+name: __APP_NAME__
+version: '__VERSION__'
+summary: __TITLE__
+title: __TITLE__
+description: __DESCRIPTION__
+contact: __CONTACT_URL__
+issues: __ISSUES_URL__
+source-code: __SOURCE_CODE_URL__
+website: __WEBSITE_URL__
+license: __LICENSE__
+
+base: core24
+confinement: classic
+grade: stable
+
+lint:
+  ignore:
+    - classic
+    - library
+
+apps:
+  __APP_NAME__:
+    command: __ASSEMBLY_NAME__
+    desktop: snap/gui/__APP_NAME__.desktop
+
+parts:
+  __APP_NAME__:
+    plugin: dump
+    source: ./
+    stage-packages:
+      - ca-certificates
+      - libc6
+      - libfontconfig1
+      - libgcc-s1
+      - libicu74
+      - liblttng-ust1
+      - libssl3
+      - libstdc++6
+      - libunwind8
+      - zlib1g

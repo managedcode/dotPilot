@@ -1,11 +1,8 @@
-global using DotPilot.Core.Features.ApplicationShell;
-global using DotPilot.Core.Features.ControlPlaneDomain;
-global using DotPilot.Core.Features.RuntimeCommunication;
-global using DotPilot.Core.Features.RuntimeFoundation;
-global using DotPilot.Core.Features.ToolchainCenter;
-global using DotPilot.Core.Features.Workbench;
-global using DotPilot.Runtime.Features.RuntimeFoundation;
-global using DotPilot.Runtime.Features.ToolchainCenter;
-global using DotPilot.Runtime.Host.Features.RuntimeFoundation;
+global using DotPilot.Core.ChatSessions.Commands;
+global using DotPilot.Core.ChatSessions.Contracts;
+global using DotPilot.Core.ChatSessions.Interfaces;
+global using DotPilot.Core.ChatSessions.Models;
+global using DotPilot.Core.Workspace.Interfaces;
+global using DotPilot.Presentation;
 global using FluentAssertions;
 global using NUnit.Framework;

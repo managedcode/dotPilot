@@ -1,0 +1,153 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.AgentBasicInfoSection"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="using:DotPilot.Presentation"
+             x:Name="Root"
+             ProviderSelectionChangedCommand="{Binding ProviderSelectionChangedCommand}"
+             SelectModelCommand="{Binding SelectModelCommand}"
+             FontFamily="{StaticResource AppBodyFontFamily}">
+  <Border Style="{StaticResource BuilderSectionStyle}"
+          AutomationProperties.AutomationId="AgentBasicInfoSection">
+    <StackPanel Spacing="18">
+      <StackPanel Spacing="6">
+        <TextBlock FontSize="18"
+                   FontWeight="SemiBold"
+                   Text="Profile" />
+        <TextBlock FontSize="12"
+                   Foreground="{StaticResource AppMutedTextBrush}"
+                   Text="Review the generated profile and runtime defaults."
+                   TextWrapping="WrapWholeWords" />
+      </StackPanel>
+
+      <Grid ColumnSpacing="16"
+            RowSpacing="16">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1.15*" MinWidth="260" />
+          <ColumnDefinition Width="*" MinWidth="240" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="8">
+          <TextBlock FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="Agent name" />
+          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
+            <TextBox AutomationProperties.AutomationId="AgentNameInput"
+                     Style="{StaticResource BuilderTextBoxStyle}"
+                     PlaceholderText="e.g. Repository reviewer"
+                     Text="{Binding AgentName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1"
+                    Spacing="8">
+          <TextBlock FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="Provider" />
+          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
+            <ComboBox x:Name="ProviderCombo"
+                      AutomationProperties.AutomationId="AgentProviderCombo"
+                      SelectionChanged="OnProviderSelectionChanged"
+                      Style="{StaticResource BuilderComboBoxStyle}"
+                      DisplayMemberPath="DisplayName"
+                      ItemsSource="{Binding Providers}"
+                      SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
+          </Border>
+          <ItemsControl x:Name="ProviderBrowserOptions"
+                        AutomationProperties.AutomationId="AgentProviderBrowserOptions"
+                        ItemsSource="{Binding Providers}"
+                        Visibility="{Binding IsBrowserHead, ElementName=Root}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="presentation:AgentProviderOption">
+                <Button AutomationProperties.AutomationId="{x:Bind SelectionAutomationId}"
+                        Click="OnProviderQuickSelectButtonClick"
+                        Style="{StaticResource InlineActionButtonStyle}">
+                  <TextBlock Text="{x:Bind DisplayName}" />
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    Spacing="8">
+          <TextBlock FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="Model" />
+          <Border Style="{StaticResource BuilderInputSurfaceStyle}">
+            <ComboBox AutomationProperties.AutomationId="AgentModelInput"
+                      IsEnabled="{Binding BuilderHasSupportedModels}"
+                      ItemsSource="{Binding BuilderSupportedModelNames}"
+                      PlaceholderText="{Binding BuilderSuggestedModelName}"
+                      SelectedItem="{Binding ModelName, Mode=TwoWay}"
+                      Style="{StaticResource BuilderComboBoxStyle}" />
+          </Border>
+          <ItemsControl x:Name="ModelBrowserOptions"
+                        AutomationProperties.AutomationId="AgentModelBrowserOptions"
+                        ItemsSource="{Binding BuilderSupportedModels}"
+                        Visibility="{Binding IsBrowserHead, ElementName=Root}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="presentation:AgentModelOption">
+                <Button AutomationProperties.AutomationId="{x:Bind SelectionAutomationId}"
+                        Click="OnModelQuickSelectButtonClick"
+                        Style="{StaticResource InlineActionButtonStyle}">
+                  <TextBlock Text="{x:Bind DisplayName}" />
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock AutomationProperties.AutomationId="AgentSuggestedModelText"
+                     FontSize="11.5"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding BuilderModelHelperText}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2"
+                    Grid.ColumnSpan="2"
+                    AutomationProperties.AutomationId="AgentProviderSummaryCard"
+                    Spacing="4">
+          <TextBlock FontSize="12"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="Provider status" />
+          <TextBlock AutomationProperties.AutomationId="AgentSelectedProviderText"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     Text="{Binding BuilderProviderDisplayName}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{Binding BuilderProviderStatusSummary}"
+                     TextWrapping="WrapWholeWords" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="{Binding BuilderProviderCommandName}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="{Binding BuilderProviderVersionLabel}"
+                     Visibility="{Binding BuilderHasProviderVersion}" />
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

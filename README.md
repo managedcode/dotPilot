@@ -1,166 +1,153 @@
+<div align="center">
+
 # dotPilot
 
-`dotPilot` is a desktop-first, local-first control plane for AI agents built with `.NET 10` and `Uno Platform`.
+### Local Agent Orchestrator
 
-## Product Summary
+**Run AI agents locally. Build workflows. Own your data.**
 
-`dotPilot` is designed as a single operator workbench for running, supervising, and reviewing agent workflows from one desktop UI. Coding workflows are first-class, but the product is not limited to coding agents. The same control plane is intended to support research, analysis, orchestration, reviewer, and operator-style flows.
+*Intent becomes the interface* 🎯
 
-From the workbench, the operator should be able to:
+[![Download](https://img.shields.io/github/v/release/managedcode/dotPilot?label=Download&style=for-the-badge)](https://github.com/managedcode/dotPilot/releases/latest)
+[![License](https://img.shields.io/github/license/managedcode/dotPilot?style=for-the-badge)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10-purple?style=for-the-badge)](https://dotnet.microsoft.com/)
+[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/@ManagedCode)
 
-- manage agent profiles and fleets
-- connect external agent runtimes such as `Codex`, `Claude Code`, and `GitHub Copilot`
-- run local models through `LLamaSharp` and `ONNX Runtime`
-- browse repositories, inspect files, review diffs, and work with Git
-- orchestrate sessions, approvals, telemetry, replay, and evaluation from one UI
+[Website](https://dotpilot.managed-code.com) · [Downloads](#downloads) · [Getting Started](#getting-started) · [YouTube](https://www.youtube.com/@ManagedCode) · [Issues](https://github.com/managedcode/dotPilot/issues)
 
-## Main Features
+---
 
-### Available In The Current Repository
+</div>
 
-- a desktop-first three-pane workbench shell
-- repository tree search and open-file navigation
-- read-only file inspection and diff-review surface
-- artifact dock and runtime log console
-- unified settings shell for providers, policies, and storage
-- a Toolchain Center for `Codex`, `Claude Code`, and `GitHub Copilot` readiness
-- provider diagnostics, environment and secret visibility, operator actions, and background polling summaries
-- dedicated agent-builder screen
-- deterministic runtime foundation panel for provider readiness and control-plane state
-- `NUnit` unit tests plus `Uno.UITest` browser UI coverage
+## What is dotPilot?
 
-### Main Product Capabilities On The Roadmap
+dotPilot is an **open source desktop app** for running AI agents locally on your machine.
 
-- multi-agent session composition and orchestration
-- embedded local-first runtime hosting with `Orleans`
-- SDK-first provider integrations for `Codex`, `Claude Code`, and `GitHub Copilot`
-- local model runtime support through `LLamaSharp` and `ONNX Runtime`
-- approvals, replay, audit trails, and artifact inspection
-- OpenTelemetry-first observability and official `.NET` AI evaluation flows
+- 🤖 **Run multiple agents** — Launch and manage several AI agents at once
+- 🔄 **Build workflows** — Create multi-agent pipelines with Microsoft Agent Framework
+- 🔌 **Any provider** — Codex, Claude Code, GitHub Copilot, Gemini, or local models
+- 🏠 **100% local** — Your data stays on your device, no cloud required
+- 💬 **Natural language** — Create agents by describing what you need
 
-## Current Status
+Built with **C#**, **.NET 10**, and **Uno Platform**.
 
-The repository is in the **active foundation and workbench implementation** stage.
+---
 
-What already exists:
+## Downloads
 
-- the first runtime foundation slices in `DotPilot.Core` and `DotPilot.Runtime`
-- the first operator workbench slice for repository browsing, document inspection, artifacts, logs, and settings
-- the first Toolchain Center slice for pre-session provider readiness and operator diagnostics
-- a presentation-only `Uno Platform` app shell with separate non-UI class-library boundaries
-- unit, coverage, and UI automation validation paths
-- architecture docs, ADRs, feature specs, and GitHub backlog tracking
+| Platform | Architecture | Link |
+|:--------:|:------------:|:----:|
+| 🍎 **macOS** | Apple Silicon | [Download .dmg](https://github.com/managedcode/dotPilot/releases/latest) |
+| 🪟 **Windows** | x64 | [Download .exe](https://github.com/managedcode/dotPilot/releases/latest) |
+| 🐧 **Linux** | x64 | [Download .snap](https://github.com/managedcode/dotPilot/releases/latest) |
 
-What is planned next:
+---
 
-- embedded `Orleans` hosting inside the desktop app
-- `Microsoft Agent Framework` orchestration and session workflows
-- richer provider adapters and toolchain management
-- MCP and repository-intelligence tooling
-- local runtime execution flows
-- telemetry, replay, and evaluation surfaces backed by real runtime events
+## Supported Providers
 
-## Product Direction
+| Provider | Type | Status |
+|:---------|:-----|:------:|
+| **Codex CLI** | OpenAI coding agent | ✅ |
+| **Claude Code** | Anthropic assistant | ✅ |
+| **GitHub Copilot** | Microsoft AI | ✅ |
+| **Gemini** | Google AI | ✅ |
+| **OpenAI API** | Direct API | ✅ |
+| **Azure OpenAI** | Enterprise API | ✅ |
+| **LLamaSharp** | Local models | ✅ |
+| **ONNX Runtime** | Local inference | ✅ |
 
-The approved architectural defaults are:
-
-- `dotPilot` stays desktop-first and reuses the current shell direction instead of replacing it
-- the first runtime cut is **local-first** with an embedded `Orleans` silo
-- `Session = grain`, with related workspace, fleet, artifact, and policy state
-- `Microsoft Agent Framework` is the preferred orchestration layer
-- provider integrations are SDK-first:
-  - `ManagedCode.CodexSharpSDK`
-  - `ManagedCode.ClaudeCodeSharpSDK`
-  - `GitHub.Copilot.SDK`
-- tool federation is centered on `ManagedCode.MCPGateway`
-- repository intelligence is centered on `ManagedCode.RagSharp`
-- agent quality and safety evaluation use `Microsoft.Extensions.AI.Evaluation*`
-- observability is OpenTelemetry-first, with local-first visibility and optional cloud export later
-- `MLXSharp` is explicitly **not** part of the first roadmap wave
-
-## Documentation Map
-
-Start here if you want the current source of truth:
-
-- [Architecture Overview](docs/Architecture.md)
-- [ADR-0001: Agent Control Plane Architecture](docs/ADR/ADR-0001-agent-control-plane-architecture.md)
-- [ADR-0003: Vertical Slices And UI-Only Uno App](docs/ADR/ADR-0003-vertical-slices-and-ui-only-uno-app.md)
-- [Feature Spec: Agent Control Plane Experience](docs/Features/agent-control-plane-experience.md)
-- [Feature Spec: Workbench Foundation](docs/Features/workbench-foundation.md)
-- [Feature Spec: Toolchain Center](docs/Features/toolchain-center.md)
-- [Task Plan: Vertical Slice Runtime Foundation](vertical-slice-runtime-foundation.plan.md)
-- [Task Plan: Workbench Foundation](issue-13-workbench-foundation.plan.md)
-- [Task Plan: Toolchain Center](issue-14-toolchain-center.plan.md)
-- [Root Governance](AGENTS.md)
-
-GitHub tracking:
-
-- [Issue Backlog](https://github.com/managedcode/dotPilot/issues)
-
-## Repository Layout
-
-```text
-.
-├── DotPilot/                 # Uno desktop presentation host
-├── DotPilot.Core/            # Vertical-slice contracts and typed identifiers
-├── DotPilot.Runtime/         # Provider-independent runtime implementations
-├── DotPilot.ReleaseTool/     # Release automation utilities
-├── DotPilot.Tests/           # NUnit contract and composition tests
-├── DotPilot.UITests/         # Uno.UITest browser coverage
-├── docs/
-│   ├── ADR/                  # architectural decisions
-│   ├── Features/             # executable feature specs
-│   └── Architecture.md       # repo architecture map
-├── AGENTS.md                 # root governance for humans and agents
-├── vertical-slice-runtime-foundation.plan.md
-├── issue-13-workbench-foundation.plan.md
-├── issue-14-toolchain-center.plan.md
-└── DotPilot.slnx             # solution entry point
-```
+---
 
 ## Getting Started
 
-### Prerequisites
+### Download & Run
 
-- `.NET SDK 10.0.103`
-- `Uno.Sdk 6.5.31`
-- a supported desktop environment for `net10.0-desktop`
+1. Download the latest release for your platform from [Releases](https://github.com/managedcode/dotPilot/releases/latest)
+2. Install and launch dotPilot
+3. Configure your preferred AI provider in Settings
+4. Create your first agent and start chatting
 
-### Core Commands
-
-```bash
-dotnet build DotPilot.slnx -warnaserror -m:1 -p:BuildInParallel=false
-dotnet test DotPilot.slnx
-dotnet format DotPilot.slnx --verify-no-changes
-dotnet publish DotPilot/DotPilot.csproj -c Release -f net10.0-desktop
-```
-
-`build` and `analyze` use the same serialized `-warnaserror` command because the multi-target Uno app must not build in parallel in a shared workspace or CI cache.
-
-### Run the App
+### Build from Source
 
 ```bash
+git clone https://github.com/managedcode/dotPilot.git
+cd dotPilot
+dotnet build DotPilot.slnx
 dotnet run --project DotPilot/DotPilot.csproj -f net10.0-desktop
 ```
 
-### Run the Browser UI Suite
+**Requirements:** `.NET SDK 10.0.103`, `Uno.Sdk 6.5.31`
 
-```bash
-dotnet test DotPilot.UITests/DotPilot.UITests.csproj
-```
+---
 
-## Quality Gates
+## Features
 
-This repository treats the following as mandatory:
+### 🤖 Run Multiple Agents Simultaneously
 
-- real `NUnit` unit tests
-- real `Uno.UITest` browser UI coverage
-- repo-root `.editorconfig` as the formatting and analyzer source of truth
-- central package management through `Directory.Packages.props`
-- descriptive GitHub Actions validation and desktop artifact publishing
+Launch as many AI agents as you need, all running in parallel on your local machine. Each agent operates with its own isolated context, memory, and tool set. The **Fleet Board** gives you a real-time dashboard to monitor all active sessions — see which agents are working, what they're doing, and their current status. Switch between agents instantly, pause or resume sessions, and manage your entire agent fleet from one unified interface.
 
-## Notes
+### 🔄 Build Agentic Workflows with Microsoft Agent Framework
 
-- The current repository still contains prototype data in the shell; the new backlog tracks the transition to runtime-backed features.
-- If you are working on non-trivial changes, start with [AGENTS.md](AGENTS.md) and [docs/Architecture.md](docs/Architecture.md).
-- The current machine-local baseline may still hit a `Uno.Resizetizer` file-lock during `dotnet build`; that risk is documented in [ci-build-lock-fix.plan.md](ci-build-lock-fix.plan.md).
+dotPilot integrates with [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) to enable sophisticated multi-agent orchestration. Design workflows where agents collaborate — one agent researches, another analyzes, a third generates code. Use **sequential pipelines** for step-by-step tasks, **parallel execution** for independent workloads, or **handoff patterns** where agents pass context to each other. All workflows support streaming output, checkpoints for long-running tasks, and human-in-the-loop approvals when you need to stay in control.
+
+### 🔌 Connect Any Provider — Cloud or Local
+
+Freedom to choose your AI backend. Connect to **Codex CLI** for OpenAI's coding agent, **Claude Code** for Anthropic's assistant, **GitHub Copilot** for Microsoft's AI pair programmer, or **Gemini** for Google's models. Need direct API access? Use **OpenAI API** or **Azure OpenAI** for enterprise scenarios. Want full privacy? Run models entirely on your hardware with **LLamaSharp** or **ONNX Runtime** — zero data leaves your machine. Mix and match providers across different agents based on what each task needs.
+
+### 💬 Intent-Driven Agent Creation
+
+Stop configuring, start describing. Tell dotPilot what kind of agent you need in plain language: *"I need an agent that reviews pull requests and suggests improvements"* or *"Create a research agent that summarizes technical papers"*. The system generates the complete agent profile — system prompt, tool configuration, provider selection, and behavioral settings. Refine with follow-up instructions or dive into manual config when you need fine-grained control. **Intent becomes the interface.**
+
+### 📊 Full Observability with OpenTelemetry
+
+Every agent action is traceable. dotPilot integrates **OpenTelemetry** to capture detailed telemetry for each session — every prompt sent, every response received, every tool invocation, every workflow step. Visualize agent reasoning flows, identify performance bottlenecks, debug unexpected behaviors. Export traces to your preferred observability backend or analyze locally. When something goes wrong, you'll know exactly where and why.
+
+### 🔒 100% Local, 100% Private
+
+Your data never leaves your device unless you explicitly choose a cloud provider. All session history, agent configurations, and conversation transcripts are stored locally in **SQLite**. No telemetry sent to external servers. No account required to use local models. Run completely air-gapped if needed. You own your data, your workflows, and your AI infrastructure.
+
+---
+
+## Tech Stack
+
+| | |
+|:--|:--|
+| **Language** | C# |
+| **Runtime** | .NET 10 |
+| **UI** | Uno Platform |
+| **Orchestration** | Microsoft Agent Framework |
+| **Database** | SQLite + EF Core |
+| **Observability** | OpenTelemetry |
+
+---
+
+## Building in Public
+
+We're developing dotPilot in the open.
+
+- 📺 **YouTube** — [@ManagedCode](https://www.youtube.com/@ManagedCode)
+- 💬 **Issues** — [GitHub Issues](https://github.com/managedcode/dotPilot/issues)
+- 🌐 **Website** — [dotpilot.managed-code.com](https://dotpilot.managed-code.com)
+
+---
+
+## Documentation
+
+- [Architecture](docs/Architecture.md)
+- [Contributing](AGENTS.md)
+
+---
+
+## License
+
+Open source. See [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**[dotpilot.managed-code.com](https://dotpilot.managed-code.com)**
+
+Made by [ManagedCode](https://dotpilot.managed-code.com)
+
+</div>

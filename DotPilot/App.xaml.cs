@@ -1,10 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using DotPilot.Runtime.Features.RuntimeFoundation;
-#if !__WASM__
-using DotPilot.Runtime.Host.Features.RuntimeFoundation;
-#endif
 
 namespace DotPilot;
 
@@ -16,6 +13,9 @@ public partial class App : Application
     private const string BuilderCreatedMarker = "Uno host builder created.";
     private const string NavigateStartedMarker = "Navigating to shell.";
     private const string NavigateCompletedMarker = "Shell navigation completed.";
+    private const string StartupHydrationStartedMarker = "Startup workspace hydration started.";
+    private const string StartupHydrationCompletedMarker = "Startup workspace hydration completed.";
+    private const string DotPilotCategoryName = "DotPilot";
 #if !__WASM__
     private const string CenterMethodName = "Center";
     private const string WindowStartupLocationPropertyName = "WindowStartupLocation";
@@ -41,6 +41,8 @@ public partial class App : Application
 
     protected Window? MainWindow { get; private set; }
     protected IHost? Host { get; private set; }
+    internal IServiceProvider? Services => Host?.Services;
+    internal event EventHandler? ServicesReady;
 
     [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "Uno.Extensions APIs are used in a way that is safe for trimming in this template context.")]
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -56,9 +58,6 @@ public partial class App : Application
                     // Switch to Development environment when running in DEBUG
                     .UseEnvironment(Environments.Development)
 #endif
-#if !__WASM__
-                    .UseDotPilotEmbeddedRuntime()
-#endif
                     .UseLogging(configure: (context, logBuilder) =>
                     {
                         // Configure log levels for different categories of logging
@@ -67,9 +66,14 @@ public partial class App : Application
                                 context.HostingEnvironment.IsDevelopment() ?
                                     LogLevel.Information :
                                     LogLevel.Warning)
+                            .AddFilter(DotPilotCategoryName, LogLevel.Information)
 
                             // Default filters for core Uno Platform namespaces
                             .CoreLogLevel(LogLevel.Warning);
+
+#if !__WASM__
+                        logBuilder.AddConsole();
+#endif
 
                         // Uno Platform namespace filter groups
                         // Uncomment individual methods to see more detailed logging
@@ -96,38 +100,12 @@ public partial class App : Application
                     )
                     // Enable localization (see appsettings.json for supported languages)
                     .UseLocalization()
-                    .UseHttp((context, services) =>
-                    {
-#if DEBUG
-                        // DelegatingHandler will be automatically injected
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<DelegatingHandler, DotPilot.Runtime.Features.HttpDiagnostics.DebugHttpHandler>(services);
-#endif
-
-                    })
                     .ConfigureServices((context, services) =>
                     {
                         Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.Workbench.IWorkbenchCatalog,
-                                DotPilot.Runtime.Features.Workbench.WorkbenchCatalog>(services);
-#if !__WASM__
-                        services.AddDesktopRuntimeFoundation();
-#else
-                        services.AddBrowserRuntimeFoundation();
-#endif
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddSingleton<
-                                DotPilot.Core.Features.ToolchainCenter.IToolchainCenterCatalog,
-                                DotPilot.Runtime.Features.ToolchainCenter.ToolchainCenterCatalog>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<ShellViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<MainViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<SecondViewModel>(services);
-                        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                            .AddTransient<SettingsViewModel>(services);
+                            .AddSingleton(services, TimeProvider.System);
+                        services.AddAgentSessions();
+                        services.AddPresentationModels();
                     })
                     .UseNavigation(RegisterRoutes)
                 );
@@ -143,6 +121,15 @@ public partial class App : Application
             WriteStartupMarker(NavigateStartedMarker);
             Host = await builder.NavigateAsync<Shell>();
             WriteStartupMarker(NavigateCompletedMarker);
+            WriteStartupMarker(StartupHydrationStartedMarker);
+            var startupHydration = Host.Services.GetRequiredService<IStartupWorkspaceHydration>();
+            await startupHydration.EnsureHydratedAsync(CancellationToken.None);
+            WriteStartupMarker(StartupHydrationCompletedMarker);
+            ServicesReady?.Invoke(this, EventArgs.Empty);
+            var appLogger = Host.Services.GetRequiredService<ILogger<App>>();
+            AppLog.StartupMarker(
+                appLogger,
+                StartupHydrationCompletedMarker);
 #if !__WASM__
             CenterDesktopWindow(MainWindow);
 #endif
@@ -318,8 +305,8 @@ public partial class App : Application
     {
         views.Register(
             new ViewMap(ViewModel: typeof(ShellViewModel)),
-            new ViewMap<MainPage, MainViewModel>(),
-            new ViewMap<SecondPage, SecondViewModel>(),
+            new ViewMap<ChatPage, ChatViewModel>(),
+            new ViewMap<AgentBuilderPage, AgentBuilderViewModel>(),
             new ViewMap<SettingsPage, SettingsViewModel>()
         );
 
@@ -327,8 +314,8 @@ public partial class App : Application
             new RouteMap("", View: views.FindByViewModel<ShellViewModel>(),
                 Nested:
                 [
-                    new ("Main", View: views.FindByViewModel<MainViewModel>(), IsDefault:true),
-                    new ("Second", View: views.FindByViewModel<SecondViewModel>()),
+                    new ("Chat", View: views.FindByViewModel<ChatViewModel>(), IsDefault:true),
+                    new ("Agents", View: views.FindByViewModel<AgentBuilderViewModel>()),
                     new ("Settings", View: views.FindByViewModel<SettingsViewModel>()),
                 ]
             )

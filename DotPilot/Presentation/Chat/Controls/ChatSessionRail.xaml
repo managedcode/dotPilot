@@ -1,0 +1,61 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.ChatSessionRail"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="using:DotPilot.Presentation"
+             AutomationProperties.AutomationId="ChatSessionRail">
+  <Border Style="{StaticResource ChatSurfacePanelStyle}">
+    <StackPanel Spacing="16">
+      <StackPanel Spacing="4">
+        <TextBlock Style="{StaticResource ChatSectionTitleTextStyle}"
+                   Text="Sessions" />
+        <TextBlock Style="{StaticResource ChatSectionCaptionTextStyle}"
+                   Text="Saved and active local sessions." />
+      </StackPanel>
+
+      <Button AutomationProperties.AutomationId="ChatStartNewButton"
+              Command="{Binding StartNewSessionCommand}"
+              Style="{StaticResource AccentActionButtonStyle}">
+        <Grid ColumnSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <SymbolIcon Symbol="Add" />
+          <TextBlock Grid.Column="1"
+                     Text="Start new session" />
+        </Grid>
+      </Button>
+
+      <ListView AutomationProperties.AutomationId="ChatRecentChatsList"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                ItemsSource="{Binding RecentChats}"
+                SelectedItem="{Binding SelectedChat, Mode=TwoWay}"
+                SelectionMode="Single">
+        <ListView.ItemTemplate>
+          <DataTemplate x:DataType="presentation:SessionSidebarItem">
+            <Border Background="{StaticResource AppSoftSurfaceBrush}"
+                    BorderBrush="{StaticResource AppOutlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Margin="0,0,0,10"
+                    Padding="12,10"
+                    AutomationProperties.AutomationId="ChatRecentChatItem">
+              <StackPanel Spacing="4">
+                <TextBlock FontSize="13"
+                           FontWeight="SemiBold"
+                           Text="{x:Bind Title}" />
+                <TextBlock FontSize="11.5"
+                           Foreground="{StaticResource AppMutedTextBrush}"
+                           Text="{x:Bind Preview}"
+                           TextTrimming="CharacterEllipsis"
+                           TextWrapping="WrapWholeWords" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+    </StackPanel>
+  </Border>
+</UserControl>
