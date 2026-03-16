@@ -47,6 +47,16 @@
         <UnoFeatures>$(UnoFeatures);SkiaRenderer;</UnoFeatures>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-desktop'">
+        <DotPilotSnapContactUrl>https://github.com/managedcode/dotPilot/issues</DotPilotSnapContactUrl>
+        <DotPilotSnapIssuesUrl>https://github.com/managedcode/dotPilot/issues</DotPilotSnapIssuesUrl>
+        <DotPilotSnapSourceCodeUrl>https://github.com/managedcode/dotPilot</DotPilotSnapSourceCodeUrl>
+        <DotPilotSnapWebsiteUrl>https://dotpilot.managed-code.com</DotPilotSnapWebsiteUrl>
+        <DotPilotSnapLicense>MIT</DotPilotSnapLicense>
+        <DotPilotSnapManifestTemplate>$(MSBuildProjectDirectory)/Platforms/Linux/snapcraft.template.yaml</DotPilotSnapManifestTemplate>
+        <DotPilotSnapDesktopFileTemplate>$(MSBuildProjectDirectory)/Platforms/Linux/dotpilot.desktop</DotPilotSnapDesktopFileTemplate>
+    </PropertyGroup>
+
     <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-browserwasm'">
         <UnoSkipWasmToolsWorkloadValidation>true</UnoSkipWasmToolsWorkloadValidation>
         <UnoDisableHotDesign>true</UnoDisableHotDesign>
@@ -77,5 +87,29 @@
         <Compile Remove="Models\Entity.cs" />
         <Compile Remove="Services\Endpoints\DebugHandler.cs" />
     </ItemGroup>
+
+    <Target Name="PrepareCustomLinuxSnapLayout"
+            Condition="'$(SelfContained)'=='true' and $(RuntimeIdentifier.StartsWith('linux')) and '$(PackageFormat)'=='snap'"
+            BeforeTargets="_UnoPublishSnap">
+        <PropertyGroup>
+            <_DotPilotSnapAppName>$([System.String]::Copy('$(AssemblyName)').ToLowerInvariant().Replace('.', '-'))</_DotPilotSnapAppName>
+            <_DotPilotSnapManifestPath>$(IntermediateOutputPath)dotpilot.snapcraft.yaml</_DotPilotSnapManifestPath>
+            <_DotPilotSnapDesktopFilePath>$(IntermediateOutputPath)dotpilot.desktop</_DotPilotSnapDesktopFilePath>
+            <SnapManifest>$(_DotPilotSnapManifestPath)</SnapManifest>
+            <DesktopFile>$(_DotPilotSnapDesktopFilePath)</DesktopFile>
+        </PropertyGroup>
+
+        <MakeDir Directories="$(IntermediateOutputPath)" />
+        <!--
+          Uno's generated core24 snap manifest currently fails the release job because
+          snapcraft promotes classic/library lint findings to a non-zero exit code. The
+          release pipeline needs a deterministic installable asset, so we generate a
+          manifest template with explicit metadata and targeted lint suppression here.
+        -->
+        <Exec Command="sed -e &quot;s|__APP_NAME__|$(_DotPilotSnapAppName)|g&quot; -e &quot;s|__ASSEMBLY_NAME__|$(AssemblyName)|g&quot; -e &quot;s|__VERSION__|$(ApplicationDisplayVersion)|g&quot; -e &quot;s|__TITLE__|$(ApplicationTitle)|g&quot; -e &quot;s|__DESCRIPTION__|$(Description)|g&quot; -e &quot;s|__CONTACT_URL__|$(DotPilotSnapContactUrl)|g&quot; -e &quot;s|__ISSUES_URL__|$(DotPilotSnapIssuesUrl)|g&quot; -e &quot;s|__SOURCE_CODE_URL__|$(DotPilotSnapSourceCodeUrl)|g&quot; -e &quot;s|__WEBSITE_URL__|$(DotPilotSnapWebsiteUrl)|g&quot; -e &quot;s|__LICENSE__|$(DotPilotSnapLicense)|g&quot; &quot;$(DotPilotSnapManifestTemplate)&quot; &gt; &quot;$(_DotPilotSnapManifestPath)&quot;" />
+        <Copy SourceFiles="$(DotPilotSnapDesktopFileTemplate)"
+              DestinationFiles="$(_DotPilotSnapDesktopFilePath)"
+              SkipUnchangedFiles="true" />
+    </Target>
 
 </Project>

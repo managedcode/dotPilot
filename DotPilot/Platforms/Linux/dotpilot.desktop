@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=DotPilot
+Comment=DotPilot powered by Uno Platform.
+Exec=dotpilot
+Terminal=false
