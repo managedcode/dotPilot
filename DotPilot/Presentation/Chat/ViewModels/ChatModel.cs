@@ -94,7 +94,13 @@ public partial record ChatModel
                 return;
             }
 
-            fleetProviderSnapshotStale = true;
+            if (refresh.TryGetValue(out var workspace))
+            {
+                fleetProviderSnapshot = [.. workspace.Providers];
+                hasFleetProviderSnapshot = true;
+                fleetProviderSnapshotStale = false;
+            }
+
             _workspaceRefresh.Raise();
             _sessionRefresh.Raise();
             await EnsureSelectedChatAsync(cancellationToken);

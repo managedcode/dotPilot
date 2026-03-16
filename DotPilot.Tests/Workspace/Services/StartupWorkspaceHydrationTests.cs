@@ -46,7 +46,7 @@ public sealed class StartupWorkspaceHydrationTests
         var databasePath = Path.Combine(blockedDirectoryPath, "dotpilot-agent-sessions.db");
 
         Directory.CreateDirectory(rootPath);
-        await File.WriteAllTextAsync(blockedDirectoryPath, "blocked");
+        Directory.CreateDirectory(blockedDirectoryPath);
 
         try
         {
@@ -55,6 +55,9 @@ public sealed class StartupWorkspaceHydrationTests
                 DatabasePath = databasePath,
             });
             var hydration = fixture.Provider.GetRequiredService<IStartupWorkspaceHydration>();
+
+            Directory.Delete(blockedDirectoryPath);
+            await File.WriteAllTextAsync(blockedDirectoryPath, "blocked");
 
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 
