@@ -1,5 +1,4 @@
 using DotPilot.Core.AgentBuilder;
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.Providers;
 using ManagedCode.Communication;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +16,6 @@ internal sealed class AgentSessionService(
     ILogger<AgentSessionService> logger)
     : IAgentSessionService, IDisposable
 {
-    private const string NotYetImplementedFormat = "{0} live CLI execution is not wired yet in this slice.";
     private const string SessionReadyText = "Session created. Send the first message to start the workflow.";
     private const string UserAuthor = "You";
     private const string ToolAuthor = "Tool";
@@ -26,8 +24,6 @@ internal sealed class AgentSessionService(
     private const string ToolAccentLabel = "tool";
     private const string StatusAccentLabel = "status";
     private const string ErrorAccentLabel = "error";
-    internal static readonly System.Text.CompositeFormat LiveExecutionUnavailableCompositeFormat =
-        System.Text.CompositeFormat.Parse(NotYetImplementedFormat);
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private bool _initialized;
 
@@ -381,14 +377,14 @@ internal sealed class AgentSessionService(
 
         await using (dbContext)
         {
-            Result<(SessionRecord Session, AgentProfileRecord Agent, AgentSessionProviderProfile ProviderProfile, DateTimeOffset Timestamp)> contextResult;
+            Result<(SessionRecord Session, AgentProfileRecord Agent, AgentProviderKind ProviderKind, string ProviderDisplayName, DateTimeOffset Timestamp)> contextResult;
             try
             {
                 var sessionRecord = await dbContext.Sessions
                     .FirstOrDefaultAsync(record => record.Id == command.SessionId.Value, cancellationToken);
                 if (sessionRecord is null)
                 {
-                    contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.FailNotFound(
+                    contextResult = Result<(SessionRecord, AgentProfileRecord, AgentProviderKind, string, DateTimeOffset)>.FailNotFound(
                         $"Session '{command.SessionId}' was not found.");
                 }
                 else
@@ -397,15 +393,17 @@ internal sealed class AgentSessionService(
                         .FirstOrDefaultAsync(record => record.Id == sessionRecord.PrimaryAgentProfileId, cancellationToken);
                     if (agentRecord is null)
                     {
-                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.FailNotFound(
+                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentProviderKind, string, DateTimeOffset)>.FailNotFound(
                             $"Agent '{sessionRecord.PrimaryAgentProfileId}' was not found.");
                     }
                     else
                     {
-                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.Succeed((
+                        var agentProviderKind = (AgentProviderKind)agentRecord.ProviderKind;
+                        contextResult = Result<(SessionRecord, AgentProfileRecord, AgentProviderKind, string, DateTimeOffset)>.Succeed((
                             sessionRecord,
                             agentRecord,
-                            AgentSessionProviderCatalog.Get((AgentProviderKind)agentRecord.ProviderKind),
+                            agentProviderKind,
+                            agentProviderKind.GetDisplayName(),
                             timeProvider.GetUtcNow()));
                     }
                 }
@@ -413,7 +411,7 @@ internal sealed class AgentSessionService(
             catch (Exception exception)
             {
                 AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, Guid.Empty);
-                contextResult = Result<(SessionRecord, AgentProfileRecord, AgentSessionProviderProfile, DateTimeOffset)>.Fail(exception);
+                contextResult = Result<(SessionRecord, AgentProfileRecord, AgentProviderKind, string, DateTimeOffset)>.Fail(exception);
             }
 
             if (contextResult.IsFailed)
@@ -422,12 +420,12 @@ internal sealed class AgentSessionService(
                 yield break;
             }
 
-            var (session, agent, providerProfile, now) = contextResult.Value;
+            var (session, agent, providerKind, providerDisplayName, now) = contextResult.Value;
             AgentSessionServiceLog.SendStarted(
                 logger,
                 command.SessionId,
                 agent.Id,
-                providerProfile.Kind);
+                providerKind);
 
             Result<SessionEntryRecord> userEntryResult;
             try
@@ -456,7 +454,7 @@ internal sealed class AgentSessionService(
                 command.SessionId,
                 SessionStreamEntryKind.Status,
                 StatusAuthor,
-                $"Running {agent.Name} with {providerProfile.DisplayName}.",
+                $"Running {agent.Name} with {providerDisplayName}.",
                 timeProvider.GetUtcNow(),
                 accentLabel: StatusAccentLabel);
             Result<SessionStreamEntry> statusEntryResult;
@@ -486,7 +484,7 @@ internal sealed class AgentSessionService(
             {
                 var providerStatuses = await GetProviderStatusesAsync(forceRefresh: false, cancellationToken);
                 providerStatusResult = Result<ProviderStatusDescriptor>.Succeed(
-                    providerStatuses.First(status => status.Kind == providerProfile.Kind));
+                    providerStatuses.First(status => status.Kind == providerKind));
             }
             catch (Exception exception)
             {
@@ -503,7 +501,7 @@ internal sealed class AgentSessionService(
             var providerStatus = providerStatusResult.Value;
             if (!providerStatus.IsEnabled)
             {
-                AgentSessionServiceLog.SendBlockedDisabled(logger, command.SessionId, providerProfile.Kind);
+                AgentSessionServiceLog.SendBlockedDisabled(logger, command.SessionId, providerKind);
                 var disabledEntry = CreateEntryRecord(
                     command.SessionId,
                     SessionStreamEntryKind.Error,
@@ -536,34 +534,13 @@ internal sealed class AgentSessionService(
                 yield break;
             }
 
-            if (!providerProfile.SupportsLiveExecution)
-            {
-                AgentSessionServiceLog.SendBlockedNotWired(logger, command.SessionId, providerProfile.Kind);
-                var notImplementedEntry = CreateEntryRecord(
-                    command.SessionId,
-                    SessionStreamEntryKind.Error,
-                    StatusAuthor,
-                    string.Format(
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        LiveExecutionUnavailableCompositeFormat,
-                        providerProfile.DisplayName),
-                    timeProvider.GetUtcNow(),
-                    accentLabel: ErrorAccentLabel);
-                dbContext.SessionEntries.Add(notImplementedEntry);
-                session.UpdatedAt = notImplementedEntry.Timestamp;
-                await dbContext.SaveChangesAsync(cancellationToken);
-
-                yield return Result<SessionStreamEntry>.Succeed(MapEntry(notImplementedEntry));
-                yield break;
-            }
-
             using var liveActivity = sessionActivityMonitor.BeginActivity(
                 new SessionActivityDescriptor(
                     command.SessionId,
                     session.Title,
                     new AgentProfileId(agent.Id),
                     agent.Name,
-                    providerProfile.DisplayName));
+                    providerDisplayName));
 
             Result<RuntimeConversationContext> runtimeConversationResult;
             try
@@ -588,7 +565,7 @@ internal sealed class AgentSessionService(
                 command.SessionId,
                 SessionStreamEntryKind.ToolStarted,
                 ToolAuthor,
-                CreateToolStartText(providerProfile),
+                CreateToolStartText(providerKind),
                 timeProvider.GetUtcNow(),
                 agentProfileId: new AgentProfileId(agent.Id),
                 accentLabel: ToolAccentLabel);
@@ -625,7 +602,7 @@ internal sealed class AgentSessionService(
                 command.SessionId,
                 agent.Id,
                 runConfiguration.Context.RunId,
-                providerProfile.Kind,
+                providerKind,
                 agent.ModelName);
 
             await using var updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
@@ -747,7 +724,7 @@ internal sealed class AgentSessionService(
                     command.SessionId,
                     SessionStreamEntryKind.ToolCompleted,
                     ToolAuthor,
-                    CreateToolDoneText(providerProfile),
+                    CreateToolDoneText(providerKind),
                     timeProvider.GetUtcNow(),
                     agentProfileId: new AgentProfileId(agent.Id),
                     accentLabel: ToolAccentLabel);
@@ -882,19 +859,58 @@ internal sealed class AgentSessionService(
 
         foreach (var providerKind in enabledProviderKinds)
         {
-            var profile = AgentSessionProviderCatalog.Get(providerKind);
-            if (!profile.SupportsLiveExecution || profile.IsBuiltIn)
+            if (providerKind.IsBuiltIn())
             {
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName)))
+            if (!string.IsNullOrWhiteSpace(ResolveExecutablePath(providerKind.GetCommandName())))
             {
                 return providerKind;
             }
         }
 
         return AgentProviderKind.Debug;
+    }
+
+    private static string? ResolveExecutablePath(string commandName)
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            return null;
+        }
+
+        var searchPaths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var searchPath in searchPaths)
+        {
+            foreach (var candidate in EnumerateExecutableCandidates(searchPath, commandName))
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateExecutableCandidates(string searchPath, string commandName)
+    {
+        yield return Path.Combine(searchPath, commandName);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            yield break;
+        }
+
+        foreach (var extension in (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT")
+                     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            yield return Path.Combine(searchPath, string.Concat(commandName, extension));
+        }
     }
 
     private async ValueTask<IReadOnlyList<ProviderStatusDescriptor>> GetProviderStatusesAsync(
@@ -968,22 +984,22 @@ internal sealed class AgentSessionService(
         };
     }
 
-    private static string CreateToolStartText(AgentSessionProviderProfile providerProfile)
+    private static string CreateToolStartText(AgentProviderKind providerKind)
     {
-        return providerProfile.Kind == AgentProviderKind.Debug
+        return providerKind == AgentProviderKind.Debug
             ? "Preparing local debug workflow."
             : string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"Launching {providerProfile.DisplayName} in the local playground.");
+                $"Launching {providerKind.GetDisplayName()} in the local playground.");
     }
 
-    private static string CreateToolDoneText(AgentSessionProviderProfile providerProfile)
+    private static string CreateToolDoneText(AgentProviderKind providerKind)
     {
-        return providerProfile.Kind == AgentProviderKind.Debug
+        return providerKind == AgentProviderKind.Debug
             ? "Debug workflow finished."
             : string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"{providerProfile.DisplayName} turn finished.");
+                $"{providerKind.GetDisplayName()} turn finished.");
     }
 
     private static SessionStreamEntry MapEntry(SessionEntryRecord record)
@@ -1010,30 +1026,31 @@ internal sealed class AgentSessionService(
             .OrderByDescending(entry => entry.Timestamp)
             .Select(entry => entry.Text)
             .FirstOrDefault() ?? string.Empty;
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agent.ProviderKind);
+        var providerKind = (AgentProviderKind)agent.ProviderKind;
+        var providerDisplayName = providerKind.GetDisplayName();
 
         return new SessionListItem(
             new SessionId(record.Id),
             record.Title,
             preview,
-            providerProfile.DisplayName,
+            providerDisplayName,
             record.UpdatedAt,
             new AgentProfileId(agent.Id),
             agent.Name,
-            providerProfile.DisplayName);
+            providerDisplayName);
     }
 
     private static AgentProfileSummary MapAgentSummary(AgentProfileRecord record)
     {
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)record.ProviderKind);
+        var providerKind = (AgentProviderKind)record.ProviderKind;
         return new AgentProfileSummary(
             new AgentProfileId(record.Id),
             record.Name,
             string.IsNullOrWhiteSpace(record.Description)
                 ? ResolveAgentDescription(string.Empty, record.SystemPrompt)
                 : record.Description,
-            (AgentProviderKind)record.ProviderKind,
-            providerProfile.DisplayName,
+            providerKind,
+            providerKind.GetDisplayName(),
             record.ModelName,
             record.SystemPrompt,
             record.CreatedAt);

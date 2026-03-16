@@ -155,6 +155,7 @@ For this app:
 - architecture work must keep a vertical-slice shape: each feature owns its contracts, orchestration, and tests behind clear boundaries instead of growing a shared horizontal service layer
 - `DotPilot.Core` is the default home for non-UI code, but once a feature becomes large enough to deserve an architectural boundary, extract it into its own DLL instead of bloating `DotPilot.Core`
 - do not create or reintroduce generic project, folder, namespace, or product language named `Runtime` unless the user explicitly asks for that exact boundary; the default non-UI home is `DotPilot.Core`, and vague runtime naming is considered architectural noise in this repo
+- do not create or keep project, folder, or namespace names like `ControlPlaneDomain`; shared identifiers, contracts, models, and policies must live under explicit roots such as `Identifiers`, `Contracts`, `Models`, and `Policies` instead of behind a vague umbrella name
 - every new large feature DLL must reference `DotPilot.Core` for shared abstractions and contracts, and the desktop app should reference that feature DLL explicitly instead of dragging the feature back into the UI project
 - when a feature slice grows beyond a few files, split it into responsibility-based subfolders that mirror the slice's real concerns such as chat, drafting, providers, persistence, settings, or tests; do not leave large flat file dumps that force unrelated code to coexist in one directory
 - do not hide multiple real features under one umbrella folder such as `AgentSessions` when the code actually belongs to distinct features like `Chat`, `AgentBuilder`, `Settings`, `Providers`, or `Workspace`; use explicit feature roots and keep logs, models, services, and tests under the feature that owns them
@@ -180,7 +181,10 @@ For this app:
 - The deterministic debug provider is an internal fallback, not an operator-facing authoring choice: do not surface it as a selectable provider or suggested model in the `New agent` creation flow; if no real provider is enabled or installed, send the operator to provider settings instead of defaulting the form to debug
 - Do not invent agent roles, tool catalogs, skill catalogs, or capability tags in code or UI unless the product has a real backing registry and runtime path for them; absent a real implementation, leave those selections out of the product surface.
 - User-facing UI must not expose backlog numbers, issue labels, workstream labels, "workbench", "domain", or similar internal planning and architecture language unless a feature explicitly exists to show source-control metadata
-- Provider integrations should stay SDK-first: when Codex, Claude Code, GitHub Copilot, or debug/test providers already expose an `IChatClient`-style abstraction, build agent orchestration on top of that instead of inventing parallel request/result wrappers without a clear gap
+- Provider integrations must stay SDK-first: when Codex, Claude Code, GitHub Copilot, or debug/test providers already expose a `Microsoft Agent Framework` or `Microsoft.Extensions.AI` path, compose agent orchestration directly on that official surface instead of inventing parallel request/result abstractions.
+- Do not add or keep provider-specific wrapper chat clients, compatibility shims, or extra adapter layers for `Codex`, `Claude Code`, or `GitHub Copilot`; use the provider SDK and `Microsoft Agent Framework` integration path directly.
+- Do not use `AgentSessionProviderCatalog` or `AgentSessionCommandProbe` as provider-runtime indirection layers; provider registration, readiness, and session creation must come from the actual `Microsoft Agent Framework` plus provider SDK composition path.
+- For `Codex` and `Claude Code`, prefer `ManagedCode.CodexSharpSDK.Extensions.AgentFramework`, `ManagedCode.CodexSharpSDK.Extensions.AI`, `ManagedCode.ClaudeCodeSharpSDK.Extensions.AgentFramework`, and `ManagedCode.ClaudeCodeSharpSDK.Extensions.AI` when those packages are available in the repo, and use them as the primary integration path instead of building repo-local wrappers; remove `AI.Fluent.Assertions` usage instead of layering it beside the Agent Framework path.
 - Do not leave Uno binding on reflection fallback: when the shell binds to view models or option models, annotate or shape those types so the generated metadata provider can resolve them without runtime reflection warnings or performance loss
 - Persist app models and durable session state through `SQLite` plus `EF Core` when the data must survive restarts; do not keep the core chat/session experience trapped in seed data or transient in-memory catalogs
 - When agent conversations must survive restarts, persist the full `AgentSession` plus chat history through an Agent Framework history/storage provider backed by a local desktop folder; do not reduce durable conversation state to transcript text rows only
@@ -407,6 +411,7 @@ Ask first:
 - Keep `dotPilot` positioned as a general agent control plane, not a coding-only shell.
 - Keep the visible product direction aligned with desktop chat apps such as Codex and Claude: sessions first, chat first, streaming first, with repo and git actions as optional utilities inside a session instead of the primary navigation model.
 - Keep provider integrations SDK-first where good typed SDKs already exist.
+- Prefer `ManagedCode` provider SDK bridges for `Codex` and `Claude Code` when they already expose `Microsoft Agent Framework` and `Microsoft.Extensions.AI` integration points, instead of keeping parallel custom adapters or `AI.Fluent.Assertions` glue.
 - Keep evaluation and observability aligned with official Microsoft `.NET` AI guidance when building agent-quality and trust features.
 
 ### Dislikes
@@ -420,5 +425,7 @@ Ask first:
 - Switching desktop Uno pages into stacked or mobile-style responsive layouts during resize work unless the user explicitly asks for a different composition; desktop pages must stay desktop-first and protect geometry through sizing constraints instead.
 - Adding extra UI-test orchestration complexity when the actual goal is simply to run the tests and get an honest pass or fail result.
 - Planning `MLXSharp` into the first product wave before it is ready for real use.
+- Keeping `AI.Fluent.Assertions` in the provider/chat stack after an official `Microsoft Agent Framework` plus `ManagedCode` integration path is available.
+- Reintroducing `AgentSessionProviderCatalog`, `AgentSessionCommandProbe`, or provider-specific wrapper chat clients after the repo has official `Microsoft Agent Framework` plus provider SDK integration packages available.
 - Letting internal implementation labels such as `Workbench`, issue numbers, or architecture slice names leak into the visible product wording or navigation when the app should behave like a clean desktop chat client.
 - Leaving deprecated product slices, pages, view models, or contracts in place "for later cleanup" after the replacement direction is already chosen.

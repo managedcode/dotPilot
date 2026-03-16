@@ -25,7 +25,7 @@ public static class AgentSessionDefaults
 
     public static string GetDefaultModel(AgentProviderKind kind)
     {
-        return AgentSessionProviderCatalog.Get(kind).DefaultModelName;
+        return kind.GetDefaultModelName();
     }
 
     public static string CreateAgentDescription(string systemPrompt)

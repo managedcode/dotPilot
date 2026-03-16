@@ -1,9 +1,9 @@
 using System.Text.Json;
-using DotPilot.Core.ControlPlaneDomain;
+using DotPilot.Core;
 
-namespace DotPilot.Tests.ControlPlaneDomain;
+namespace DotPilot.Tests.SharedTypes;
 
-public class ControlPlaneDomainContractsTests
+public class SharedContractsTests
 {
     private const string SyntheticWorkspaceRootPath = "/repo/dotPilot";
     private static readonly DateTimeOffset CreatedAt = new(2026, 3, 13, 10, 15, 30, TimeSpan.Zero);
@@ -11,7 +11,7 @@ public class ControlPlaneDomainContractsTests
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
     [Test]
-    public void ControlPlaneIdentifiersProduceStableNonEmptyRepresentations()
+    public void SharedIdentifiersProduceStableNonEmptyRepresentations()
     {
         IReadOnlyList<string> values =
         [
@@ -34,19 +34,19 @@ public class ControlPlaneDomainContractsTests
     }
 
     [Test]
-    public void ControlPlaneContractsRoundTripThroughSystemTextJson()
+    public void SharedContractsRoundTripThroughSystemTextJson()
     {
         var envelope = CreateEnvelope();
 
         var payload = JsonSerializer.Serialize(envelope, SerializerOptions);
-        var roundTrip = JsonSerializer.Deserialize<ControlPlaneDomainEnvelope>(payload, SerializerOptions);
+        var roundTrip = JsonSerializer.Deserialize<SharedContractsEnvelope>(payload, SerializerOptions);
 
         roundTrip.Should().NotBeNull();
         roundTrip!.Should().BeEquivalentTo(envelope);
     }
 
     [Test]
-    public void ControlPlaneContractsModelMixedProviderAndLocalRuntimeSessions()
+    public void SharedContractsModelMixedProviderAndLocalRuntimeSessions()
     {
         var envelope = CreateEnvelope();
 
@@ -63,7 +63,7 @@ public class ControlPlaneDomainContractsTests
         envelope.Evaluation.Metric.Should().Be(EvaluationMetricKind.ToolCallAccuracy);
     }
 
-    private static ControlPlaneDomainEnvelope CreateEnvelope()
+    private static SharedContractsEnvelope CreateEnvelope()
     {
         var tool = new ToolCapabilityDescriptor
         {
@@ -188,7 +188,7 @@ public class ControlPlaneDomainContractsTests
             EvaluatedAt = UpdatedAt,
         };
 
-        return new ControlPlaneDomainEnvelope
+        return new SharedContractsEnvelope
         {
             Workspace = workspace,
             Tool = tool,
@@ -214,7 +214,7 @@ public class ControlPlaneDomainContractsTests
         };
     }
 
-    private sealed record ControlPlaneDomainEnvelope
+    private sealed record SharedContractsEnvelope
     {
         public WorkspaceDescriptor Workspace { get; init; } = new();
 

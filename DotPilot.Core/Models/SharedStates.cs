@@ -1,4 +1,4 @@
-namespace DotPilot.Core.ControlPlaneDomain;
+namespace DotPilot.Core;
 
 public enum SessionPhase
 {

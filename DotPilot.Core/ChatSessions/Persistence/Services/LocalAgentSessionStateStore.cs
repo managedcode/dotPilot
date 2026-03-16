@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Agents.AI;
 
 namespace DotPilot.Core.ChatSessions;

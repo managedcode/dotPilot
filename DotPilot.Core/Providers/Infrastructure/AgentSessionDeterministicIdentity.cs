@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using DotPilot.Core.ControlPlaneDomain;
 
 namespace DotPilot.Core.Providers;
 

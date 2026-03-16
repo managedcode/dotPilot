@@ -1,17 +1,22 @@
 using System.Globalization;
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Core.Providers;
+using GitHub.Copilot.SDK;
+using ManagedCode.ClaudeCodeSharpSDK.Configuration;
+using ManagedCode.ClaudeCodeSharpSDK.Extensions.AI;
+using ManagedCode.CodexSharpSDK.Configuration;
+using ManagedCode.CodexSharpSDK.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ClaudeThreadOptions = ManagedCode.ClaudeCodeSharpSDK.Client.ThreadOptions;
+using CodexThreadOptions = ManagedCode.CodexSharpSDK.Client.ThreadOptions;
 
 namespace DotPilot.Core.ChatSessions;
 
 internal sealed class AgentRuntimeConversationFactory(
     AgentSessionStorageOptions storageOptions,
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
-    LocalCodexThreadStateStore codexThreadStateStore,
     LocalAgentSessionStateStore sessionStateStore,
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
@@ -52,7 +57,7 @@ internal sealed class AgentRuntimeConversationFactory(
         var historyProvider = new FolderChatHistoryProvider(
             serviceProvider.GetRequiredService<LocalAgentChatHistoryStore>());
         var descriptor = CreateExecutionDescriptor(agentRecord);
-        var agent = CreateAgent(agentRecord, descriptor, historyProvider, sessionId);
+        var agent = await CreateAgentAsync(agentRecord, descriptor, historyProvider, sessionId, cancellationToken);
         if (useTransientConversation)
         {
             var transientSession = await CreateNewSessionAsync(agent, sessionId, cancellationToken);
@@ -110,11 +115,106 @@ internal sealed class AgentRuntimeConversationFactory(
         return session;
     }
 
-    private AIAgent CreateAgent(
+    private async ValueTask<AIAgent> CreateAgentAsync(
         AgentProfileRecord agentRecord,
         AgentExecutionDescriptor descriptor,
         FolderChatHistoryProvider historyProvider,
-        SessionId sessionId)
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        AgentRuntimeConversationFactoryLog.AgentRuntimeCreated(
+            logger,
+            agentRecord.Id,
+            agentRecord.Name,
+            descriptor.ProviderKind);
+
+        var agent = descriptor.ProviderKind switch
+        {
+            AgentProviderKind.GitHubCopilot => await CreateGitHubCopilotAgentAsync(
+                agentRecord,
+                descriptor,
+                sessionId,
+                cancellationToken),
+            _ => CreateChatClientAgent(
+                agentRecord,
+                descriptor,
+                historyProvider,
+                CreateChatClient(descriptor.ProviderKind, agentRecord.Name, sessionId, agentRecord.ModelName)),
+        };
+
+        return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
+    }
+
+    private static AgentExecutionDescriptor CreateExecutionDescriptor(AgentProfileRecord agentRecord)
+    {
+        var providerKind = (AgentProviderKind)agentRecord.ProviderKind;
+        return new AgentExecutionDescriptor(
+            agentRecord.Id,
+            agentRecord.Name,
+            providerKind,
+            providerKind.GetDisplayName(),
+            agentRecord.ModelName);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1859:Use concrete types when possible for improved performance",
+        Justification = "The runtime conversation factory intentionally preserves the IChatClient abstraction across provider-backed chat clients.")]
+    private IChatClient CreateChatClient(
+        AgentProviderKind providerKind,
+        string agentName,
+        SessionId sessionId,
+        string modelName)
+    {
+        if (providerKind == AgentProviderKind.Debug)
+        {
+            return new DebugChatClient(agentName, timeProvider);
+        }
+
+        if (providerKind == AgentProviderKind.Codex)
+        {
+            return new CodexChatClient(new CodexChatClientOptions
+            {
+                CodexOptions = new CodexOptions(),
+                DefaultModel = modelName,
+                DefaultThreadOptions = new CodexThreadOptions
+                {
+                    Model = modelName,
+                    WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
+                },
+            });
+        }
+
+        if (providerKind == AgentProviderKind.ClaudeCode)
+        {
+            return new ClaudeChatClient(new ClaudeChatClientOptions
+            {
+                ClaudeOptions = new ClaudeOptions(),
+                DefaultModel = modelName,
+                DefaultThreadOptions = new ClaudeThreadOptions
+                {
+                    Model = modelName,
+                    WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
+                },
+            });
+        }
+
+        throw new InvalidOperationException(
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} live execution is unavailable.",
+                providerKind.GetDisplayName()));
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1859:Use concrete types when possible for improved performance",
+        Justification = "The factory returns the concrete ChatClientAgent only for the chat-client-backed providers and keeps the outer flow on AIAgent.")]
+    private ChatClientAgent CreateChatClientAgent(
+        AgentProfileRecord agentRecord,
+        AgentExecutionDescriptor descriptor,
+        FolderChatHistoryProvider historyProvider,
+        IChatClient chatClient)
     {
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
         var options = new ChatClientAgentOptions
@@ -131,64 +231,44 @@ internal sealed class AgentRuntimeConversationFactory(
             },
         };
 
-        AgentRuntimeConversationFactoryLog.AgentRuntimeCreated(
-            logger,
-            agentRecord.Id,
-            agentRecord.Name,
-            descriptor.ProviderKind);
-
-        var agent = CreateChatClient(
-                descriptor.ProviderKind,
-                descriptor.ProviderDisplayName,
-                agentRecord.Name,
-                sessionId,
-                agentRecord.ModelName)
-            .AsAIAgent(options, loggerFactory, serviceProvider);
-
-        return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
+        return (ChatClientAgent)chatClient.AsAIAgent(options, loggerFactory, serviceProvider);
     }
 
-    private static AgentExecutionDescriptor CreateExecutionDescriptor(AgentProfileRecord agentRecord)
-    {
-        var providerProfile = AgentSessionProviderCatalog.Get((AgentProviderKind)agentRecord.ProviderKind);
-        return new AgentExecutionDescriptor(
-            agentRecord.Id,
-            agentRecord.Name,
-            providerProfile.Kind,
-            providerProfile.DisplayName,
-            agentRecord.ModelName);
-    }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Performance",
-        "CA1859:Use concrete types when possible for improved performance",
-        Justification = "The runtime conversation factory intentionally preserves the IChatClient abstraction across provider-backed chat clients.")]
-    private IChatClient CreateChatClient(
-        AgentProviderKind providerKind,
-        string providerDisplayName,
-        string agentName,
+    private async ValueTask<AIAgent> CreateGitHubCopilotAgentAsync(
+        AgentProfileRecord agentRecord,
+        AgentExecutionDescriptor descriptor,
         SessionId sessionId,
-        string modelName)
+        CancellationToken cancellationToken)
     {
-        if (providerKind == AgentProviderKind.Debug)
+        var workingDirectory = ResolvePlaygroundDirectory(sessionId);
+        var copilotClient = new CopilotClient(new CopilotClientOptions
         {
-            return new DebugChatClient(agentName, timeProvider);
-        }
+            AutoStart = false,
+            UseStdio = true,
+        });
 
-        if (providerKind == AgentProviderKind.Codex)
-        {
-            return new CodexChatClient(
-                sessionId,
-                agentName,
-                modelName,
-                codexThreadStateStore,
-                timeProvider);
-        }
+        await copilotClient.StartAsync(cancellationToken);
 
-        throw new InvalidOperationException(
-            string.Format(
-                CultureInfo.InvariantCulture,
-                AgentSessionService.LiveExecutionUnavailableCompositeFormat,
-                providerDisplayName));
+        return copilotClient.AsAIAgent(
+            new SessionConfig
+            {
+                Model = agentRecord.ModelName,
+                SystemMessage = new SystemMessageConfig
+                {
+                    Content = agentRecord.SystemPrompt,
+                },
+                WorkingDirectory = workingDirectory,
+            },
+            ownsClient: true,
+            id: agentRecord.Id.ToString("N", CultureInfo.InvariantCulture),
+            name: agentRecord.Name,
+            description: descriptor.ProviderDisplayName);
+    }
+
+    private string ResolvePlaygroundDirectory(SessionId sessionId)
+    {
+        var directory = AgentSessionStoragePaths.ResolvePlaygroundDirectory(storageOptions, sessionId);
+        Directory.CreateDirectory(directory);
+        return directory;
     }
 }

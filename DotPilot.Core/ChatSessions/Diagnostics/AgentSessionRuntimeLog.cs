@@ -1,4 +1,3 @@
-using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.ChatSessions;

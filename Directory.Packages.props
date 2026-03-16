@@ -10,10 +10,13 @@
   -->
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="8.0.0" />
-    <PackageVersion Include="FluentAssertions" Version="6.12.0" />
-    <PackageVersion Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AI" Version="1.0.2" />
+    <PackageVersion Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AgentFramework" Version="1.1.0-rc4" />
+    <PackageVersion Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AI" Version="1.1.0" />
+    <PackageVersion Include="ManagedCode.CodexSharpSDK.Extensions.AgentFramework" Version="1.1.0-rc4" />
+    <PackageVersion Include="ManagedCode.CodexSharpSDK.Extensions.AI" Version="1.1.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc4" />
+    <PackageVersion Include="Microsoft.Agents.AI.GitHub.Copilot" Version="1.0.0-preview.260311.1" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc4" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.0.1" />
     <PackageVersion Include="NUnit" Version="4.5.1" />
@@ -21,8 +24,8 @@
     <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.1" />
     <PackageVersion Include="GitHub.Copilot.SDK" Version="0.1.32" />
     <PackageVersion Include="ManagedCode.Communication" Version="10.0.1" />
-    <PackageVersion Include="ManagedCode.ClaudeCodeSharpSDK" Version="1.0.2" />
-    <PackageVersion Include="ManagedCode.CodexSharpSDK" Version="1.0.1" />
+    <PackageVersion Include="ManagedCode.ClaudeCodeSharpSDK" Version="1.1.0" />
+    <PackageVersion Include="ManagedCode.CodexSharpSDK" Version="1.1.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.5" />

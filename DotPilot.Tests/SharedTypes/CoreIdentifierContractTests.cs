@@ -1,8 +1,8 @@
-using DotPilot.Core.ControlPlaneDomain;
+using DotPilot.Core;
 
-namespace DotPilot.Tests.ControlPlaneDomain;
+namespace DotPilot.Tests.SharedTypes;
 
-public sealed class ControlPlaneIdentifierContractTests
+public sealed class CoreIdentifierContractTests
 {
     [Test]
     public void NewlyCreatedIdentifiersUseVersionSevenTokens()

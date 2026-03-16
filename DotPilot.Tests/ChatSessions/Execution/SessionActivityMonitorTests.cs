@@ -1,5 +1,5 @@
 using DotPilot.Core.ChatSessions;
-using DotPilot.Core.ControlPlaneDomain;
+using DotPilot.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotPilot.Tests.ChatSessions.Execution;

@@ -1,8 +1,8 @@
-# Control Plane Domain Model
+# Shared Core Types
 
 ## Summary
 
-Issue [#22](https://github.com/managedcode/dotPilot/issues/22) defines the first stable domain contracts that later runtime, communication, and orchestration slices will share. The goal is to keep these shapes broad enough for coding and non-coding agents while staying serialization-safe and independent from the Uno UI host.
+Issue [#22](https://github.com/managedcode/dotPilot/issues/22) defines the first stable shared contracts that later runtime, communication, and orchestration slices will share. The goal is to keep these shapes broad enough for coding and non-coding agents while staying serialization-safe and independent from the Uno UI host.
 
 ## Scope
 
@@ -49,7 +49,7 @@ flowchart LR
 
 ## Contract Notes
 
-- `ControlPlaneIdentifiers` use `Guid.CreateVersion7()` so new IDs are sortable and modern without leaking UI concerns into the core domain slice.
+- `CoreIdentifiers` use `Guid.CreateVersion7()` so new IDs are sortable and modern without leaking UI concerns into the shared core types.
 - DTOs are modeled as non-positional `sealed record` types with `init` properties and safe defaults so `System.Text.Json` can round-trip them without custom infrastructure.
 - `ProviderConnectionStatus` includes non-happy-path states such as `RequiresAuthentication`, `Misconfigured`, and `Outdated` because the operator UI must surface these explicitly before live sessions start.
 - `AgentProfileDescriptor` supports mixed provider and local-runtime participation by allowing either `ProviderId`, `ModelRuntimeId`, or both depending on future orchestration needs.
@@ -57,7 +57,7 @@ flowchart LR
 
 ## Verification
 
-- `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~ControlPlaneDomain`
+- `dotnet test DotPilot.Tests/DotPilot.Tests.csproj --filter FullyQualifiedName~SharedTypes`
 - `dotnet test DotPilot.Tests/DotPilot.Tests.csproj`
 - `dotnet test DotPilot.slnx`
 

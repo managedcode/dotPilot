@@ -13,7 +13,10 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
 - `DotPilot.Core.csproj`
 - `AgentBuilder/{Configuration,Models,Services}/*`
 - `ChatSessions/{Commands,Configuration,Contracts,Diagnostics,Execution,Interfaces,Models,Persistence}/*`
-- `ControlPlaneDomain/{Identifiers,Contracts,Models,Policies}/*`
+- `Identifiers/*`
+- `Contracts/*`
+- `Models/*`
+- `Policies/*`
 - `HttpDiagnostics/DebugHttpHandler.cs`
 - `Providers/{Configuration,Infrastructure,Interfaces,Models,Services}/*`
 - `Workspace/{Interfaces,Services}/*`
@@ -33,16 +36,17 @@ Stack: `.NET 10`, class library, non-UI contracts, orchestration, persistence, a
 - do not leave extracted subsystem contracts half-inside `DotPilot.Core`; when a future subsystem is split into its own DLL, its feature-facing interfaces and implementation seams should move with it
 - keep feature-specific heavy infrastructure out of this project once it becomes its own subsystem; `DotPilot.Core` should stay cohesive instead of half-owning an extracted runtime
 - Do not collect unrelated code under an umbrella directory such as `AgentSessions`; split session, workspace, settings, providers, and host code into explicit feature roots when the surface grows.
-- Keep `ControlPlaneDomain` explicit too: identifiers belong under `Identifiers`, participant/provider/session DTOs under `Contracts`, cross-flow state under `Models`, and policy shapes under `Policies` instead of leaving one flat dump.
+- Do not introduce or keep a `ControlPlaneDomain` umbrella in this project; shared identifiers belong under `Identifiers`, participant/provider/session DTOs under `Contracts`, cross-flow state under `Models`, and policy shapes under `Policies`.
 - Keep contract-centric slices explicit inside each feature root: commands live under `Commands`, public DTO shapes live under `Contracts`, public service seams live under `Interfaces`, state records or enums live under `Models`, diagnostics under `Diagnostics`, and persistence under `Persistence`.
 - When a slice exposes `Commands` and `Results`, use the solution-standard `ManagedCode.Communication` primitives instead of hand-rolled command/result record types.
 - Keep the top level readable as two kinds of folders:
-  - shared/domain folders such as `ControlPlaneDomain` and `Workspace`
+  - shared roots such as `Identifiers`, `Contracts`, `Models`, `Policies`, and `Workspace`
   - operational/system folders such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`
 - keep this structure SOLID at the folder and project level too: cohesive feature slices stay together, but once a slice becomes too large or too independent, it should graduate into its own project instead of turning `DotPilot.Core` into mud
 - Keep provider-independent testing seams real and deterministic so CI can validate core flows without external CLIs.
 - Keep provider readiness probing explicit and coalesced: ordinary workspace reads may share one in-flight CLI probe, but normal navigation must not fan out into repeated PATH/version probing loops.
 - The approved caching exception in this project is startup readiness hydration: Core may keep one startup-owned provider/CLI snapshot after the initial splash-time probe, but it must invalidate that snapshot on explicit refresh or provider preference changes instead of drifting into a long-lived opaque cache layer.
+- Do not introduce or keep `AgentSessionProviderCatalog`, `AgentSessionCommandProbe`, or provider-specific wrapper chat clients in this project; provider session creation and readiness must compose directly from `Microsoft Agent Framework` plus the provider SDK extension packages.
 - Treat superseded async loads as cancellation, not failure; Core services should not emit error-level noise for expected state invalidation or navigation churn.
 
 ## Local Commands

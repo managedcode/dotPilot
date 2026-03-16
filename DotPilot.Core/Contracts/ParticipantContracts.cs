@@ -1,4 +1,4 @@
-namespace DotPilot.Core.ControlPlaneDomain;
+namespace DotPilot.Core;
 
 [GenerateSerializer]
 public sealed record WorkspaceDescriptor

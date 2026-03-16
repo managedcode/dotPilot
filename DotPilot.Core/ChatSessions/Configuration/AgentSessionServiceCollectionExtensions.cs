@@ -17,7 +17,6 @@ public static class AgentSessionServiceCollectionExtensions
         services.AddDbContextFactory<LocalAgentSessionDbContext>(ConfigureDbContext);
         services.AddSingleton<LocalAgentSessionStateStore>();
         services.AddSingleton<LocalAgentChatHistoryStore>();
-        services.AddSingleton<LocalCodexThreadStateStore>();
         services.AddSingleton<IAgentProviderStatusReader, AgentProviderStatusReader>();
         services.AddSingleton<AgentPromptDraftGenerator>();
         services.AddSingleton<AgentExecutionLoggingMiddleware>();

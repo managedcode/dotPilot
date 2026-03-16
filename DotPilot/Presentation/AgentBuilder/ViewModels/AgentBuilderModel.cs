@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using DotPilot.Core.AgentBuilder;
-using DotPilot.Core.ControlPlaneDomain;
+using DotPilot.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Data;
 

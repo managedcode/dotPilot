@@ -1,5 +1,4 @@
 using System.Globalization;
-using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -7,9 +6,9 @@ namespace DotPilot.Core.ChatSessions;
 
 internal sealed class FolderChatHistoryProvider(LocalAgentChatHistoryStore chatHistoryStore)
     : ChatHistoryProvider(
-        provideOutputMessageFilter: static messages => messages,
-        storeInputRequestMessageFilter: static messages => messages,
-        storeInputResponseMessageFilter: static messages => messages)
+        provideOutputMessageFilter: FilterSystemMessages,
+        storeInputRequestMessageFilter: FilterSystemMessages,
+        storeInputResponseMessageFilter: FilterSystemMessages)
 {
     private const string ProviderStateKey = "DotPilot.AgentSessionHistory";
     private static readonly ProviderSessionState<FolderChatHistoryState> SessionState = new(
@@ -97,5 +96,11 @@ internal sealed class FolderChatHistoryProvider(LocalAgentChatHistoryStore chatH
                 message.CreatedAt,
                 message.Text)
             : message.MessageId;
+    }
+
+    private static IEnumerable<ChatMessage> FilterSystemMessages(IEnumerable<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        return messages.Where(static message => message.Role != ChatRole.System);
     }
 }
