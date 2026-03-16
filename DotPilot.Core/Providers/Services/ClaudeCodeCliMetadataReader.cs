@@ -71,9 +71,6 @@ internal static class ClaudeCodeCliMetadataReader
 
     private static string GetSettingsPath()
     {
-        var homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return string.IsNullOrWhiteSpace(homePath)
-            ? string.Empty
-            : Path.Combine(homePath, ".claude", SettingsFileName);
+        return ProviderCliHomeDirectory.GetFilePath(".claude", SettingsFileName);
     }
 }

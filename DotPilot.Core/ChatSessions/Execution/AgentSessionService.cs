@@ -806,24 +806,7 @@ internal sealed class AgentSessionService(
             .AnyAsync(record => record.IsEnabled, cancellationToken);
         if (!hasEnabledProvider)
         {
-            var debugPreference = await dbContext.ProviderPreferences
-                .FirstOrDefaultAsync(
-                    record => record.ProviderKind == (int)AgentProviderKind.Debug,
-                    cancellationToken);
-
-            if (debugPreference is null)
-            {
-                debugPreference = new ProviderPreferenceRecord
-                {
-                    ProviderKind = (int)AgentProviderKind.Debug,
-                };
-                dbContext.ProviderPreferences.Add(debugPreference);
-            }
-
-            debugPreference.IsEnabled = true;
-            debugPreference.UpdatedAt = timeProvider.GetUtcNow();
-            AgentSessionServiceLog.DefaultProviderEnabled(logger, AgentProviderKind.Debug);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await EnsureProviderEnabledAsync(dbContext, AgentProviderKind.Debug, cancellationToken);
         }
 
         await NormalizeLegacyAgentProfilesAsync(dbContext, cancellationToken);
@@ -834,13 +817,12 @@ internal sealed class AgentSessionService(
             return;
         }
 
-        var providerSnapshot = await GetProviderStatusesAsync(forceRefresh: true, cancellationToken);
-        var providerKind = providerSnapshot
-            .Where(provider =>
-                provider.CanCreateAgents &&
-                AgentSessionProviderCatalog.Get(provider.Kind).SupportsLiveExecution)
-            .Select(static provider => provider.Kind)
-            .FirstOrDefault(AgentProviderKind.Debug);
+        var providerKind = await ResolveSeedProviderKindAsync(dbContext, cancellationToken);
+        if (providerKind == AgentProviderKind.Debug)
+        {
+            await EnsureProviderEnabledAsync(dbContext, providerKind, cancellationToken);
+        }
+
         var record = new AgentProfileRecord
         {
             Id = Guid.CreateVersion7(),
@@ -857,6 +839,62 @@ internal sealed class AgentSessionService(
         dbContext.AgentProfiles.Add(record);
         await dbContext.SaveChangesAsync(cancellationToken);
         AgentSessionServiceLog.DefaultAgentSeeded(logger, record.Id, providerKind, record.ModelName);
+    }
+
+    private async Task EnsureProviderEnabledAsync(
+        LocalAgentSessionDbContext dbContext,
+        AgentProviderKind providerKind,
+        CancellationToken cancellationToken)
+    {
+        var preference = await dbContext.ProviderPreferences
+            .FirstOrDefaultAsync(
+                record => record.ProviderKind == (int)providerKind,
+                cancellationToken);
+
+        if (preference is null)
+        {
+            preference = new ProviderPreferenceRecord
+            {
+                ProviderKind = (int)providerKind,
+            };
+            dbContext.ProviderPreferences.Add(preference);
+        }
+
+        if (preference.IsEnabled)
+        {
+            return;
+        }
+
+        preference.IsEnabled = true;
+        preference.UpdatedAt = timeProvider.GetUtcNow();
+        AgentSessionServiceLog.DefaultProviderEnabled(logger, providerKind);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async ValueTask<AgentProviderKind> ResolveSeedProviderKindAsync(
+        LocalAgentSessionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var enabledProviderKinds = await dbContext.ProviderPreferences
+            .Where(record => record.IsEnabled)
+            .Select(record => (AgentProviderKind)record.ProviderKind)
+            .ToArrayAsync(cancellationToken);
+
+        foreach (var providerKind in enabledProviderKinds)
+        {
+            var profile = AgentSessionProviderCatalog.Get(providerKind);
+            if (!profile.SupportsLiveExecution || profile.IsBuiltIn)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName)))
+            {
+                return providerKind;
+            }
+        }
+
+        return AgentProviderKind.Debug;
     }
 
     private async ValueTask<IReadOnlyList<ProviderStatusDescriptor>> GetProviderStatusesAsync(

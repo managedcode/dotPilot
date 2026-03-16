@@ -42,11 +42,10 @@ public sealed class StartupWorkspaceHydrationTests
             "DotPilot.Tests",
             nameof(StartupWorkspaceHydrationTests),
             Guid.NewGuid().ToString("N"));
-        var blockedDirectoryPath = Path.Combine(rootPath, "blocked");
-        var databasePath = Path.Combine(blockedDirectoryPath, "dotpilot-agent-sessions.db");
+        var databasePath = Path.Combine(rootPath, "dotpilot-agent-sessions.db");
 
         Directory.CreateDirectory(rootPath);
-        Directory.CreateDirectory(blockedDirectoryPath);
+        Directory.CreateDirectory(databasePath);
 
         try
         {
@@ -56,16 +55,12 @@ public sealed class StartupWorkspaceHydrationTests
             });
             var hydration = fixture.Provider.GetRequiredService<IStartupWorkspaceHydration>();
 
-            Directory.Delete(blockedDirectoryPath);
-            await File.WriteAllTextAsync(blockedDirectoryPath, "blocked");
-
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 
             hydration.IsHydrating.Should().BeFalse();
             hydration.IsReady.Should().BeFalse();
 
-            File.Delete(blockedDirectoryPath);
-            Directory.CreateDirectory(blockedDirectoryPath);
+            Directory.Delete(databasePath);
 
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 

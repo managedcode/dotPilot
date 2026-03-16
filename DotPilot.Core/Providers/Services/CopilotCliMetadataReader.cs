@@ -123,9 +123,6 @@ internal static class CopilotCliMetadataReader
 
     private static string GetConfigPath()
     {
-        var homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return string.IsNullOrWhiteSpace(homePath)
-            ? string.Empty
-            : Path.Combine(homePath, ".copilot", ConfigFileName);
+        return ProviderCliHomeDirectory.GetFilePath(".copilot", ConfigFileName);
     }
 }
