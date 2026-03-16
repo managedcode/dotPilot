@@ -5,6 +5,8 @@ namespace DotPilot.Tests.Providers;
 
 internal sealed class CodexCliTestScope : IDisposable
 {
+    private const int DeleteRetryCount = 20;
+    private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
     private readonly string rootPath;
     private readonly string? originalPath;
     private readonly string? originalHome;
@@ -54,10 +56,7 @@ internal sealed class CodexCliTestScope : IDisposable
         Environment.SetEnvironmentVariable("PATH", originalPath);
         Environment.SetEnvironmentVariable("HOME", originalHome);
         Environment.SetEnvironmentVariable("USERPROFILE", originalUserProfile);
-        if (Directory.Exists(rootPath))
-        {
-            Directory.Delete(rootPath, recursive: true);
-        }
+        DeleteDirectoryWithRetry(rootPath);
 
         disposed = true;
     }
@@ -231,5 +230,30 @@ internal sealed class CodexCliTestScope : IDisposable
             UnixFileMode.GroupExecute |
             UnixFileMode.OtherRead |
             UnixFileMode.OtherExecute);
+    }
+
+    private static void DeleteDirectoryWithRetry(string path)
+    {
+        for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
+        {
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < DeleteRetryCount - 1)
+            {
+                System.Threading.Thread.Sleep(DeleteRetryDelay);
+            }
+            catch (UnauthorizedAccessException) when (attempt < DeleteRetryCount - 1)
+            {
+                System.Threading.Thread.Sleep(DeleteRetryDelay);
+            }
+        }
     }
 }

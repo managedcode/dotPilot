@@ -9,6 +9,8 @@ namespace DotPilot.Tests.ChatSessions;
 
 public sealed class AgentSessionPersistenceTests
 {
+    private const int DeleteRetryCount = 20;
+    private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
     private static readonly JsonSerializerOptions HistorySerializerOptions = new()
     {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
@@ -82,7 +84,7 @@ public sealed class AgentSessionPersistenceTests
         }
         finally
         {
-            DeleteDirectory(root);
+            await DeleteDirectoryAsync(root);
         }
     }
 
@@ -152,11 +154,28 @@ public sealed class AgentSessionPersistenceTests
             Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    private static void DeleteDirectory(string path)
+    private static async Task DeleteDirectoryAsync(string path)
     {
-        if (Directory.Exists(path))
+        for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
         {
-            Directory.Delete(path, recursive: true);
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < DeleteRetryCount - 1)
+            {
+                await Task.Delay(DeleteRetryDelay);
+            }
+            catch (UnauthorizedAccessException) when (attempt < DeleteRetryCount - 1)
+            {
+                await Task.Delay(DeleteRetryDelay);
+            }
         }
     }
 

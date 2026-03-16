@@ -13,6 +13,8 @@ public sealed class AgentSessionServiceTests
 {
     private const int LegacyDefaultRole = 4;
     private const string LegacyEmptyCapabilitiesJson = "[]";
+    private const int DeleteRetryCount = 20;
+    private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(250);
 
     [Test]
     public async Task GetWorkspaceAsyncSeedsDefaultSystemAgentForANewStore()
@@ -646,7 +648,7 @@ public sealed class AgentSessionServiceTests
 
     private static async Task DeleteDirectoryWithRetryAsync(string path)
     {
-        for (var attempt = 0; attempt < 5; attempt++)
+        for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
         {
             if (!Directory.Exists(path))
             {
@@ -658,13 +660,13 @@ public sealed class AgentSessionServiceTests
                 Directory.Delete(path, recursive: true);
                 return;
             }
-            catch (IOException) when (attempt < 4)
+            catch (IOException) when (attempt < DeleteRetryCount - 1)
             {
-                await Task.Delay(100);
+                await Task.Delay(DeleteRetryDelay);
             }
-            catch (UnauthorizedAccessException) when (attempt < 4)
+            catch (UnauthorizedAccessException) when (attempt < DeleteRetryCount - 1)
             {
-                await Task.Delay(100);
+                await Task.Delay(DeleteRetryDelay);
             }
         }
     }
