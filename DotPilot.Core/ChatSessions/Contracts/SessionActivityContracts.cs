@@ -12,6 +12,7 @@ public sealed record SessionActivityDescriptor(
 public sealed record SessionActivitySnapshot(
     bool HasActiveSessions,
     int ActiveSessionCount,
+    IReadOnlyList<SessionActivityDescriptor> ActiveSessions,
     SessionId? SessionId,
     string SessionTitle,
     AgentProfileId? AgentProfileId,

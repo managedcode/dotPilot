@@ -42,6 +42,11 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string ChatComposerInputAutomationId = "ChatComposerInput";
     private const string ChatComposerHintAutomationId = "ChatComposerHint";
     private const string ChatComposerSendButtonAutomationId = "ChatComposerSendButton";
+    private const string ChatFleetBoardSectionAutomationId = "ChatFleetBoardSection";
+    private const string ChatFleetMetricItemAutomationId = "ChatFleetMetricItem";
+    private const string ChatFleetSessionItemAutomationId = "ChatFleetSessionItem";
+    private const string ChatFleetProviderItemAutomationId = "ChatFleetProviderItem";
+    private const string ChatFleetEmptyStateAutomationId = "ChatFleetEmptyState";
     private const string ComposerBehaviorSectionAutomationId = "ComposerBehaviorSection";
     private const string ComposerBehaviorCurrentHintAutomationId = "ComposerBehaviorCurrentHint";
     private const string ComposerBehaviorEnterInsertsNewLineButtonAutomationId = "ComposerBehaviorEnterInsertsNewLineButton";
@@ -132,9 +137,36 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForElement(AppSidebarLiveSessionIndicatorAutomationId);
         WaitForTextContains(AppSidebarLiveSessionTitleAutomationId, "Live session active", ScreenTransitionTimeout);
         WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
-        WaitForAutomationElementToDisappearById(AppSidebarLiveSessionIndicatorAutomationId);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
+        WaitForAutomationElementToDisappearById(AppSidebarLiveSessionIndicatorAutomationId, ScreenTransitionTimeout);
 
         TakeScreenshot("sidebar_live_session_indicator");
+    }
+
+    [Test]
+    public async Task WhenLiveGenerationStartsThenFleetBoardShowsTheActiveSessionAndProviderHealth()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        WaitForElement(ChatFleetBoardSectionAutomationId);
+        WaitForTextContains(ChatFleetEmptyStateAutomationId, "No live sessions right now.", ScreenTransitionTimeout);
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
+
+        WaitForTextContains(ChatFleetMetricItemAutomationId, "Live sessions", ScreenTransitionTimeout);
+        WaitForTextContains(ChatFleetSessionItemAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+        WaitForTextContains(ChatFleetProviderItemAutomationId, "Debug Provider", ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
+        WaitForAutomationElementToDisappearById(AppSidebarLiveSessionIndicatorAutomationId, ScreenTransitionTimeout);
+        WaitForAutomationElementToDisappearById(ChatFleetSessionItemAutomationId, ScreenTransitionTimeout);
+        WaitForTextContains(ChatFleetEmptyStateAutomationId, "No live sessions right now.", ScreenTransitionTimeout);
+
+        TakeScreenshot("chat_fleet_board_live_session");
     }
 
     [Test]

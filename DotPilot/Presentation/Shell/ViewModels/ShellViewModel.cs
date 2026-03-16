@@ -1,4 +1,3 @@
-using DotPilot.Core.ChatSessions;
 using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;

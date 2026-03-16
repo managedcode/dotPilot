@@ -23,24 +23,35 @@ public partial record ChatModel
         LocalMemberSummary,
         "L",
         DesignBrushPalette.UserAvatarBrush);
+    private readonly UiDispatcher uiDispatcher;
     private readonly IAgentWorkspaceState workspaceState;
+    private readonly ISessionActivityMonitor sessionActivityMonitor;
     private readonly IOperatorPreferencesStore operatorPreferencesStore;
     private readonly ILogger<ChatModel> logger;
+    private readonly SemaphoreSlim fleetProviderRefreshGate = new(1, 1);
     private AsyncCommand? _startNewSessionCommand;
     private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
     private readonly Signal _sessionRefresh = new();
+    private ImmutableArray<ProviderStatusDescriptor> fleetProviderSnapshot = [];
+    private bool hasFleetProviderSnapshot;
+    private bool fleetProviderSnapshotStale = true;
 
     public ChatModel(
+        UiDispatcher uiDispatcher,
         IAgentWorkspaceState workspaceState,
+        ISessionActivityMonitor sessionActivityMonitor,
         IOperatorPreferencesStore operatorPreferencesStore,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
         ILogger<ChatModel> logger)
     {
+        this.uiDispatcher = uiDispatcher;
         this.workspaceState = workspaceState;
+        this.sessionActivityMonitor = sessionActivityMonitor;
         this.operatorPreferencesStore = operatorPreferencesStore;
         this.logger = logger;
         workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
+        this.sessionActivityMonitor.StateChanged += OnSessionActivityChanged;
     }
 
     public string ComposerPlaceholder => DefaultComposerPlaceholder;
@@ -152,8 +163,12 @@ public partial record ChatModel
 
     private void OnWorkspaceProjectionChanged(object? sender, EventArgs e)
     {
-        _workspaceRefresh.Raise();
-        _sessionRefresh.Raise();
+        fleetProviderSnapshotStale = true;
+        uiDispatcher.Execute(() =>
+        {
+            _workspaceRefresh.Raise();
+            _sessionRefresh.Raise();
+        });
     }
 
     private async ValueTask SendMessageCore(string? messageOverride, CancellationToken cancellationToken)

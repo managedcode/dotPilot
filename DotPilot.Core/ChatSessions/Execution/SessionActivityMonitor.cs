@@ -1,3 +1,4 @@
+using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.ChatSessions;
@@ -7,6 +8,7 @@ internal sealed class SessionActivityMonitor(ILogger<SessionActivityMonitor> log
     private static readonly SessionActivitySnapshot EmptySnapshot = new(
         false,
         0,
+        [],
         null,
         string.Empty,
         null,
@@ -79,22 +81,43 @@ internal sealed class SessionActivityMonitor(ILogger<SessionActivityMonitor> log
 
     private SessionActivitySnapshot UpdateSnapshotUnsafe()
     {
+        var activeSessions = GetActiveSessionsUnsafe();
         _current = _leases.Count == 0
             ? EmptySnapshot
-            : CreateSnapshot(_leases[^1].Descriptor, _leases.Count);
+            : CreateSnapshot(activeSessions);
         return _current;
     }
 
-    private static SessionActivitySnapshot CreateSnapshot(SessionActivityDescriptor descriptor, int activeSessionCount)
+    private IReadOnlyList<SessionActivityDescriptor> GetActiveSessionsUnsafe()
     {
+        if (_leases.Count == 0)
+        {
+            return [];
+        }
+
+        var descriptors = new Dictionary<SessionId, SessionActivityDescriptor>();
+        for (var index = 0; index < _leases.Count; index++)
+        {
+            var descriptor = _leases[index].Descriptor;
+            descriptors.Remove(descriptor.SessionId);
+            descriptors[descriptor.SessionId] = descriptor;
+        }
+
+        return [.. descriptors.Values];
+    }
+
+    private static SessionActivitySnapshot CreateSnapshot(IReadOnlyList<SessionActivityDescriptor> activeSessions)
+    {
+        var latestSession = activeSessions[^1];
         return new SessionActivitySnapshot(
             true,
-            activeSessionCount,
-            descriptor.SessionId,
-            descriptor.SessionTitle,
-            descriptor.AgentProfileId,
-            descriptor.AgentName,
-            descriptor.ProviderDisplayName);
+            activeSessions.Count,
+            activeSessions,
+            latestSession.SessionId,
+            latestSession.SessionTitle,
+            latestSession.AgentProfileId,
+            latestSession.AgentName,
+            latestSession.ProviderDisplayName);
     }
 
     private sealed class ActivityLease(SessionActivityMonitor owner, SessionActivityDescriptor descriptor) : IDisposable

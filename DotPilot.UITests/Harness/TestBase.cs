@@ -587,7 +587,7 @@ public class TestBase
             return true;
         }
 
-        return WaitForAutomationElementToDisappear(automationId);
+        return WaitForAutomationElementToDisappear(automationId, PostClickTransitionProbeTimeout);
     }
 
     private static bool WaitForActionEffect(Func<bool> effectObserved)
@@ -626,9 +626,9 @@ public class TestBase
         }
     }
 
-    private bool WaitForAutomationElementToDisappear(string automationId)
+    private bool WaitForAutomationElementToDisappear(string automationId, TimeSpan timeout)
     {
-        var timeoutAt = DateTimeOffset.UtcNow.Add(PostClickTransitionProbeTimeout);
+        var timeoutAt = DateTimeOffset.UtcNow.Add(timeout);
         while (DateTimeOffset.UtcNow < timeoutAt)
         {
             if (!BrowserHasAutomationElement(automationId))
@@ -668,9 +668,14 @@ public class TestBase
 
     protected void WaitForAutomationElementToDisappearById(string automationId)
     {
+        WaitForAutomationElementToDisappearById(automationId, PostClickTransitionProbeTimeout);
+    }
+
+    protected void WaitForAutomationElementToDisappearById(string automationId, TimeSpan timeout)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
 
-        if (WaitForAutomationElementToDisappear(automationId))
+        if (WaitForAutomationElementToDisappear(automationId, timeout))
         {
             return;
         }

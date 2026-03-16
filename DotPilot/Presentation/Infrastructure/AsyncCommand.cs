@@ -10,7 +10,7 @@ public sealed class AsyncCommand(
     private readonly Func<object?, ValueTask> _executeAsync =
         executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
     private readonly Func<object?, bool>? _canExecute = canExecute;
-    private readonly DispatcherQueue? _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+    private readonly DispatcherQueue? _dispatcherQueue = TryGetDispatcherQueue();
 
     public AsyncCommand(Func<Task> executeAsync, Func<bool>? canExecute = null)
         : this(
@@ -70,5 +70,17 @@ public sealed class AsyncCommand(
         }
 
         _dispatcherQueue.TryEnqueue(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
+    }
+
+    private static DispatcherQueue? TryGetDispatcherQueue()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread();
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

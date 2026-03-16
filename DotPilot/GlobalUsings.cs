@@ -1,3 +1,4 @@
+global using DotPilot.Core.ChatSessions;
 global using DotPilot.Core.ChatSessions.Commands;
 global using DotPilot.Core.ChatSessions.Contracts;
 global using DotPilot.Core.ChatSessions.Models;

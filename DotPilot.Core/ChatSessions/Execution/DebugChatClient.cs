@@ -6,7 +6,7 @@ namespace DotPilot.Core.ChatSessions;
 internal sealed class DebugChatClient(string agentName, TimeProvider timeProvider) : IChatClient
 {
     private const int DefaultChunkDelayMilliseconds = 45;
-    private const int BrowserChunkDelayMilliseconds = 180;
+    private const int BrowserChunkDelayMilliseconds = 400;
     private const string FallbackPrompt = "the latest request";
     private const string Newline = "\n";
 

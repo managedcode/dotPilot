@@ -1,0 +1,132 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.ChatFleetBoard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presentation="using:DotPilot.Presentation"
+             AutomationProperties.AutomationId="ChatFleetBoardSection">
+  <UserControl.Resources>
+    <DataTemplate x:Key="FleetMetricTemplate"
+                  x:DataType="presentation:FleetBoardMetricItem">
+      <Border Style="{StaticResource MetricCardStyle}"
+              AutomationProperties.AutomationId="ChatFleetMetricItem">
+        <StackPanel Spacing="4">
+          <TextBlock FontSize="12"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind Label}" />
+          <TextBlock FontSize="20"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{x:Bind Value}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppSecondaryTextBrush}"
+                     Text="{x:Bind Summary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="FleetActiveSessionTemplate"
+                  x:DataType="presentation:FleetBoardSessionItem">
+      <Button AutomationProperties.AutomationId="ChatFleetSessionItem"
+              Command="{x:Bind OpenCommand}"
+              CommandParameter="{x:Bind OpenRequest}"
+              HorizontalContentAlignment="Stretch"
+              Padding="12,10"
+              Style="{StaticResource InlineActionButtonStyle}">
+        <StackPanel Spacing="4">
+          <TextBlock FontSize="12.5"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource AppPrimaryTextBrush}"
+                     Text="{x:Bind Title}" />
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind Summary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Button>
+    </DataTemplate>
+
+    <DataTemplate x:Key="FleetProviderTemplate"
+                  x:DataType="presentation:FleetBoardProviderItem">
+      <Border Background="{StaticResource AppInputSurfaceBrush}"
+              BorderBrush="{StaticResource AppOutlineBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="12,10"
+              AutomationProperties.AutomationId="ChatFleetProviderItem">
+        <StackPanel Spacing="6">
+          <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock FontSize="12.5"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppPrimaryTextBrush}"
+                       Text="{x:Bind DisplayName}" />
+
+            <Border Grid.Column="1"
+                    Background="{x:Bind StatusBrush}"
+                    CornerRadius="999"
+                    Padding="8,2">
+              <TextBlock FontSize="10"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource AppPrimaryTextBrush}"
+                         Text="{x:Bind StatusLabel}" />
+            </Border>
+          </Grid>
+
+          <TextBlock FontSize="11.5"
+                     Foreground="{StaticResource AppMutedTextBrush}"
+                     Text="{x:Bind Summary}"
+                     TextWrapping="WrapWholeWords" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <StackPanel Spacing="12">
+    <TextBlock CharacterSpacing="80"
+               FontSize="12"
+               FontWeight="Medium"
+               Foreground="{StaticResource AppMutedTextBrush}"
+               Text="FLEET BOARD" />
+
+    <ItemsControl AutomationProperties.AutomationId="ChatFleetMetricsList"
+                  ItemTemplate="{StaticResource FleetMetricTemplate}"
+                  ItemsSource="{Binding FleetBoard.Metrics}" />
+
+    <StackPanel Spacing="8">
+      <TextBlock CharacterSpacing="80"
+                 FontSize="12"
+                 FontWeight="Medium"
+                 Foreground="{StaticResource AppMutedTextBrush}"
+                 Text="ACTIVE SESSIONS" />
+
+      <ItemsControl AutomationProperties.AutomationId="ChatFleetSessionsList"
+                    ItemTemplate="{StaticResource FleetActiveSessionTemplate}"
+                    ItemsSource="{Binding FleetBoard.ActiveSessions}"
+                    Visibility="{Binding FleetBoard.HasActiveSessions}" />
+
+      <TextBlock AutomationProperties.AutomationId="ChatFleetEmptyState"
+                 FontSize="11.5"
+                 Foreground="{StaticResource AppMutedTextBrush}"
+                 Text="{Binding FleetBoard.ActiveSessionsEmptyMessage}"
+                 TextWrapping="WrapWholeWords"
+                 Visibility="{Binding FleetBoard.ShowActiveSessionsEmptyState}" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock CharacterSpacing="80"
+                 FontSize="12"
+                 FontWeight="Medium"
+                 Foreground="{StaticResource AppMutedTextBrush}"
+                 Text="PROVIDER HEALTH" />
+
+      <ItemsControl AutomationProperties.AutomationId="ChatFleetProvidersList"
+                    ItemTemplate="{StaticResource FleetProviderTemplate}"
+                    ItemsSource="{Binding FleetBoard.Providers}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

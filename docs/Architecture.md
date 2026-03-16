@@ -6,7 +6,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 ## Summary
 
-- **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create or edit an agent profile, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
+- **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create or edit an agent profile, start or resume a session, send a message, and watch streaming status/tool output in the transcript while the chat info panel surfaces a compact fleet board for live-session visibility and provider health.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns contract-shaped folders such as `ControlPlaneDomain` and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
 - **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
@@ -57,6 +57,7 @@ flowchart LR
   SessionList["Session list"]
   Session["Active session"]
   Stream["Streaming transcript + status + tool activity"]
+  Fleet["Fleet board + live session monitor"]
   Git["Optional repo/git actions"]
 
   Settings --> Providers
@@ -64,6 +65,7 @@ flowchart LR
   AgentCreate --> SessionList
   SessionList --> Session
   Session --> Stream
+  Session --> Fleet
   Session --> Git
 ```
 
@@ -150,6 +152,7 @@ sequenceDiagram
 
 - `Application startup and route registration` — [../DotPilot/App.xaml.cs](../DotPilot/App.xaml.cs)
 - `Chat shell route` — [../DotPilot/Presentation/Chat/Views/ChatPage.xaml](../DotPilot/Presentation/Chat/Views/ChatPage.xaml)
+- `Chat info panel + fleet board` — [../DotPilot/Presentation/Chat/Controls/ChatInfoPanel.xaml](../DotPilot/Presentation/Chat/Controls/ChatInfoPanel.xaml), [../DotPilot/Presentation/Chat/Controls/ChatFleetBoard.xaml](../DotPilot/Presentation/Chat/Controls/ChatFleetBoard.xaml)
 - `Agent creation route` — [../DotPilot/Presentation/AgentBuilder/Views/AgentBuilderPage.xaml](../DotPilot/Presentation/AgentBuilder/Views/AgentBuilderPage.xaml)
 - `Settings shell` — [../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml](../DotPilot/Presentation/Settings/Controls/SettingsShell.xaml)
 - `Active contracts` — [../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs](../DotPilot.Core/ChatSessions/Contracts/AgentSessionContracts.cs)
