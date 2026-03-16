@@ -10,13 +10,14 @@ public sealed class CreateAgentProfileCommand : Command<CreateAgentProfileComman
         string name,
         AgentProviderKind providerKind,
         string modelName,
-        string systemPrompt)
+        string systemPrompt,
+        string description = "")
         : base(
             Guid.CreateVersion7(),
             nameof(CreateAgentProfileCommand),
-            new Payload(name, providerKind, modelName, systemPrompt))
+            new Payload(name, providerKind, modelName, systemPrompt, description))
     {
-        _payload = new Payload(name, providerKind, modelName, systemPrompt);
+        _payload = new Payload(name, providerKind, modelName, systemPrompt, description);
         Value = _payload;
     }
 
@@ -28,10 +29,13 @@ public sealed class CreateAgentProfileCommand : Command<CreateAgentProfileComman
 
     public string SystemPrompt => _payload.SystemPrompt;
 
+    public string Description => _payload.Description;
+
     [GenerateSerializer]
     public sealed record Payload(
         [property: Id(0)] string Name,
         [property: Id(1)] AgentProviderKind ProviderKind,
         [property: Id(2)] string ModelName,
-        [property: Id(3)] string SystemPrompt);
+        [property: Id(3)] string SystemPrompt,
+        [property: Id(4)] string Description);
 }

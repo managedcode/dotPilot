@@ -54,6 +54,11 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string DefaultSystemAgentName = "dotPilot System Agent";
     private const string DefaultSessionTitle = "Session with dotPilot System Agent";
     private const string DefaultSystemAgentStartChatButtonAutomationId = "AgentCatalogStartChatButton_dotPilotSystemAgent";
+    private const string EditableCodexAgentName = "UI Editable Agent";
+    private const string EditedCodexAgentName = "UI Edited Agent";
+    private const string EditableCodexAgentDescription = "UI-created editable agent.";
+    private const string EditedCodexAgentDescription = "Updated UI-edited agent.";
+    private const string EditableCodexAgentEditButtonAutomationId = "AgentCatalogEditButton_UIEditableAgent";
     private const string UserPrompt = "hello from ui";
     private const string DebugResponsePrefix = "Debug provider received: hello from ui";
     private const string DebugToolFinishedText = "Debug workflow finished.";
@@ -214,6 +219,53 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForTextContains(ChatTitleTextAutomationId, "Session with UI Codex Agent", ScreenTransitionTimeout);
 
         TakeScreenshot("saving_new_agent_opens_chat");
+    }
+
+    [Test]
+    public async Task WhenEditingASavedAgentThenTheCatalogReflectsTheUpdatedProfile()
+    {
+        await Task.CompletedTask;
+
+        EnsureProviderEnabled(CodexProviderEntryAutomationId, "Codex");
+
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        ClickActionAutomationElement(OpenCreateAgentButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(BuildManuallyButtonAutomationId);
+        ClickActionAutomationElement(BuildManuallyButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+
+        ReplaceTextAutomationElement("AgentNameInput", EditableCodexAgentName);
+        ClickActionAutomationElement(
+            AgentProviderCodexOptionAutomationId,
+            () => HasTextContaining(AgentSelectedProviderTextAutomationId, "Codex"));
+        ReplaceTextAutomationElement("AgentDescriptionInput", EditableCodexAgentDescription);
+        ReplaceTextAutomationElement("AgentSystemPromptInput", "Answer briefly.");
+
+        ClickActionAutomationElement(SaveAgentButtonAutomationId);
+        WaitForElement(ChatScreenAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, $"Session with {EditableCodexAgentName}", ScreenTransitionTimeout);
+
+        TapAutomationElement(AgentsNavButtonAutomationId);
+        WaitForElement(AgentBuilderScreenAutomationId);
+        WaitForElement(AgentCatalogSectionAutomationId);
+        ClickActionAutomationElement(EditableCodexAgentEditButtonAutomationId, expectElementToDisappear: true);
+        WaitForElement(AgentBasicInfoSectionAutomationId);
+        WaitForTextContains(AgentsPageTitleAutomationId, "Edit agent", ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement("AgentNameInput", EditedCodexAgentName);
+        ReplaceTextAutomationElement("AgentDescriptionInput", EditedCodexAgentDescription);
+        ReplaceTextAutomationElement("AgentSystemPromptInput", "Answer concisely after edit.");
+
+        ClickActionAutomationElement(SaveAgentButtonAutomationId);
+
+        WaitForElement(AgentCatalogSectionAutomationId);
+        WaitForTextContains(AgentsPageTitleAutomationId, "All agents", ScreenTransitionTimeout);
+        WaitForTextContains("AgentCatalogStatusMessage", "Saved changes to UI Edited Agent using Codex.", ScreenTransitionTimeout);
+        WaitForTextContains(AgentCatalogItemAutomationId, EditedCodexAgentName, ScreenTransitionTimeout);
+        WaitForTextContains(AgentCatalogItemAutomationId, EditedCodexAgentDescription, ScreenTransitionTimeout);
+
+        TakeScreenshot("editing_saved_agent_updates_catalog");
     }
 
     [Test]

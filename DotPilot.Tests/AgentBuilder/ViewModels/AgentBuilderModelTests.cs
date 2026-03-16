@@ -1,4 +1,3 @@
-using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
 using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
@@ -288,6 +287,56 @@ public sealed class AgentBuilderModelTests
     }
 
     [Test]
+    public async Task OpenEditAgentLoadsAnExistingProfileAndSaveUpdatesItInPlace()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4", "gpt-5");
+
+        await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var existing = (await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Editable Codex Agent",
+                AgentProviderKind.Codex,
+                "gpt-5.4",
+                "Answer clearly.",
+                "Editable Codex profile."),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.OpenEditAgent(existing.Id, CancellationToken.None);
+
+        (await model.Surface).Should().NotBeNull();
+        (await model.Surface)!.Title.Should().Be("Edit agent");
+        (await model.Surface)!.PrimaryActionLabel.Should().Be("Save changes");
+        (await model.AgentName).Should().Be("Editable Codex Agent");
+        (await model.AgentDescription).Should().Be("Editable Codex profile.");
+        (await model.ModelName).Should().Be("gpt-5.4");
+
+        await model.AgentName.SetAsync("Edited Codex Agent", CancellationToken.None);
+        await model.AgentDescription.SetAsync("Edited Codex profile.", CancellationToken.None);
+        await model.SystemPrompt.SetAsync("Answer even more clearly.", CancellationToken.None);
+
+        await model.SaveAgent(CancellationToken.None);
+
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        workspace.Agents.Should().ContainSingle(agent =>
+            agent.Id == existing.Id &&
+            agent.Name == "Edited Codex Agent" &&
+            agent.Description == "Edited Codex profile." &&
+            agent.SystemPrompt == "Answer even more clearly.");
+        workspace.Sessions.Should().BeEmpty();
+        fixture.RequestedRoutes.Should().BeEmpty();
+        (await model.Surface)!.ShowCatalog.Should().BeTrue();
+        (await model.OperationMessage).Should().Be("Saved changes to Edited Codex Agent using Codex.");
+    }
+
+    [Test]
     public async Task StartChatForAgentCreatesAndSelectsSessionForChosenCatalogAgent()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
@@ -314,10 +363,13 @@ public sealed class AgentBuilderModelTests
             createdAgentSummary.Id,
             "R",
             createdAgentSummary.Name,
-            AgentSessionDefaults.CreateAgentDescription(createdAgentSummary.SystemPrompt),
+            createdAgentSummary.Description,
             createdAgentSummary.ProviderDisplayName,
             createdAgentSummary.ModelName,
             false,
+            "AgentCatalogEditButton_RepositoryReviewerAgent",
+            new AgentCatalogEditRequest(createdAgentSummary.Id, createdAgentSummary.Name),
+            null,
             "AgentCatalogStartChatButton_RepositoryReviewerAgent",
             new AgentCatalogStartChatRequest(createdAgentSummary.Id, createdAgentSummary.Name),
             null);

@@ -148,6 +148,7 @@ internal sealed class AgentSessionService(
         var agentName = command.Name.Trim();
         var modelName = command.ModelName.Trim();
         var systemPrompt = command.SystemPrompt.Trim();
+        var description = ResolveAgentDescription(command.Description, systemPrompt);
         AgentSessionServiceLog.AgentCreationStarted(logger, agentName, command.ProviderKind);
 
         try
@@ -165,6 +166,7 @@ internal sealed class AgentSessionService(
             {
                 Id = Guid.CreateVersion7(),
                 Name = agentName,
+                Description = description,
                 Role = AgentProfileSchemaDefaults.DefaultRole,
                 ProviderKind = (int)command.ProviderKind,
                 ModelName = modelName,
@@ -187,6 +189,58 @@ internal sealed class AgentSessionService(
         catch (Exception exception)
         {
             AgentSessionServiceLog.AgentCreationFailed(logger, exception, agentName, command.ProviderKind);
+            return Result<AgentProfileSummary>.Fail(exception);
+        }
+    }
+
+    public async ValueTask<Result<AgentProfileSummary>> UpdateAgentAsync(
+        UpdateAgentProfileCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        await EnsureInitializedAsync(cancellationToken);
+        var agentName = command.Name.Trim();
+        var modelName = command.ModelName.Trim();
+        var systemPrompt = command.SystemPrompt.Trim();
+        var description = ResolveAgentDescription(command.Description, systemPrompt);
+        AgentSessionServiceLog.AgentUpdateStarted(logger, command.AgentId, agentName, command.ProviderKind);
+
+        try
+        {
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var record = await dbContext.AgentProfiles
+                .FirstOrDefaultAsync(agent => agent.Id == command.AgentId.Value, cancellationToken);
+            if (record is null)
+            {
+                return Result<AgentProfileSummary>.FailNotFound($"Agent '{command.AgentId}' was not found.");
+            }
+
+            var providers = await GetProviderStatusesAsync(forceRefresh: false, cancellationToken);
+            var provider = providers.First(status => status.Kind == command.ProviderKind);
+            if (!provider.CanCreateAgents)
+            {
+                return Result<AgentProfileSummary>.FailForbidden(provider.StatusSummary);
+            }
+
+            record.Name = agentName;
+            record.Description = description;
+            record.ProviderKind = (int)command.ProviderKind;
+            record.ModelName = modelName;
+            record.SystemPrompt = systemPrompt;
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            AgentSessionServiceLog.AgentUpdated(
+                logger,
+                record.Id,
+                record.Name,
+                command.ProviderKind);
+
+            return Result<AgentProfileSummary>.Succeed(MapAgentSummary(record));
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.AgentUpdateFailed(logger, exception, command.AgentId, agentName, command.ProviderKind);
             return Result<AgentProfileSummary>.Fail(exception);
         }
     }
@@ -782,6 +836,7 @@ internal sealed class AgentSessionService(
         {
             Id = Guid.CreateVersion7(),
             Name = AgentSessionDefaults.SystemAgentName,
+            Description = AgentSessionDefaults.SystemAgentDescription,
             Role = AgentProfileSchemaDefaults.DefaultRole,
             ProviderKind = (int)providerKind,
             ModelName = AgentSessionDefaults.GetDefaultModel(providerKind),
@@ -816,8 +871,9 @@ internal sealed class AgentSessionService(
         var legacyDebugModel = AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug);
         var legacyAgents = await dbContext.AgentProfiles
             .Where(record =>
-                record.ProviderKind != (int)AgentProviderKind.Debug &&
-                record.ModelName == legacyDebugModel)
+                (record.ProviderKind != (int)AgentProviderKind.Debug &&
+                 record.ModelName == legacyDebugModel) ||
+                string.IsNullOrWhiteSpace(record.Description))
             .ToListAsync(cancellationToken);
         if (legacyAgents.Count == 0)
         {
@@ -827,8 +883,17 @@ internal sealed class AgentSessionService(
         foreach (var agent in legacyAgents)
         {
             var providerKind = (AgentProviderKind)agent.ProviderKind;
-            agent.ModelName = AgentSessionDefaults.GetDefaultModel(providerKind);
-            AgentSessionServiceLog.LegacyAgentProfileNormalized(logger, agent.Id, providerKind, agent.ModelName);
+            if (agent.ProviderKind != (int)AgentProviderKind.Debug &&
+                agent.ModelName == legacyDebugModel)
+            {
+                agent.ModelName = AgentSessionDefaults.GetDefaultModel(providerKind);
+                AgentSessionServiceLog.LegacyAgentProfileNormalized(logger, agent.Id, providerKind, agent.ModelName);
+            }
+
+            if (string.IsNullOrWhiteSpace(agent.Description))
+            {
+                agent.Description = ResolveAgentDescription(string.Empty, agent.SystemPrompt);
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -917,6 +982,9 @@ internal sealed class AgentSessionService(
         return new AgentProfileSummary(
             new AgentProfileId(record.Id),
             record.Name,
+            string.IsNullOrWhiteSpace(record.Description)
+                ? ResolveAgentDescription(string.Empty, record.SystemPrompt)
+                : record.Description,
             (AgentProviderKind)record.ProviderKind,
             providerProfile.DisplayName,
             record.ModelName,
@@ -938,5 +1006,18 @@ internal sealed class AgentSessionService(
     public void Dispose()
     {
         _initializationGate.Dispose();
+    }
+
+    private static string ResolveAgentDescription(string description, string systemPrompt)
+    {
+        var normalizedDescription = description.Trim();
+        if (!string.IsNullOrWhiteSpace(normalizedDescription))
+        {
+            return normalizedDescription;
+        }
+
+        return string.IsNullOrWhiteSpace(systemPrompt)
+            ? string.Empty
+            : AgentSessionDefaults.CreateAgentDescription(systemPrompt);
     }
 }

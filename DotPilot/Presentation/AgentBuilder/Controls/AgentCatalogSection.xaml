@@ -116,15 +116,24 @@
                   </Border>
                 </StackPanel>
 
-                <Button Grid.Column="1"
-                        Grid.RowSpan="3"
-                        AutomationProperties.AutomationId="{x:Bind StartChatAutomationId}"
-                        Command="{x:Bind StartChatCommand}"
-                        CommandParameter="{x:Bind StartChatRequest}"
-                        Style="{StaticResource InlineActionButtonStyle}"
-                        VerticalAlignment="Center">
-                  <TextBlock Text="Start chat" />
-                </Button>
+                <StackPanel Grid.Column="1"
+                            Grid.RowSpan="3"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                  <Button AutomationProperties.AutomationId="{x:Bind EditAutomationId}"
+                          Command="{x:Bind EditCommand}"
+                          CommandParameter="{x:Bind EditRequest}"
+                          Style="{StaticResource InlineActionButtonStyle}">
+                    <TextBlock Text="Edit" />
+                  </Button>
+
+                  <Button AutomationProperties.AutomationId="{x:Bind StartChatAutomationId}"
+                          Command="{x:Bind StartChatCommand}"
+                          CommandParameter="{x:Bind StartChatRequest}"
+                          Style="{StaticResource InlineActionButtonStyle}">
+                    <TextBlock Text="Start chat" />
+                  </Button>
+                </StackPanel>
               </Grid>
             </Border>
           </DataTemplate>

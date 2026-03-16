@@ -6,6 +6,8 @@ internal sealed class AgentProfileRecord
 
     public string Name { get; set; } = string.Empty;
 
+    public string Description { get; set; } = string.Empty;
+
     public int Role { get; set; }
 
     public int ProviderKind { get; set; }

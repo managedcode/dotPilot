@@ -15,6 +15,10 @@ public interface IAgentSessionService
         CreateAgentProfileCommand command,
         CancellationToken cancellationToken);
 
+    ValueTask<Result<AgentProfileSummary>> UpdateAgentAsync(
+        UpdateAgentProfileCommand command,
+        CancellationToken cancellationToken);
+
     ValueTask<Result<SessionTranscriptSnapshot>> CreateSessionAsync(
         CreateSessionCommand command,
         CancellationToken cancellationToken);

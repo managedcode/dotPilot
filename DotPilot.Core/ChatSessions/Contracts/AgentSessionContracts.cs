@@ -29,6 +29,7 @@ public sealed record ProviderStatusDescriptor(
 public sealed record AgentProfileSummary(
     AgentProfileId Id,
     string Name,
+    string Description,
     AgentProviderKind ProviderKind,
     string ProviderDisplayName,
     string ModelName,

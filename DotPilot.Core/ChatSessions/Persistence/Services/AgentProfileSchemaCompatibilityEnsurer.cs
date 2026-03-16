@@ -6,6 +6,7 @@ namespace DotPilot.Core.ChatSessions;
 internal static class AgentProfileSchemaCompatibilityEnsurer
 {
     private const string AgentProfilesTableName = "AgentProfiles";
+    private const string DescriptionColumnName = "Description";
     private const string RoleColumnName = "Role";
     private const string CapabilitiesJsonColumnName = "CapabilitiesJson";
 
@@ -19,6 +20,16 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
         }
 
         var existingColumns = await ReadColumnNamesAsync(dbContext, cancellationToken);
+        if (!existingColumns.Contains(DescriptionColumnName, StringComparer.OrdinalIgnoreCase))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $"""
+                 ALTER TABLE "{AgentProfilesTableName}"
+                 ADD COLUMN "{DescriptionColumnName}" TEXT NOT NULL DEFAULT '';
+                 """,
+                cancellationToken);
+        }
+
         if (!existingColumns.Contains(RoleColumnName, StringComparer.OrdinalIgnoreCase))
         {
             await dbContext.Database.ExecuteSqlRawAsync(

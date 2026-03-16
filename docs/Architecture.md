@@ -6,7 +6,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 
 ## Summary
 
-- **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create an agent, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
+- **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create or edit an agent profile, start or resume a session, send a message, and watch streaming status/tool output in the transcript.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns contract-shaped folders such as `ControlPlaneDomain` and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
 - **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
@@ -52,7 +52,7 @@ flowchart LR
 flowchart LR
   Settings["Settings"]
   Providers["Provider readiness + install actions"]
-  AgentCreate["Create agent"]
+  AgentCreate["Create or edit agent profile"]
   SessionList["Session list"]
   Session["Active session"]
   Stream["Streaming transcript + status + tool activity"]
@@ -109,8 +109,8 @@ sequenceDiagram
   participant FS as Local folder AgentSession/history store
   participant Provider as Provider SDK / Debug Client
 
-  UI->>Service: CreateAgentAsync(...)
-  Service->>DB: Save agent profile
+  UI->>Service: CreateAgentAsync(...) or UpdateAgentAsync(...)
+  Service->>DB: Save or update agent profile
   UI->>Service: CreateSessionAsync(...)
   Service->>DB: Save session + initial status entry
   Service->>FS: Create/persist opaque AgentSession

@@ -35,16 +35,25 @@ public partial record AgentBuilderModel(
     private const string PromptTitle = "New agent";
     private const string PromptSubtitle = "Describe the agent once and review the generated draft.";
     private const string EditorSubtitle = "Review the generated draft and save the profile.";
+    private const string EditTitle = "Edit agent";
+    private const string EditSubtitle = "Review the current profile and save changes.";
     private const string CreateActionLabel = "Create agent";
     private const string SaveActionLabel = "Save agent";
+    private const string SaveChangesActionLabel = "Save changes";
     private const string SessionTitlePrefix = "Session with ";
     private const string StartedChatMessageFormat = "Started a session with {0}.";
+    private const string EditingAgentMessageFormat = "Editing {0}. Adjust the profile before saving.";
+    private const string UpdatedAgentMessageFormat = "Saved changes to {0} using {1}.";
     private static readonly System.Text.CompositeFormat SavedAgentCompositeFormat =
         System.Text.CompositeFormat.Parse(SavedAgentMessageFormat);
     private static readonly System.Text.CompositeFormat GeneratedDraftCompositeFormat =
         System.Text.CompositeFormat.Parse(GeneratedDraftMessageFormat);
     private static readonly System.Text.CompositeFormat StartedChatCompositeFormat =
         System.Text.CompositeFormat.Parse(StartedChatMessageFormat);
+    private static readonly System.Text.CompositeFormat EditingAgentCompositeFormat =
+        System.Text.CompositeFormat.Parse(EditingAgentMessageFormat);
+    private static readonly System.Text.CompositeFormat UpdatedAgentCompositeFormat =
+        System.Text.CompositeFormat.Parse(UpdatedAgentMessageFormat);
     private static readonly System.Text.CompositeFormat SuggestedModelHelperCompositeFormat =
         System.Text.CompositeFormat.Parse(SuggestedModelHelperFormat);
     private static readonly AgentProviderOption EmptySelectedProvider =
@@ -55,6 +64,8 @@ public partial record AgentBuilderModel(
         new(AgentBuilderSurfaceKind.PromptComposer, PromptTitle, PromptSubtitle, true, string.Empty);
     private static readonly AgentBuilderSurface EditorSurface =
         new(AgentBuilderSurfaceKind.Editor, PromptTitle, EditorSubtitle, true, SaveActionLabel);
+    private static readonly AgentBuilderSurface EditSurface =
+        new(AgentBuilderSurfaceKind.Editor, EditTitle, EditSubtitle, true, SaveChangesActionLabel);
     private static readonly AgentBuilderView EmptyBuilderView =
         new(
             EmptyProviderDisplayName,
@@ -74,6 +85,7 @@ public partial record AgentBuilderModel(
     private AsyncCommand? _generateAgentDraftCommand;
     private AsyncCommand? _saveAgentCommand;
     private AsyncCommand? _startChatForAgentCommand;
+    private AsyncCommand? _openEditAgentCommand;
     private AsyncCommand? _providerSelectionChangedCommand;
     private AsyncCommand? _selectModelCommand;
     private readonly Signal _workspaceRefresh = new();
@@ -93,6 +105,9 @@ public partial record AgentBuilderModel(
     public IState<string> ModelName => State.Value(this, static () => string.Empty);
 
     public IState<string> SystemPrompt => State.Value(this, static () => string.Empty);
+
+    public IState<AgentProfileId> EditingAgentId =>
+        State.Value(this, static () => default(AgentProfileId));
 
     public IState<string> OperationMessage => State.Value(this, static () => string.Empty);
 
@@ -156,6 +171,10 @@ public partial record AgentBuilderModel(
         _startChatForAgentCommand ??= new AsyncCommand(
             parameter => StartChatForParameter(parameter, CancellationToken.None));
 
+    public ICommand OpenEditAgentCommand =>
+        _openEditAgentCommand ??= new AsyncCommand(
+            parameter => OpenEditAgentForParameter(parameter, CancellationToken.None));
+
     public ICommand ProviderSelectionChangedCommand =>
         _providerSelectionChangedCommand ??= new AsyncCommand(
             parameter => HandleProviderSelectionChanged(parameter, CancellationToken.None));
@@ -171,6 +190,7 @@ public partial record AgentBuilderModel(
         await AgentDescription.SetAsync(string.Empty, cancellationToken);
         await ModelName.SetAsync(string.Empty, cancellationToken);
         await SystemPrompt.SetAsync(string.Empty, cancellationToken);
+        await EditingAgentId.SetAsync(default, cancellationToken);
         await OperationMessage.SetAsync(string.Empty, cancellationToken);
         await SelectedProvider.UpdateAsync(_ => EmptySelectedProvider, cancellationToken);
         await SelectedProviderKind.UpdateAsync(_ => AgentProviderKind.Debug, cancellationToken);
@@ -307,6 +327,43 @@ public partial record AgentBuilderModel(
             }
 
             var modelName = await ResolveEffectiveModelNameAsync(cancellationToken);
+            var description = ((await AgentDescription) ?? string.Empty).Trim();
+            var systemPrompt = ((await SystemPrompt) ?? string.Empty).Trim();
+            var editingAgentId = await EditingAgentId;
+            if (editingAgentId != default)
+            {
+                await OperationMessage.SetAsync(AgentCreationProgressMessage, cancellationToken);
+                AgentBuilderModelLog.AgentUpdateRequested(logger, editingAgentId.Value, agentName, selectedProvider.Kind, modelName);
+
+                var updatedResult = await workspaceState.UpdateAgentAsync(
+                    new UpdateAgentProfileCommand(
+                        editingAgentId,
+                        agentName,
+                        selectedProvider.Kind,
+                        modelName,
+                        systemPrompt,
+                        description),
+                    cancellationToken);
+                if (!updatedResult.TryGetValue(out var updated))
+                {
+                    await OperationMessage.SetAsync(updatedResult.ToOperatorMessage("Could not save the agent."), cancellationToken);
+                    return;
+                }
+
+                var updatedMessage = string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    UpdatedAgentCompositeFormat,
+                    updated.Name,
+                    updated.ProviderDisplayName);
+                _workspaceRefresh.Raise();
+                workspaceProjectionNotifier.Publish();
+                await EditingAgentId.SetAsync(default, cancellationToken);
+                await Surface.UpdateAsync(_ => CatalogSurface, cancellationToken);
+                await OperationMessage.SetAsync(updatedMessage, cancellationToken);
+                AgentBuilderModelLog.AgentUpdated(logger, updated.Id.Value, updated.Name, updated.ProviderKind, updated.ModelName);
+                return;
+            }
+
             await OperationMessage.SetAsync(AgentCreationProgressMessage, cancellationToken);
             AgentBuilderModelLog.AgentCreationRequested(logger, agentName, selectedProvider.Kind, modelName);
 
@@ -315,7 +372,8 @@ public partial record AgentBuilderModel(
                     agentName,
                     selectedProvider.Kind,
                     modelName,
-                    ((await SystemPrompt) ?? string.Empty).Trim()),
+                    systemPrompt,
+                    description),
                 cancellationToken);
             if (!createdResult.TryGetValue(out var created))
             {
@@ -384,6 +442,65 @@ public partial record AgentBuilderModel(
             AgentCatalogStartChatRequest request => StartChatForRequest(request, cancellationToken),
             _ => ValueTask.CompletedTask,
         };
+    }
+
+    private ValueTask OpenEditAgentForParameter(object? parameter, CancellationToken cancellationToken)
+    {
+        return parameter switch
+        {
+            AgentCatalogItem item => OpenEditAgent(item.Id, cancellationToken),
+            AgentCatalogEditRequest request => OpenEditAgent(request.AgentId, cancellationToken),
+            AgentProfileId agentId => OpenEditAgent(agentId, cancellationToken),
+            _ => ValueTask.CompletedTask,
+        };
+    }
+
+    public async ValueTask OpenEditAgent(AgentProfileId agentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workspaceResult = await workspaceState.GetWorkspaceAsync(cancellationToken);
+            if (!workspaceResult.TryGetValue(out var workspace))
+            {
+                await OperationMessage.SetAsync(workspaceResult.ToOperatorMessage("Could not load the agent profile."), cancellationToken);
+                return;
+            }
+
+            var agent = workspace.Agents.FirstOrDefault(candidate => candidate.Id == agentId);
+            if (agent is null)
+            {
+                await OperationMessage.SetAsync($"Agent '{agentId}' was not found.", cancellationToken);
+                return;
+            }
+
+            await AgentRequest.SetAsync(string.Empty, cancellationToken);
+            await AgentName.SetAsync(agent.Name, cancellationToken);
+            await AgentDescription.SetAsync(agent.Description, cancellationToken);
+            await SystemPrompt.SetAsync(agent.SystemPrompt, cancellationToken);
+            await EditingAgentId.SetAsync(agent.Id, cancellationToken);
+
+            var provider = FindProviderByKind(await Providers, agent.ProviderKind);
+            if (IsEmptySelectedProvider(provider))
+            {
+                provider = await ResolveSelectedProviderAsync(cancellationToken);
+            }
+
+            await HandleSelectedProviderChanged(provider, cancellationToken);
+            await ModelName.SetAsync(agent.ModelName, cancellationToken);
+            await RefreshBuilderAsync(cancellationToken);
+            await OperationMessage.SetAsync(
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    EditingAgentCompositeFormat,
+                    agent.Name),
+                cancellationToken);
+            await Surface.UpdateAsync(_ => EditSurface, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            AgentBuilderModelLog.Failure(logger, exception);
+            await OperationMessage.SetAsync(exception.Message, cancellationToken);
+        }
     }
 
     private async ValueTask StartChatForRequest(
@@ -756,10 +873,13 @@ public partial record AgentBuilderModel(
             agent.Id,
             agent.Name[..1],
             agent.Name,
-            AgentSessionDefaults.CreateAgentDescription(agent.SystemPrompt),
+            agent.Description,
             agent.ProviderDisplayName,
             agent.ModelName,
             AgentSessionDefaults.IsSystemAgent(agent.Name),
+            "AgentCatalogEditButton_" + automationIdSuffix,
+            new AgentCatalogEditRequest(agent.Id, agent.Name),
+            OpenEditAgentCommand,
             "AgentCatalogStartChatButton_" + automationIdSuffix,
             new AgentCatalogStartChatRequest(agent.Id, agent.Name),
             StartChatForAgentCommand);

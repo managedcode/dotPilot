@@ -180,6 +180,37 @@ internal static partial class AgentSessionServiceLog
         AgentProviderKind providerKind);
 
     [LoggerMessage(
+        EventId = 1224,
+        Level = LogLevel.Information,
+        Message = "Updating agent profile. AgentId={AgentId} Name={AgentName} Provider={ProviderKind}.")]
+    public static partial void AgentUpdateStarted(
+        ILogger logger,
+        AgentProfileId agentId,
+        string agentName,
+        AgentProviderKind providerKind);
+
+    [LoggerMessage(
+        EventId = 1225,
+        Level = LogLevel.Information,
+        Message = "Updated agent profile. AgentId={AgentId} Name={AgentName} Provider={ProviderKind}.")]
+    public static partial void AgentUpdated(
+        ILogger logger,
+        Guid agentId,
+        string agentName,
+        AgentProviderKind providerKind);
+
+    [LoggerMessage(
+        EventId = 1226,
+        Level = LogLevel.Error,
+        Message = "Agent profile update failed. AgentId={AgentId} Name={AgentName} Provider={ProviderKind}.")]
+    public static partial void AgentUpdateFailed(
+        ILogger logger,
+        Exception exception,
+        AgentProfileId agentId,
+        string agentName,
+        AgentProviderKind providerKind);
+
+    [LoggerMessage(
         EventId = 1208,
         Level = LogLevel.Information,
         Message = "Creating session. Title={SessionTitle} AgentId={AgentId}.")]

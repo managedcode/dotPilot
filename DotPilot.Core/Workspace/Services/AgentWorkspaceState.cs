@@ -27,6 +27,13 @@ internal sealed class AgentWorkspaceState(IAgentSessionService agentSessionServi
         return agentSessionService.CreateAgentAsync(command, cancellationToken);
     }
 
+    public ValueTask<Result<AgentProfileSummary>> UpdateAgentAsync(
+        UpdateAgentProfileCommand command,
+        CancellationToken cancellationToken)
+    {
+        return agentSessionService.UpdateAgentAsync(command, cancellationToken);
+    }
+
     public ValueTask<Result<SessionTranscriptSnapshot>> CreateSessionAsync(
         CreateSessionCommand command,
         CancellationToken cancellationToken)

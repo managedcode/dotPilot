@@ -35,6 +35,11 @@ public sealed partial record AgentCatalogStartChatRequest(
     string AgentName);
 
 [Bindable]
+public sealed partial record AgentCatalogEditRequest(
+    AgentProfileId AgentId,
+    string AgentName);
+
+[Bindable]
 public sealed partial record AgentCatalogItem(
     AgentProfileId Id,
     string Initial,
@@ -43,6 +48,9 @@ public sealed partial record AgentCatalogItem(
     string ProviderDisplayName,
     string ModelName,
     bool IsDefault,
+    string EditAutomationId,
+    AgentCatalogEditRequest EditRequest,
+    ICommand? EditCommand,
     string StartChatAutomationId,
     AgentCatalogStartChatRequest StartChatRequest,
     ICommand? StartChatCommand);

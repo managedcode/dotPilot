@@ -19,6 +19,9 @@ internal sealed class LocalAgentSessionDbContext(DbContextOptions<LocalAgentSess
         {
             entity.HasKey(record => record.Id);
             entity.Property(record => record.Name).IsRequired();
+            entity.Property(record => record.Description)
+                .HasDefaultValue(string.Empty)
+                .IsRequired();
             entity.Property(record => record.Role)
                 .HasDefaultValue(AgentProfileSchemaDefaults.DefaultRole);
             entity.Property(record => record.ModelName).IsRequired();

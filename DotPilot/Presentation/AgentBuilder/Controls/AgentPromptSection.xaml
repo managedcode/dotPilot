@@ -73,7 +73,7 @@
                 Click="OnSaveAgentButtonClick"
                 Tag="{Binding SaveAgentCommand}"
                 Style="{StaticResource AccentActionButtonStyle}">
-          <TextBlock Text="Save agent" />
+          <TextBlock Text="{Binding Surface.PrimaryActionLabel}" />
         </Button>
       </Grid>
     </StackPanel>

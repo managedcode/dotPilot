@@ -47,10 +47,12 @@ public sealed class AgentSessionServiceTests
                 "SQLite Agent",
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Use the persisted SQLite path."),
+                "Use the persisted SQLite path.",
+                "SQLite-backed debug agent."),
             CancellationToken.None)).ShouldSucceed();
 
         created.Name.Should().Be("SQLite Agent");
+        created.Description.Should().Be("SQLite-backed debug agent.");
 
         await using var connection = new SqliteConnection($"Data Source={databasePath}");
         await connection.OpenAsync(CancellationToken.None);
@@ -58,15 +60,16 @@ public sealed class AgentSessionServiceTests
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT "Role", "CapabilitiesJson"
+            SELECT "Description", "Role", "CapabilitiesJson"
             FROM "AgentProfiles"
             WHERE "Name" = 'SQLite Agent';
             """;
 
         await using var reader = await command.ExecuteReaderAsync(CancellationToken.None);
         (await reader.ReadAsync(CancellationToken.None)).Should().BeTrue();
-        reader.GetInt32(0).Should().Be(LegacyDefaultRole);
-        reader.GetString(1).Should().Be(LegacyEmptyCapabilitiesJson);
+        reader.GetString(0).Should().Be("SQLite-backed debug agent.");
+        reader.GetInt32(1).Should().Be(LegacyDefaultRole);
+        reader.GetString(2).Should().Be(LegacyEmptyCapabilitiesJson);
     }
 
     [Test]
@@ -97,6 +100,7 @@ public sealed class AgentSessionServiceTests
 
         columns.Should().Contain("Role");
         columns.Should().Contain("CapabilitiesJson");
+        columns.Should().Contain("Description");
     }
 
     [Test]
@@ -112,18 +116,48 @@ public sealed class AgentSessionServiceTests
                 "Debug Agent",
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Act as a deterministic local test agent."),
+                "Act as a deterministic local test agent.",
+                "Deterministic local test agent."),
             CancellationToken.None)).ShouldSucceed();
 
         var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
 
         created.Name.Should().Be("Debug Agent");
+        created.Description.Should().Be("Deterministic local test agent.");
         created.ProviderKind.Should().Be(AgentProviderKind.Debug);
         workspace.Agents.Should().ContainSingle(agent => agent.Id == created.Id);
         workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
             provider.IsEnabled &&
             provider.CanCreateAgents);
+    }
+
+    [Test]
+    public async Task UpdateAgentAsyncUpdatesAnExistingProfileWithoutCreatingADuplicate()
+    {
+        await using var fixture = CreateFixture();
+        var created = await EnableDebugAndCreateAgentAsync(fixture.Service, "Editable Agent");
+
+        var updated = (await fixture.Service.UpdateAgentAsync(
+            new UpdateAgentProfileCommand(
+                created.Id,
+                "Edited Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Stay deterministic after edit.",
+                "Updated deterministic profile."),
+            CancellationToken.None)).ShouldSucceed();
+
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+
+        updated.Id.Should().Be(created.Id);
+        updated.Name.Should().Be("Edited Agent");
+        updated.Description.Should().Be("Updated deterministic profile.");
+        workspace.Agents.Should().ContainSingle(agent =>
+            agent.Id == created.Id &&
+            agent.Name == "Edited Agent" &&
+            agent.Description == "Updated deterministic profile." &&
+            agent.SystemPrompt == "Stay deterministic after edit.");
     }
 
     [Test]
@@ -365,7 +399,8 @@ public sealed class AgentSessionServiceTests
                 name,
                 AgentProviderKind.Debug,
                 "debug-echo",
-                "Be deterministic for automated verification."),
+                "Be deterministic for automated verification.",
+                "Deterministic local test agent."),
             CancellationToken.None)).ShouldSucceed();
     }
 
@@ -421,6 +456,7 @@ public sealed class AgentSessionServiceTests
             ?? throw new InvalidOperationException("AgentProfileRecord could not be created.");
         SetProperty(record, "Id", agentId);
         SetProperty(record, "Name", agentName);
+        TrySetProperty(record, "Description", string.Empty);
         SetProperty(record, "ProviderKind", (int)providerKind);
         SetProperty(record, "ModelName", modelName);
         SetProperty(record, "SystemPrompt", "Use Codex when available.");
@@ -487,6 +523,7 @@ public sealed class AgentSessionServiceTests
               CREATE TABLE "AgentProfiles" (
                   "Id" TEXT NOT NULL CONSTRAINT "PK_AgentProfiles" PRIMARY KEY,
                   "Name" TEXT NOT NULL,
+                  "Description" TEXT NOT NULL,
                   "Role" INTEGER NOT NULL,
                   "ProviderKind" INTEGER NOT NULL,
                   "ModelName" TEXT NOT NULL,

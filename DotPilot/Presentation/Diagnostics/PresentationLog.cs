@@ -94,6 +94,28 @@ internal static partial class AgentBuilderModelLog
         Message = "Starting a chat session from the agent catalog. AgentId={AgentId} Name={AgentName}.")]
     public static partial void ChatSessionRequested(ILogger logger, Guid agentId, string agentName);
 
+    [LoggerMessage(
+        EventId = 2108,
+        Level = LogLevel.Information,
+        Message = "Updating local agent profile. AgentId={AgentId} Name={AgentName} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void AgentUpdateRequested(
+        ILogger logger,
+        Guid agentId,
+        string agentName,
+        AgentProviderKind providerKind,
+        string modelName);
+
+    [LoggerMessage(
+        EventId = 2109,
+        Level = LogLevel.Information,
+        Message = "Updated local agent profile. AgentId={AgentId} Name={AgentName} Provider={ProviderKind} Model={ModelName}.")]
+    public static partial void AgentUpdated(
+        ILogger logger,
+        Guid agentId,
+        string agentName,
+        AgentProviderKind providerKind,
+        string modelName);
+
     [LoggerMessage(EventId = 2107, Level = LogLevel.Error, Message = "Agent builder operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }
