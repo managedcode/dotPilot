@@ -30,6 +30,55 @@ public sealed class ShellViewModelTests
         viewModel.StartupOverlayVisibility.Should().Be(Visibility.Collapsed);
     }
 
+    [Test]
+    public async Task LiveSessionIndicatorAppearsWhileStreamingAndCollapsesAfterCompletion()
+    {
+        await using var fixture = CreateFixture();
+        var viewModel = fixture.Provider.GetRequiredService<ShellViewModel>();
+
+        var agent = (await fixture.Service.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Sleep Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Stay deterministic while testing the shell indicator.",
+                "Shell indicator test agent."),
+            CancellationToken.None)).ShouldSucceed();
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Session with Sleep Agent", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        await using var enumerator = fixture.Service.SendMessageAsync(
+                new SendSessionMessageCommand(session.Session.Id, "hello from shell test"),
+                CancellationToken.None)
+            .GetAsyncEnumerator(CancellationToken.None);
+
+        var observedIndicator = false;
+        while (await enumerator.MoveNextAsync())
+        {
+            _ = enumerator.Current.ShouldSucceed();
+            if (viewModel.LiveSessionIndicatorVisibility != Visibility.Visible)
+            {
+                continue;
+            }
+
+            observedIndicator = true;
+            viewModel.LiveSessionIndicatorTitle.Should().Be("Live session active");
+            viewModel.LiveSessionIndicatorSummary.Should().Contain("Sleep Agent");
+            viewModel.LiveSessionIndicatorSummary.Should().Contain("Session with Sleep Agent");
+            break;
+        }
+
+        observedIndicator.Should().BeTrue();
+
+        while (await enumerator.MoveNextAsync())
+        {
+            _ = enumerator.Current.ShouldSucceed();
+        }
+
+        viewModel.LiveSessionIndicatorVisibility.Should().Be(Visibility.Collapsed);
+    }
+
     private static TestFixture CreateFixture()
     {
         var services = new ServiceCollection();
@@ -40,6 +89,8 @@ public sealed class ShellViewModelTests
             UseInMemoryDatabase = true,
             InMemoryDatabaseName = Guid.NewGuid().ToString("N"),
         });
+        services.AddSingleton<UiDispatcher>();
+        services.AddSingleton<DesktopSleepPreventionService>();
         services.AddSingleton<ShellViewModel>();
 
         var provider = services.BuildServiceProvider();
@@ -49,6 +100,8 @@ public sealed class ShellViewModelTests
     private sealed class TestFixture(ServiceProvider provider) : IAsyncDisposable
     {
         public ServiceProvider Provider { get; } = provider;
+
+        public IAgentSessionService Service { get; } = provider.GetRequiredService<IAgentSessionService>();
 
         public ValueTask DisposeAsync()
         {

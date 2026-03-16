@@ -55,6 +55,7 @@ public sealed partial class Shell : Page, IContentControlProvider
             app.ServicesReady += OnAppServicesReady;
         }
 
+        TryAssignShellDataContext();
         TryRegisterNavigationNotifier();
     }
 
@@ -78,7 +79,25 @@ public sealed partial class Shell : Page, IContentControlProvider
 
     private void OnAppServicesReady(object? sender, EventArgs e)
     {
+        TryAssignShellDataContext();
         TryRegisterNavigationNotifier();
+    }
+
+    private void TryAssignShellDataContext()
+    {
+        if (DataContext is ShellViewModel)
+        {
+            return;
+        }
+
+        if (Application.Current is not App { Services: { } services })
+        {
+            BrowserConsoleDiagnostics.Info("[DotPilot.Shell] Shell data context is waiting for app services.");
+            return;
+        }
+
+        DataContext = services.GetRequiredService<ShellViewModel>();
+        BrowserConsoleDiagnostics.Info("[DotPilot.Shell] Shell data context assigned.");
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)

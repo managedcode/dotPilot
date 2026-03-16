@@ -10,6 +10,7 @@ namespace DotPilot.Core.ChatSessions;
 internal sealed class AgentSessionService(
     IDbContextFactory<LocalAgentSessionDbContext> dbContextFactory,
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
+    ISessionActivityMonitor sessionActivityMonitor,
     IAgentProviderStatusReader providerStatusReader,
     AgentRuntimeConversationFactory runtimeConversationFactory,
     TimeProvider timeProvider,
@@ -555,6 +556,14 @@ internal sealed class AgentSessionService(
                 yield return Result<SessionStreamEntry>.Succeed(MapEntry(notImplementedEntry));
                 yield break;
             }
+
+            using var liveActivity = sessionActivityMonitor.BeginActivity(
+                new SessionActivityDescriptor(
+                    command.SessionId,
+                    session.Title,
+                    new AgentProfileId(agent.Id),
+                    agent.Name,
+                    providerProfile.DisplayName));
 
             Result<RuntimeConversationContext> runtimeConversationResult;
             try

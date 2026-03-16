@@ -149,3 +149,24 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2300, Level = LogLevel.Information, Message = "{StartupMarker}")]
     public static partial void StartupMarker(ILogger logger, string startupMarker);
 }
+
+internal static partial class ShellSleepPreventionLog
+{
+    [LoggerMessage(
+        EventId = 2301,
+        Level = LogLevel.Information,
+        Message = "Acquired desktop sleep prevention using {Mechanism}.")]
+    public static partial void Acquired(ILogger logger, string mechanism);
+
+    [LoggerMessage(
+        EventId = 2302,
+        Level = LogLevel.Information,
+        Message = "Released desktop sleep prevention.")]
+    public static partial void Released(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 2303,
+        Level = LogLevel.Error,
+        Message = "Could not acquire desktop sleep prevention.")]
+    public static partial void AcquireFailed(ILogger logger, Exception exception);
+}

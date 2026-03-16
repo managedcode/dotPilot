@@ -10,6 +10,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
 - **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns contract-shaped folders such as `ControlPlaneDomain` and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
 - **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
+- **Live-session desktop rule:** while a session is actively generating, `DotPilot.Core` owns the live-session signal and the desktop host may hold a bounded sleep-prevention lock; the shell must show that state so the operator knows why the machine is being kept awake.
 - **Extraction rule:** large non-UI features start in `DotPilot.Core`, but once a slice becomes big enough to need its own boundary, it should move into a dedicated DLL that references `DotPilot.Core`, while the desktop app references that feature DLL directly.
 - **Solution-shape rule:** solution folders may group projects by stable categories such as libraries and tests, but extracted subsystems must still keep their own files, namespaces, and project-local rules inside their real project directory.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
@@ -75,6 +76,8 @@ flowchart TD
   ViewModels["MVUX screen models + generated view-model proxies"]
   Service["IAgentSessionService"]
   Hydration["Startup workspace hydration"]
+  LiveActivity["Session activity monitor"]
+  WakeLock["Desktop sleep prevention host"]
   ProjectionStore["EF Core + SQLite projections"]
   SessionStore["Folder AgentSession + chat history"]
   ProviderCatalog["Provider catalog + readiness probe"]
@@ -90,8 +93,12 @@ flowchart TD
   ViewModels --> Service
   Service --> ProjectionStore
   Service --> SessionStore
+  Service --> LiveActivity
   Service --> ProviderCatalog
   Service --> ProviderSnapshot
+  LiveActivity --> WakeLock
+  LiveActivity --> ViewModels
+  WakeLock --> ViewModels
   ProviderCatalog --> ProviderSnapshot
   ProviderCatalog --> ProviderClient
   Service --> ProviderClient

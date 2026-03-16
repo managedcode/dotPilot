@@ -160,6 +160,30 @@
                 <TextBlock FontSize="11"
                            Foreground="{StaticResource AppMutedTextBrush}"
                            Text="Local runtime" />
+                <Border x:Name="AppSidebarLiveSessionIndicator"
+                        Margin="0,8,0,0"
+                        Padding="8,6"
+                        Background="{StaticResource AppInputSurfaceBrush}"
+                        BorderBrush="{StaticResource AppOutlineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="{Binding LiveSessionIndicatorVisibility}"
+                        AutomationProperties.AutomationId="AppSidebarLiveSessionIndicator">
+                  <StackPanel Spacing="2">
+                    <TextBlock x:Name="AppSidebarLiveSessionTitle"
+                               FontSize="10.5"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppPrimaryTextBrush}"
+                               Text="{Binding LiveSessionIndicatorTitle}"
+                               AutomationProperties.AutomationId="AppSidebarLiveSessionTitle" />
+                    <TextBlock x:Name="AppSidebarLiveSessionSummary"
+                               FontSize="10.5"
+                               Foreground="{StaticResource AppMutedTextBrush}"
+                               Text="{Binding LiveSessionIndicatorSummary}"
+                               TextWrapping="WrapWholeWords"
+                               AutomationProperties.AutomationId="AppSidebarLiveSessionSummary" />
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </Grid>
           </StackPanel>
@@ -172,7 +196,8 @@
                       VerticalContentAlignment="Stretch" />
     </Grid>
 
-    <Grid AutomationProperties.AutomationId="StartupSplashScreen"
+    <Grid x:Name="StartupSplashScreen"
+          AutomationProperties.AutomationId="StartupSplashScreen"
           Visibility="{Binding StartupOverlayVisibility}">
       <Border Background="{StaticResource AppShellBackgroundBrush}"
               Opacity="0.76" />
@@ -189,10 +214,12 @@
                           Height="28"
                           IsActive="True" />
             <StackPanel Spacing="4">
-              <TextBlock FontSize="20"
+              <TextBlock x:Name="StartupSplashTitleText"
+                         FontSize="20"
                          FontWeight="SemiBold"
                          Text="{Binding StartupTitle}" />
-              <TextBlock Foreground="{StaticResource AppMutedTextBrush}"
+              <TextBlock x:Name="StartupSplashSummaryText"
+                         Foreground="{StaticResource AppMutedTextBrush}"
                          Text="{Binding StartupSummary}"
                          TextWrapping="WrapWholeWords" />
             </StackPanel>

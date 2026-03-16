@@ -320,3 +320,26 @@ internal static partial class StartupWorkspaceHydrationLog
         Message = "Startup workspace hydration failed.")]
     public static partial void HydrationFailed(ILogger logger, Exception exception);
 }
+
+internal static partial class SessionActivityMonitorLog
+{
+    [LoggerMessage(
+        EventId = 1303,
+        Level = LogLevel.Information,
+        Message = "Marked session activity as live. SessionId={SessionId} AgentId={AgentId} ActiveSessionCount={ActiveSessionCount}.")]
+    public static partial void ActivityStarted(
+        ILogger logger,
+        Guid sessionId,
+        Guid agentId,
+        int activeSessionCount);
+
+    [LoggerMessage(
+        EventId = 1304,
+        Level = LogLevel.Information,
+        Message = "Released session live activity. SessionId={SessionId} AgentId={AgentId} ActiveSessionCount={ActiveSessionCount}.")]
+    public static partial void ActivityCompleted(
+        ILogger logger,
+        Guid sessionId,
+        Guid agentId,
+        int activeSessionCount);
+}

@@ -21,6 +21,7 @@ public static class AgentSessionServiceCollectionExtensions
         services.AddSingleton<IAgentProviderStatusReader, AgentProviderStatusReader>();
         services.AddSingleton<AgentPromptDraftGenerator>();
         services.AddSingleton<AgentExecutionLoggingMiddleware>();
+        services.AddSingleton<ISessionActivityMonitor, SessionActivityMonitor>();
         services.AddSingleton<AgentRuntimeConversationFactory>();
         services.AddSingleton<IAgentSessionService, AgentSessionService>();
         services.AddSingleton<IAgentWorkspaceState, AgentWorkspaceState>();

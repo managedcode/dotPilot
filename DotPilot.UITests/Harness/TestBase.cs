@@ -666,6 +666,20 @@ public class TestBase
         App.EnterText(automationId, ComposeEnterSequence(useModifier: true));
     }
 
+    protected void WaitForAutomationElementToDisappearById(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+
+        if (WaitForAutomationElementToDisappear(automationId))
+        {
+            return;
+        }
+
+        WriteBrowserAutomationDiagnostics(automationId);
+        WriteBrowserDomSnapshot($"disappear-timeout:{automationId}", automationId);
+        throw new TimeoutException($"Timed out waiting for automation id '{automationId}' to disappear.");
+    }
+
     protected void SelectComboBoxAutomationElementOption(string automationId, string optionText)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(automationId);

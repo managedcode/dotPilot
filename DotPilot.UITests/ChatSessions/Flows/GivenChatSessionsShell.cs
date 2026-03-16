@@ -21,6 +21,8 @@ public sealed class GivenChatSessionsShell : TestBase
     private const string AppSidebarBrandAutomationId = "AppSidebarBrand";
     private const string AppSidebarNavigationAutomationId = "AppSidebarNavigation";
     private const string AppSidebarProfileAutomationId = "AppSidebarProfile";
+    private const string AppSidebarLiveSessionIndicatorAutomationId = "AppSidebarLiveSessionIndicator";
+    private const string AppSidebarLiveSessionTitleAutomationId = "AppSidebarLiveSessionTitle";
     private const string ChatNavButtonAutomationId = "ChatNavButton";
     private const string ProvidersNavButtonAutomationId = "ProvidersNavButton";
     private const string AgentsNavButtonAutomationId = "AgentsNavButton";
@@ -113,6 +115,26 @@ public sealed class GivenChatSessionsShell : TestBase
         WaitForTextContains(ChatMessageTextAutomationId, DebugToolFinishedText, ScreenTransitionTimeout);
 
         TakeScreenshot("chat_default_system_agent_flow");
+    }
+
+    [Test]
+    public async Task WhenLiveGenerationStartsThenSidebarShowsTheLiveSessionIndicator()
+    {
+        await Task.CompletedTask;
+
+        EnsureOnChatScreen();
+        ClickActionAutomationElement(ChatStartNewButtonAutomationId);
+        WaitForTextContains(ChatTitleTextAutomationId, DefaultSessionTitle, ScreenTransitionTimeout);
+
+        ReplaceTextAutomationElement(ChatComposerInputAutomationId, UserPrompt);
+        PressEnterAutomationElement(ChatComposerInputAutomationId);
+
+        WaitForElement(AppSidebarLiveSessionIndicatorAutomationId);
+        WaitForTextContains(AppSidebarLiveSessionTitleAutomationId, "Live session active", ScreenTransitionTimeout);
+        WaitForTextContains(ChatMessageTextAutomationId, DebugResponsePrefix, ScreenTransitionTimeout);
+        WaitForAutomationElementToDisappearById(AppSidebarLiveSessionIndicatorAutomationId);
+
+        TakeScreenshot("sidebar_live_session_indicator");
     }
 
     [Test]

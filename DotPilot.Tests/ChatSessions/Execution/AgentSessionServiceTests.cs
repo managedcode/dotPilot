@@ -249,6 +249,48 @@ public sealed class AgentSessionServiceTests
     }
 
     [Test]
+    public async Task SendMessageAsyncMarksTheSessionAsLiveWhileStreamingIsActive()
+    {
+        await using var fixture = CreateFixture();
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Live Agent");
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Live session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        fixture.SessionActivityMonitor.Current.HasActiveSessions.Should().BeFalse();
+
+        await using var enumerator = fixture.Service.SendMessageAsync(
+                new SendSessionMessageCommand(session.Session.Id, "hello from live monitor"),
+                CancellationToken.None)
+            .GetAsyncEnumerator(CancellationToken.None);
+
+        var observedLiveState = false;
+        while (await enumerator.MoveNextAsync())
+        {
+            _ = enumerator.Current.ShouldSucceed();
+            if (!fixture.SessionActivityMonitor.Current.HasActiveSessions)
+            {
+                continue;
+            }
+
+            observedLiveState = true;
+            fixture.SessionActivityMonitor.Current.SessionId.Should().Be(session.Session.Id);
+            fixture.SessionActivityMonitor.Current.AgentProfileId.Should().Be(agent.Id);
+            fixture.SessionActivityMonitor.Current.AgentName.Should().Be("Live Agent");
+            break;
+        }
+
+        observedLiveState.Should().BeTrue();
+
+        while (await enumerator.MoveNextAsync())
+        {
+            _ = enumerator.Current.ShouldSucceed();
+        }
+
+        fixture.SessionActivityMonitor.Current.HasActiveSessions.Should().BeFalse();
+    }
+
+    [Test]
     public async Task SendMessageAsyncStreamsDebugEntriesWhenTransientRuntimeConversationIsPreferred()
     {
         await using var fixture = CreateFixture(new AgentSessionStorageOptions
@@ -583,6 +625,9 @@ public sealed class AgentSessionServiceTests
         public ServiceProvider Provider { get; } = provider;
 
         public IAgentSessionService Service { get; } = service;
+
+        public ISessionActivityMonitor SessionActivityMonitor { get; } =
+            provider.GetRequiredService<ISessionActivityMonitor>();
 
         public ValueTask DisposeAsync()
         {

@@ -5,7 +5,8 @@ namespace DotPilot.Core.ChatSessions;
 
 internal sealed class DebugChatClient(string agentName, TimeProvider timeProvider) : IChatClient
 {
-    private const int ChunkDelayMilliseconds = 45;
+    private const int DefaultChunkDelayMilliseconds = 45;
+    private const int BrowserChunkDelayMilliseconds = 180;
     private const string FallbackPrompt = "the latest request";
     private const string Newline = "\n";
 
@@ -44,7 +45,7 @@ internal sealed class DebugChatClient(string agentName, TimeProvider timeProvide
         foreach (var chunk in SplitIntoChunks(responseText))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Delay(ChunkDelayMilliseconds, cancellationToken);
+            await Task.Delay(GetChunkDelayMilliseconds(), cancellationToken);
 
             yield return new ChatResponseUpdate(ChatRole.Assistant, chunk)
             {
@@ -104,5 +105,11 @@ internal sealed class DebugChatClient(string agentName, TimeProvider timeProvide
                 "Tool activity is simulated inline before the final assistant answer completes.",
             ]);
     }
-}
 
+    private static int GetChunkDelayMilliseconds()
+    {
+        return OperatingSystem.IsBrowser()
+            ? BrowserChunkDelayMilliseconds
+            : DefaultChunkDelayMilliseconds;
+    }
+}
