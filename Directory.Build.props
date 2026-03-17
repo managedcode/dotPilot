@@ -21,6 +21,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" Link="CodeMetricsConfig.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt"
+                     Link="CodeMetricsConfig.txt"
+                     Condition="Exists('$(MSBuildThisFileDirectory)CodeMetricsConfig.txt')" />
   </ItemGroup>
 </Project>

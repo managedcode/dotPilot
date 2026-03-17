@@ -71,12 +71,12 @@ internal static class AgentProviderStatusSnapshotReader
         ProviderPreferenceRecord preference,
         CancellationToken cancellationToken)
     {
+        var isBuiltIn = providerKind.IsBuiltIn();
         var commandName = providerKind.GetCommandName();
         var displayName = providerKind.GetDisplayName();
-        var defaultModelName = providerKind.GetDefaultModelName();
+        var defaultModelName = isBuiltIn ? providerKind.GetDefaultModelName() : string.Empty;
         var installCommand = providerKind.GetInstallCommand();
-        var fallbackModels = providerKind.GetSupportedModelNames();
-        var isBuiltIn = providerKind.IsBuiltIn();
+        var fallbackModels = isBuiltIn ? providerKind.GetSupportedModelNames() : [];
         var providerId = AgentSessionDeterministicIdentity.CreateProviderId(commandName);
         var actions = new List<ProviderActionDescriptor>();
         var details = new List<ProviderDetailDescriptor>();
@@ -121,7 +121,10 @@ internal static class AgentProviderStatusSnapshotReader
                 }
 
                 actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{commandName} --version"));
-                suggestedModelName = ResolveSuggestedModel(defaultModelName, metadata.SuggestedModelName);
+                suggestedModelName = ResolveSuggestedModel(
+                    defaultModelName,
+                    metadata.SuggestedModelName,
+                    metadata.SupportedModels);
                 supportedModelNames = ResolveSupportedModels(
                     defaultModelName,
                     suggestedModelName,
@@ -182,11 +185,20 @@ internal static class AgentProviderStatusSnapshotReader
             metadata?.AvailableModels ?? []);
     }
 
-    private static string ResolveSuggestedModel(string defaultModelName, string? suggestedModelName)
+    private static string ResolveSuggestedModel(
+        string defaultModelName,
+        string? suggestedModelName,
+        IReadOnlyList<string> discoveredModels)
     {
-        return string.IsNullOrWhiteSpace(suggestedModelName)
+        if (!string.IsNullOrWhiteSpace(suggestedModelName))
+        {
+            return suggestedModelName;
+        }
+
+        var discoveredModel = discoveredModels.FirstOrDefault(static model => !string.IsNullOrWhiteSpace(model));
+        return string.IsNullOrWhiteSpace(discoveredModel)
             ? defaultModelName
-            : suggestedModelName;
+            : discoveredModel;
     }
 
     private static bool LooksLikeInstalledVersion(string? installedVersion, string commandName)
@@ -244,7 +256,10 @@ internal static class AgentProviderStatusSnapshotReader
             details.Add(new ProviderDetailDescriptor("Installed version", installedVersion));
         }
 
-        details.Add(new ProviderDetailDescriptor("Suggested model", suggestedModelName));
+        if (!string.IsNullOrWhiteSpace(suggestedModelName))
+        {
+            details.Add(new ProviderDetailDescriptor("Suggested model", suggestedModelName));
+        }
 
         var supportedModels = FormatSupportedModels(supportedModelNames);
         if (!string.IsNullOrWhiteSpace(supportedModels))

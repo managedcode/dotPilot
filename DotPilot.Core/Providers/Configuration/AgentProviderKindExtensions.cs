@@ -2,47 +2,6 @@ namespace DotPilot.Core.Providers;
 
 internal static class AgentProviderKindExtensions
 {
-    private static readonly IReadOnlyList<string> DebugModels =
-    [
-        "debug-echo",
-    ];
-
-    private static readonly IReadOnlyList<string> CodexModels =
-    [
-        "gpt-5",
-    ];
-
-    private static readonly IReadOnlyList<string> ClaudeModels =
-    [
-        "claude-opus-4-6",
-        "claude-opus-4-5",
-        "claude-sonnet-4-5",
-        "claude-haiku-4-5",
-        "claude-sonnet-4",
-    ];
-
-    private static readonly IReadOnlyList<string> CopilotModels =
-    [
-        "claude-sonnet-4.6",
-        "claude-sonnet-4.5",
-        "claude-haiku-4.5",
-        "claude-opus-4.6",
-        "claude-opus-4.6-fast",
-        "claude-opus-4.5",
-        "claude-sonnet-4",
-        "gemini-3-pro-preview",
-        "gpt-5.4",
-        "gpt-5.3-codex",
-        "gpt-5.2-codex",
-        "gpt-5.2",
-        "gpt-5.1-codex-max",
-        "gpt-5.1-codex",
-        "gpt-5.1",
-        "gpt-5.1-codex-mini",
-        "gpt-5-mini",
-        "gpt-4.1",
-    ];
-
     public static string GetCommandName(this AgentProviderKind kind)
     {
         return kind switch
@@ -95,10 +54,10 @@ internal static class AgentProviderKindExtensions
     {
         return kind switch
         {
-            AgentProviderKind.Debug => DebugModels,
-            AgentProviderKind.Codex => CodexModels,
-            AgentProviderKind.ClaudeCode => ClaudeModels,
-            AgentProviderKind.GitHubCopilot => CopilotModels,
+            AgentProviderKind.Debug => [kind.GetDefaultModelName()],
+            AgentProviderKind.Codex => [],
+            AgentProviderKind.ClaudeCode => [],
+            AgentProviderKind.GitHubCopilot => [],
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }

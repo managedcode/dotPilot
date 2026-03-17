@@ -306,11 +306,46 @@ public sealed class ChatModelTests
         }
     }
 
+    [Test]
+    public async Task SessionSelectionNotifierPrefersTheRequestedSessionOverTheCurrentSelection()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var agent = (await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Selector Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Stay deterministic for session selection verification."),
+            CancellationToken.None)).ShouldSucceed();
+        var firstSession = (await fixture.WorkspaceState.CreateSessionAsync(
+            new CreateSessionCommand("Requested Session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        var secondSession = (await fixture.WorkspaceState.CreateSessionAsync(
+            new CreateSessionCommand("Current Session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
+        await model.SelectedChat.UpdateAsync(
+            _ => new SessionSidebarItem(secondSession.Session.Id, secondSession.Session.Title, secondSession.Session.Preview),
+            CancellationToken.None);
+
+        fixture.Provider
+            .GetRequiredService<SessionSelectionNotifier>()
+            .Request(firstSession.Session.Id);
+
+        var activeSession = await model.ActiveSession;
+
+        activeSession.Should().NotBeNull();
+        activeSession!.Title.Should().Be("Requested Session");
+        (await model.SelectedChat).Should().NotBeNull();
+        (await model.SelectedChat)!.Id.Should().Be(firstSession.Session.Id);
+    }
+
     private static async Task<TestFixture> CreateFixtureAsync()
     {
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton<SessionSelectionNotifier>();
         services.AddSingleton<UiDispatcher>();
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddAgentSessions(new AgentSessionStorageOptions

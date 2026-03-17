@@ -29,6 +29,7 @@ public partial record ChatModel
     private readonly IOperatorPreferencesStore operatorPreferencesStore;
     private readonly ILogger<ChatModel> logger;
     private readonly SemaphoreSlim fleetProviderRefreshGate = new(1, 1);
+    private SessionId? pendingSelectedSessionId;
     private AsyncCommand? _startNewSessionCommand;
     private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
@@ -43,6 +44,7 @@ public partial record ChatModel
         ISessionActivityMonitor sessionActivityMonitor,
         IOperatorPreferencesStore operatorPreferencesStore,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
+        SessionSelectionNotifier sessionSelectionNotifier,
         ILogger<ChatModel> logger)
     {
         this.uiDispatcher = uiDispatcher;
@@ -51,6 +53,7 @@ public partial record ChatModel
         this.operatorPreferencesStore = operatorPreferencesStore;
         this.logger = logger;
         workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
+        sessionSelectionNotifier.Requested += OnSessionSelectionRequested;
         this.sessionActivityMonitor.StateChanged += OnSessionActivityChanged;
     }
 
@@ -171,6 +174,16 @@ public partial record ChatModel
     private void OnWorkspaceProjectionChanged(object? sender, EventArgs e)
     {
         fleetProviderSnapshotStale = true;
+        uiDispatcher.Execute(() =>
+        {
+            _workspaceRefresh.Raise();
+            _sessionRefresh.Raise();
+        });
+    }
+
+    private void OnSessionSelectionRequested(object? sender, SessionSelectionRequestedEventArgs e)
+    {
+        pendingSelectedSessionId = e.SessionId;
         uiDispatcher.Execute(() =>
         {
             _workspaceRefresh.Raise();
@@ -374,7 +387,21 @@ public partial record ChatModel
         CancellationToken cancellationToken)
     {
         var selectedChat = (await SelectedChat) ?? EmptySelectedChat;
-        var resolvedSelection = FindSessionById(sessions, selectedChat.Id);
+        var resolvedSelection = EmptySelectedChat;
+        if (pendingSelectedSessionId is { } requestedSessionId)
+        {
+            resolvedSelection = FindSessionById(sessions, requestedSessionId);
+            if (!IsEmptySelectedChat(resolvedSelection))
+            {
+                pendingSelectedSessionId = null;
+            }
+        }
+
+        if (IsEmptySelectedChat(resolvedSelection))
+        {
+            resolvedSelection = FindSessionById(sessions, selectedChat.Id);
+        }
+
         if (IsEmptySelectedChat(resolvedSelection) && workspace.SelectedSessionId is { } selectedSessionId)
         {
             resolvedSelection = FindSessionById(sessions, selectedSessionId);

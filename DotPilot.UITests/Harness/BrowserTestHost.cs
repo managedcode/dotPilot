@@ -11,6 +11,7 @@ internal static class BrowserTestHost
     private const string FrameworkOption = "-f";
     private const string BrowserFramework = "net10.0-browserwasm";
     private const string ProjectOption = "--project";
+    private const string NoBuildOption = "--no-build";
     private const string NoLaunchProfileOption = "--no-launch-profile";
     private const string UiAutomationProperty = "-p:IsUiAutomationMappingEnabled=True";
     private const string ProjectRelativePath = "DotPilot/DotPilot.csproj";
@@ -93,6 +94,7 @@ internal static class BrowserTestHost
             UiAutomationProperty,
             ProjectOption,
             projectPath,
+            NoBuildOption,
             NoLaunchProfileOption,
         ];
     }

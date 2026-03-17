@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using DotPilot.Core.ChatSessions;
 using DotPilot.Core;
+using DotPilot.Core.ChatSessions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

@@ -452,7 +452,7 @@ public partial record SettingsModel
     {
         for (var index = 0; index < providers.Count; index++)
         {
-            if (providers[index].IsEnabled)
+            if (providers[index].IsEnabled && IsVisibleProvider(providers[index].Kind))
             {
                 return providers[index].Kind;
             }
@@ -496,6 +496,7 @@ public partial record SettingsModel
         ProviderStatusItem? selectedProvider)
     {
         return providers
+            .Where(static provider => IsVisibleProvider(provider.Kind))
             .Select(provider => MapProviderStatusItem(provider, selectedProvider))
             .ToImmutableArray();
     }
@@ -565,5 +566,10 @@ public partial record SettingsModel
         }
 
         return true;
+    }
+
+    private static bool IsVisibleProvider(AgentProviderKind kind)
+    {
+        return kind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.GitHubCopilot;
     }
 }

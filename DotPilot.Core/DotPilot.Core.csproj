@@ -14,6 +14,7 @@
         <PackageReference Include="ManagedCode.CodexSharpSDK.Extensions.AgentFramework" />
         <PackageReference Include="ManagedCode.CodexSharpSDK.Extensions.AI" />
         <PackageReference Include="ManagedCode.Communication" />
+        <PackageReference Include="GitHub.Copilot.SDK" />
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.GitHub.Copilot" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" />

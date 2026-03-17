@@ -107,10 +107,11 @@ public sealed class AgentBuilderModelTests
         await model.BuildManually(CancellationToken.None);
 
         (await model.BuilderProviderDisplayName).Should().Be("Codex");
-        (await model.BuilderSuggestedModelName).Should().Be("gpt-5");
-        (await model.BuilderModelHelperText).Should().Be("Choose one of the supported models for this provider. Suggested: gpt-5.");
+        (await model.BuilderSuggestedModelName).Should().BeEmpty();
+        (await model.BuilderModelHelperText).Should().Be("Select an enabled provider to load its supported models.");
+        (await model.BuilderHasSupportedModels).Should().BeFalse();
         (await model.BuilderCanCreateAgent).Should().BeFalse();
-        (await model.ModelName).Should().Be("gpt-5");
+        (await model.ModelName).Should().BeNullOrEmpty();
     }
 
     [Test]
@@ -121,7 +122,7 @@ public sealed class AgentBuilderModelTests
         var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
 
         await model.BuildManually(CancellationToken.None);
-        (await model.ModelName).Should().Be("gpt-5");
+        (await model.ModelName).Should().BeNullOrEmpty();
         await model.SelectedProvider.UpdateAsync(
             _ => new AgentProviderOption(
                 AgentProviderKind.Codex,
@@ -176,7 +177,7 @@ public sealed class AgentBuilderModelTests
                 AgentProviderKind.GitHubCopilot,
                 "GitHub Copilot",
                 "copilot",
-                "GitHub Copilot profile authoring is available.",
+                "GitHub Copilot CLI is ready for local desktop execution.",
                 "claude-opus-4.6",
                 ["claude-opus-4.6", "gpt-5"],
                 "1.0.3",
@@ -242,7 +243,7 @@ public sealed class AgentBuilderModelTests
                 AgentProviderKind.ClaudeCode,
                 "Claude Code",
                 "claude",
-                "Claude Code profile authoring is available.",
+                "Claude Code CLI is ready for local desktop execution.",
                 "claude-opus-4-6",
                 ["claude-opus-4-6", "claude-sonnet-4-5"],
                 "2.0.75",
@@ -394,6 +395,7 @@ public sealed class AgentBuilderModelTests
         });
         services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddSingleton<ShellNavigationNotifier>();
+        services.AddSingleton<SessionSelectionNotifier>();
 
         var provider = services.BuildServiceProvider();
         var workspaceState = provider.GetRequiredService<IAgentWorkspaceState>();

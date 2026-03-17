@@ -393,6 +393,9 @@ Ask first:
 ### Likes
 
 - Keep regression coverage tied to real operator flows: when agent creation changes, tests should cover creating an agent, choosing a valid provider model, and sending at least one message through the resulting session path.
+- Keep the first provider baseline deliberately small: the operator-visible provider list should stay focused on the three real console providers, and each one needs automated create-agent plus `hello -> hello reply` smoke coverage before extra provider features are added.
+- Keep operator-visible provider models unseeded: supported and suggested model lists for real providers must come from live CLI metadata or explicit operator input, not from hardcoded fallback catalogs.
+- Keep provider, model, and runtime state honest: when a value should come from a live provider, workspace, or operator choice, do not hardcode it into production paths.
 - Follow the canonical MCAF tutorial when bootstrapping or upgrading the agent workflow.
 - Commit cohesive code-change batches promptly while debugging, especially before switching focus or starting long verification runs, so the branch state stays inspectable and pushable.
 - After opening or updating a PR, create a fresh working branch before continuing with the next slice of work so follow-up changes do not pile onto the already-reviewed branch.
@@ -417,6 +420,7 @@ Ask first:
 ### Dislikes
 
 - Installing stale, non-canonical, or non-`mcaf-*` skills into the repo-local agent skill directory.
+- Shipping fake, mock, stub, pretend, or synthetic runtime paths where the product or verification is supposed to exercise the real contract.
 - Moving root governance out of the repository root.
 - Mixing multiple `.NET` test frameworks in the active solution without a documented migration plan.
 - Creating auxiliary `git worktree` directories for normal PR follow-up when straightforward branch switching in the main checkout is enough.

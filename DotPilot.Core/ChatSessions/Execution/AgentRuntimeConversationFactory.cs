@@ -3,6 +3,7 @@ using DotPilot.Core.Providers;
 using GitHub.Copilot.SDK;
 using ManagedCode.ClaudeCodeSharpSDK.Configuration;
 using ManagedCode.ClaudeCodeSharpSDK.Extensions.AI;
+using ManagedCode.CodexSharpSDK.Client;
 using ManagedCode.CodexSharpSDK.Configuration;
 using ManagedCode.CodexSharpSDK.Extensions.AI;
 using Microsoft.Agents.AI;
@@ -138,7 +139,7 @@ internal sealed class AgentRuntimeConversationFactory(
             _ => CreateChatClientAgent(
                 agentRecord,
                 descriptor,
-                historyProvider,
+                ShouldUseFolderChatHistory(descriptor.ProviderKind) ? historyProvider : null,
                 CreateChatClient(descriptor.ProviderKind, agentRecord.Name, sessionId, agentRecord.ModelName)),
         };
 
@@ -173,13 +174,19 @@ internal sealed class AgentRuntimeConversationFactory(
 
         if (providerKind == AgentProviderKind.Codex)
         {
+            var codexExecutablePath = ResolveExecutablePath(providerKind);
             return new CodexChatClient(new CodexChatClientOptions
             {
-                CodexOptions = new CodexOptions(),
+                CodexOptions = new CodexOptions
+                {
+                    CodexExecutablePath = codexExecutablePath,
+                },
                 DefaultModel = modelName,
                 DefaultThreadOptions = new CodexThreadOptions
                 {
                     Model = modelName,
+                    ModelReasoningEffort = ModelReasoningEffort.High,
+                    SkipGitRepoCheck = true,
                     WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
                 },
             });
@@ -187,9 +194,13 @@ internal sealed class AgentRuntimeConversationFactory(
 
         if (providerKind == AgentProviderKind.ClaudeCode)
         {
+            var claudeExecutablePath = ResolveExecutablePath(providerKind);
             return new ClaudeChatClient(new ClaudeChatClientOptions
             {
-                ClaudeOptions = new ClaudeOptions(),
+                ClaudeOptions = new ClaudeOptions
+                {
+                    ClaudeExecutablePath = claudeExecutablePath,
+                },
                 DefaultModel = modelName,
                 DefaultThreadOptions = new ClaudeThreadOptions
                 {
@@ -213,7 +224,7 @@ internal sealed class AgentRuntimeConversationFactory(
     private ChatClientAgent CreateChatClientAgent(
         AgentProfileRecord agentRecord,
         AgentExecutionDescriptor descriptor,
-        FolderChatHistoryProvider historyProvider,
+        FolderChatHistoryProvider? historyProvider,
         IChatClient chatClient)
     {
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
@@ -222,7 +233,6 @@ internal sealed class AgentRuntimeConversationFactory(
             Id = agentRecord.Id.ToString("N", CultureInfo.InvariantCulture),
             Name = agentRecord.Name,
             Description = descriptor.ProviderDisplayName,
-            ChatHistoryProvider = historyProvider,
             UseProvidedChatClientAsIs = true,
             ChatOptions = new ChatOptions
             {
@@ -230,6 +240,10 @@ internal sealed class AgentRuntimeConversationFactory(
                 ModelId = agentRecord.ModelName,
             },
         };
+        if (historyProvider is not null)
+        {
+            options.ChatHistoryProvider = historyProvider;
+        }
 
         return (ChatClientAgent)chatClient.AsAIAgent(options, loggerFactory, serviceProvider);
     }
@@ -241,8 +255,11 @@ internal sealed class AgentRuntimeConversationFactory(
         CancellationToken cancellationToken)
     {
         var workingDirectory = ResolvePlaygroundDirectory(sessionId);
+        var copilotExecutablePath = ResolveExecutablePath(AgentProviderKind.GitHubCopilot) ??
+            AgentProviderKind.GitHubCopilot.GetCommandName();
         var copilotClient = new CopilotClient(new CopilotClientOptions
         {
+            CliPath = copilotExecutablePath,
             AutoStart = false,
             UseStdio = true,
         });
@@ -253,6 +270,7 @@ internal sealed class AgentRuntimeConversationFactory(
             new SessionConfig
             {
                 Model = agentRecord.ModelName,
+                OnPermissionRequest = PermissionHandler.ApproveAll,
                 SystemMessage = new SystemMessageConfig
                 {
                     Content = agentRecord.SystemPrompt,
@@ -270,5 +288,53 @@ internal sealed class AgentRuntimeConversationFactory(
         var directory = AgentSessionStoragePaths.ResolvePlaygroundDirectory(storageOptions, sessionId);
         Directory.CreateDirectory(directory);
         return directory;
+    }
+
+    private static bool ShouldUseFolderChatHistory(AgentProviderKind providerKind)
+    {
+        return providerKind == AgentProviderKind.Debug;
+    }
+
+    private static string? ResolveExecutablePath(AgentProviderKind providerKind)
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            return null;
+        }
+
+        var commandName = providerKind.GetCommandName();
+        var searchPaths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var searchPath in searchPaths)
+        {
+            foreach (var candidate in EnumerateCandidates(searchPath, commandName))
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateCandidates(string searchPath, string commandName)
+    {
+        yield return Path.Combine(searchPath, commandName);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            yield break;
+        }
+
+        var pathext = (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var extension in pathext)
+        {
+            yield return Path.Combine(searchPath, commandName + extension);
+        }
     }
 }
