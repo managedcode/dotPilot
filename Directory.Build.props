@@ -4,6 +4,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14</LangVersion>
 
+    <DotPilotVersionPrefix Condition="'$(DotPilotVersionPrefix)' == ''">0.0</DotPilotVersionPrefix>
+    <DotPilotBuildNumber Condition="'$(DotPilotBuildNumber)' == ''">1</DotPilotBuildNumber>
+    <DotPilotReleaseVersion Condition="'$(DotPilotReleaseVersion)' == ''">$(DotPilotVersionPrefix)</DotPilotReleaseVersion>
 
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

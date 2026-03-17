@@ -61,9 +61,9 @@ jobs:
         id: resolve_version
         shell: bash
         run: |
-          version_prefix="$(dotnet msbuild ./DotPilot/DotPilot.csproj -getProperty:ApplicationDisplayVersion | tail -n 1 | tr -d '\r')"
+          version_prefix="$(dotnet msbuild ./DotPilot/DotPilot.csproj -getProperty:DotPilotVersionPrefix | tail -n 1 | tr -d '\r')"
           if [[ ! "${version_prefix}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-            echo "ApplicationDisplayVersion must be a two-segment numeric prefix. Found: '${version_prefix}'." >&2
+            echo "DotPilotVersionPrefix must be a two-segment numeric prefix. Found: '${version_prefix}'." >&2
             exit 1
           fi
 
@@ -129,8 +129,8 @@ jobs:
             -p:PackageFormat=dmg \
             -p:CodesignKey=- \
             -p:DiskImageSigningKey=- \
-            -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
-            -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+            -p:DotPilotReleaseVersion=${{ needs.prepare_release.outputs.release_version }} \
+            -p:DotPilotBuildNumber=${{ needs.prepare_release.outputs.application_version }}
 
       - name: Stage macOS Release Asset
         shell: bash
@@ -186,8 +186,8 @@ jobs:
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:IncludeAllContentForSelfExtract=true
-          -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }}
-          -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+          -p:DotPilotReleaseVersion=${{ needs.prepare_release.outputs.release_version }}
+          -p:DotPilotBuildNumber=${{ needs.prepare_release.outputs.application_version }}
 
       - name: Stage Windows Release Asset
         shell: pwsh
@@ -254,8 +254,8 @@ jobs:
             -p:SelfContained=true \
             -p:PackageFormat=snap \
             -p:UnoSnapcraftAdditionalParameters=--destructive-mode \
-            -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
-            -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+            -p:DotPilotReleaseVersion=${{ needs.prepare_release.outputs.release_version }} \
+            -p:DotPilotBuildNumber=${{ needs.prepare_release.outputs.application_version }}
 
           sudo chown -R "$USER:$USER" ./bin/Release/net10.0-desktop/linux-x64
 

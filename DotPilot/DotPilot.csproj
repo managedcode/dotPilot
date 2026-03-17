@@ -10,10 +10,10 @@
         <!-- Display name -->
         <ApplicationTitle>DotPilot</ApplicationTitle>
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.DotPilot</ApplicationId>
+        <ApplicationId>com.managed-code.dotpilot</ApplicationId>
         <!-- Versions -->
-        <ApplicationDisplayVersion>0.0</ApplicationDisplayVersion>
-        <ApplicationVersion>1</ApplicationVersion>
+        <ApplicationDisplayVersion>$(DotPilotReleaseVersion)</ApplicationDisplayVersion>
+        <ApplicationVersion>$(DotPilotBuildNumber)</ApplicationVersion>
         <!-- Package Publisher -->
         <ApplicationPublisher>O=DotPilot</ApplicationPublisher>
         <!-- Package Description -->

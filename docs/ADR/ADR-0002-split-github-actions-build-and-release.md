@@ -16,7 +16,7 @@ That shape no longer matches the repository workflow:
 
 - normal validation should stay focused on build and test feedback
 - release publishing has different permissions, side effects, and operator intent
-- the release path now needs CI-derived version resolution from `DotPilot/DotPilot.csproj`
+- the release path now needs CI-derived version resolution from the shared version prefix in `Directory.Build.props`
 - desktop releases must publish platform artifacts and create a GitHub Release with feature-oriented notes
 
 Keeping all of that in one catch-all workflow makes the automation harder to reason about, harder to secure, and harder to operate safely.
@@ -31,7 +31,7 @@ We will split GitHub Actions into two explicit workflows:
    - does not publish desktop artifacts or create releases
 2. `release-publish.yml`
    - runs automatically on pushes to `main`
-   - resolves the release version from the two-segment `ApplicationDisplayVersion` prefix in `DotPilot/DotPilot.csproj` plus the GitHub Actions build number
+   - resolves the release version from the two-segment `DotPilotVersionPrefix` value in `Directory.Build.props` plus the GitHub Actions build number
    - publishes desktop release assets for macOS, Windows, and Linux as real packaged outputs instead of raw publish-folder archives
    - uses `.dmg` for macOS, a self-contained single-file `.exe` for Windows, and `.snap` for Linux
    - creates the GitHub Release
@@ -73,7 +73,7 @@ This keeps unrelated concerns coupled and makes ordinary CI runs carry release-s
 
 Rejected.
 
-The repository still needs a manual source-of-truth prefix in `DotPilot/DotPilot.csproj`, but the final build segment should be CI-derived so every `main` release is unique without generating a release-only source commit.
+The repository still needs a manual source-of-truth prefix in `Directory.Build.props`, but the final build segment should be CI-derived so every `main` release is unique without generating a release-only source commit.
 
 ### 3. Store release notes entirely as manual workflow input
 
@@ -94,7 +94,7 @@ That makes release quality depend on operator memory instead of repo-owned histo
 ### Negative
 
 - Release automation now depends on the GitHub Actions run number remaining a suitable build-number source for releases.
-- The repository gains workflow-owned release logic that must stay aligned with `DotPilot.csproj`, git history, and `docs/Features/`.
+- The repository gains workflow-owned release logic that must stay aligned with `Directory.Build.props`, project packaging metadata, git history, and `docs/Features/`.
 
 ## Implementation Impact
 

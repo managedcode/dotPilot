@@ -212,9 +212,12 @@ For this app:
 - after changing GitHub rulesets, workflows, or release packaging, verify against the specific live blocked operation or failing run instead of assuming the policy or YAML change solved the issue
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
 - desktop release assets must be native installable or directly executable outputs for each OS, not archives of raw publish folders; package the real `.exe`, `.snap`, `.dmg`, `.pkg`, `Setup.exe`, or equivalent runnable installer/app artifact instead of zipping intermediate publish directories
-- desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
-- until the user explicitly changes the versioning policy, the manually maintained `ApplicationDisplayVersion` prefix for desktop releases must stay `0.0`, not `1.0`
-- the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
+- desktop release version-prefix source of truth must live in `Directory.Build.props`, not as a separately maintained value in `DotPilot/DotPilot.csproj`
+- until the user explicitly changes the versioning policy, the shared desktop release version prefix must stay `0.0`
+- the release workflow must not take ownership of the human-managed prefix; CI may append only the final build segment to produce release versions such as `0.0.<build-number>`
+- keep `ApplicationDisplayVersion` aligned to the shared version prefix during normal project evaluation, and let CI override it only with the final three-segment release version
+- do not maintain a separate human-edited `ApplicationVersion` prefix in app projects; when packaging needs a build value, derive it from CI/build metadata instead of duplicating version authority
+- the production desktop app identifier must be `com.managed-code.dotpilot`
 - for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks
 - prefer MIT-licensed GitHub and NuGet dependencies when they materially accelerate delivery and align with the current architecture
 - prefer official `.NET` AI evaluation libraries under `Microsoft.Extensions.AI.Evaluation*` for response-quality, tool-usage, and safety evaluation instead of custom or third-party evaluation stacks by default
