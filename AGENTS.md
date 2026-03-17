@@ -208,6 +208,8 @@ For this app:
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
 - PR bodies for issue-backed work must use GitHub closing references such as `Closes #14` so merged work closes the tracked issue automatically
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
+- repository rules for `main` must keep an explicit org-admin bypass path for required status checks so repository administrators can perform direct emergency or operator-owned pushes without deadlocking the branch policy
+- after changing GitHub rulesets, workflows, or release packaging, verify against the specific live blocked operation or failing run instead of assuming the policy or YAML change solved the issue
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
 - desktop release assets must be native installable or directly executable outputs for each OS, not archives of raw publish folders; package the real `.exe`, `.snap`, `.dmg`, `.pkg`, `Setup.exe`, or equivalent runnable installer/app artifact instead of zipping intermediate publish directories
 - desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
@@ -392,6 +394,7 @@ Ask first:
 
 ### Likes
 
+- When the user asks to fix CI or release automation, push the workflow/code changes yourself and keep iterating on live runs until the targeted pipeline is green, instead of stopping at a local patch.
 - Verify `Uno Platform`, packaging, and CI-fix decisions against the latest official docs and current web sources when working on release or tooling failures, so the repo does not keep stale workflow assumptions.
 - Keep regression coverage tied to real operator flows: when agent creation changes, tests should cover creating an agent, choosing a valid provider model, and sending at least one message through the resulting session path.
 - Keep the first provider baseline deliberately small: the operator-visible provider list should stay focused on the three real console providers, and each one needs automated create-agent plus `hello -> hello reply` smoke coverage before extra provider features are added.

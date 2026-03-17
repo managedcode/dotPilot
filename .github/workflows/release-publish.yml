@@ -126,7 +126,6 @@ jobs:
             -p:BuildInParallel=false \
             -p:CI=true \
             -p:SelfContained=true \
-            -p:TargetFrameworks=net10.0-desktop \
             -p:PackageFormat=dmg \
             -p:CodesignKey=- \
             -p:DiskImageSigningKey=- \
@@ -184,7 +183,6 @@ jobs:
           -p:BuildInParallel=false
           -p:CI=true
           -p:SelfContained=true
-          -p:TargetFrameworks=net10.0-desktop
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:IncludeAllContentForSelfExtract=true
@@ -254,7 +252,6 @@ jobs:
             -p:BuildInParallel=false \
             -p:CI=true \
             -p:SelfContained=true \
-            -p:TargetFrameworks=net10.0-desktop \
             -p:PackageFormat=snap \
             -p:UnoSnapcraftAdditionalParameters=--destructive-mode \
             -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
