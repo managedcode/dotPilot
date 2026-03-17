@@ -59,8 +59,8 @@
     <meta name="apple-mobile-web-app-title" content="dotPilot">
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#2563eb">
-    <meta name="msapplication-TileColor" content="#2563eb">
+    <meta name="theme-color" content="#7c6bc4">
+    <meta name="msapplication-TileColor" content="#7c6bc4">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,16 +179,17 @@
 
     <style>
         :root {
-            --color-accent: #2563eb;
-            --color-accent-hover: #1d4ed8;
-            --color-accent-light: #dbeafe;
-            --color-bg: #ffffff;
-            --color-bg-secondary: #f8fafc;
-            --color-bg-tertiary: #f1f5f9;
-            --color-text: #0f172a;
-            --color-text-secondary: #64748b;
-            --color-border: #e2e8f0;
-            --color-border-hover: #cbd5e1;
+            --color-accent: #7c6bc4;
+            --color-accent-hover: #6a59b3;
+            --color-accent-light: #ece8f8;
+            --color-bg: #ededec;
+            --color-bg-card: #ffffff;
+            --color-text: #2d2b3a;
+            --color-text-secondary: #6b6880;
+            --color-text-light: #8e8ba0;
+            --color-border: #dddcdb;
+            --color-btn-dark: #2d2b3a;
+            --color-btn-dark-hover: #3d3b4f;
             --font-family: 'Host Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
@@ -213,7 +214,7 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 24px;
+            padding: 0 40px;
         }
 
         /* Header */
@@ -223,25 +224,25 @@
             left: 0;
             right: 0;
             z-index: 100;
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(237, 237, 236, 0.85);
             backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--color-border);
         }
 
         nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 24px;
+            padding: 20px 40px;
             max-width: 1200px;
             margin: 0 auto;
         }
 
         .logo {
-            font-size: 24px;
-            font-weight: 700;
+            font-size: 22px;
+            font-weight: 600;
             color: var(--color-text);
             text-decoration: none;
+            letter-spacing: -0.5px;
         }
 
         .logo span {
@@ -250,15 +251,16 @@
 
         .nav-links {
             display: flex;
-            gap: 32px;
+            gap: 36px;
             list-style: none;
         }
 
         .nav-links a {
             color: var(--color-text-secondary);
             text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s;
+            font-weight: 400;
+            font-size: 15px;
+            transition: color 0.2s;
         }
 
         .nav-links a:hover {
@@ -266,275 +268,274 @@
         }
 
         .version-badge {
-            background: var(--color-accent);
+            background: var(--color-btn-dark);
             color: #ffffff;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 500;
         }
 
         /* Hero Section */
         .hero {
             padding: 160px 0 80px;
-            text-align: center;
-            background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-secondary) 100%);
         }
 
-        .hero h1 {
-            font-size: clamp(40px, 7vw, 72px);
-            font-weight: 700;
-            margin-bottom: 24px;
-            line-height: 1.1;
-            color: var(--color-text);
+        .hero-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 60px;
+            align-items: start;
         }
 
-        .hero h1 .highlight {
-            background: linear-gradient(120deg, var(--color-accent) 0%, #3b82f6 50%, #6366f1 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .hero-left h1 {
+            font-size: clamp(42px, 5.5vw, 64px);
+            font-weight: 300;
+            line-height: 1.15;
+            letter-spacing: -1.5px;
+            color: var(--color-text-light);
+            margin-bottom: 40px;
         }
 
-        .hero .tagline {
-            font-size: 24px;
+        .hero-left h1 .highlight {
             color: var(--color-accent);
-            font-weight: 600;
-            margin-bottom: 16px;
+            font-weight: 400;
         }
 
-        .hero p {
-            font-size: 18px;
-            color: var(--color-text-secondary);
-            max-width: 700px;
-            margin: 0 auto 40px;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 32px;
+        .hero-left h1 .bold {
+            color: var(--color-text);
+            font-weight: 400;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 16px 32px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
+            gap: 10px;
+            padding: 16px 36px;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
 
-        .btn-primary {
+        .btn-dark {
+            background: var(--color-btn-dark);
+            color: #ffffff;
+        }
+
+        .btn-dark:hover {
+            background: var(--color-btn-dark-hover);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--color-text);
+            border: 1.5px solid var(--color-border);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--color-text-secondary);
+        }
+
+        .btn-accent {
             background: var(--color-accent);
             color: #ffffff;
-            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
         }
 
-        .btn-primary:hover {
+        .btn-accent:hover {
             background: var(--color-accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
         }
 
-        .btn-secondary {
-            background: var(--color-bg);
-            color: var(--color-text);
-            border: 1px solid var(--color-border);
+        .hero-right p {
+            font-size: 17px;
+            color: var(--color-text-secondary);
+            line-height: 1.7;
         }
 
-        .btn-secondary:hover {
-            border-color: var(--color-border-hover);
-            background: var(--color-bg-secondary);
-            transform: translateY(-2px);
-        }
-
-        .social-links {
+        .hero-buttons {
             display: flex;
-            gap: 16px;
-            justify-content: center;
+            gap: 12px;
+            margin-top: 40px;
+            flex-wrap: wrap;
         }
 
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--color-text-secondary);
-            text-decoration: none;
-            font-size: 14px;
-            transition: color 0.3s;
+        /* Cards row under hero */
+        .hero-cards {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 24px;
+            margin-top: 60px;
         }
 
-        .social-link:hover {
-            color: var(--color-accent);
+        .hero-card {
+            background: var(--color-bg-card);
+            border-radius: 20px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
         }
 
-        /* Philosophy Section */
-        .philosophy {
-            padding: 80px 0;
-            background: var(--color-bg-secondary);
-            text-align: center;
+        .hero-card-gradient {
+            background: linear-gradient(135deg, #f5e6dc 0%, #e8d4e0 40%, #d6d0ec 100%);
         }
 
-        .philosophy-content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .philosophy h2 {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 24px;
-        }
-
-        .philosophy .quote {
-            font-size: 28px;
-            font-weight: 600;
-            color: var(--color-accent);
-            margin-bottom: 24px;
-            line-height: 1.3;
-        }
-
-        .philosophy p {
-            color: var(--color-text-secondary);
+        .hero-card h3 {
             font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
         }
 
-        /* Features Section */
-        .features {
+        .hero-card p {
+            color: var(--color-text-secondary);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .hero-card .card-label {
+            display: inline-block;
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--color-text-secondary);
+            margin-bottom: 12px;
+        }
+
+        /* Section styles */
+        .section {
             padding: 100px 0;
         }
 
-        .section-title {
-            font-size: 40px;
-            font-weight: 700;
-            text-align: center;
+        .section-header {
+            max-width: 700px;
             margin-bottom: 60px;
         }
 
+        .section-header h2 {
+            font-size: clamp(32px, 4vw, 48px);
+            font-weight: 400;
+            line-height: 1.2;
+            letter-spacing: -1px;
+            color: var(--color-text);
+            margin-bottom: 20px;
+        }
+
+        .section-header p {
+            font-size: 17px;
+            color: var(--color-text-secondary);
+            line-height: 1.7;
+        }
+
+        /* Features */
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
         }
 
         .feature-card {
-            background: var(--color-bg);
-            border: 1px solid var(--color-border);
+            background: var(--color-bg-card);
             border-radius: 16px;
             padding: 32px;
-            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+            transition: transform 0.2s;
         }
 
         .feature-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--color-accent);
-            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
+            transform: translateY(-3px);
         }
 
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            background: var(--color-accent-light);
-            border-radius: 12px;
-            display: flex;
+        .feature-number {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: var(--color-accent-light);
+            color: var(--color-accent);
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
             margin-bottom: 20px;
-            font-size: 24px;
         }
 
         .feature-card h3 {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
+            color: var(--color-text);
         }
 
         .feature-card p {
             color: var(--color-text-secondary);
-            font-size: 15px;
+            font-size: 14px;
+            line-height: 1.6;
         }
 
-        /* Providers Section */
-        .providers {
+        /* Providers */
+        .providers-section {
             padding: 80px 0;
-            background: var(--color-bg-secondary);
         }
 
         .providers-grid {
             display: flex;
             flex-wrap: wrap;
-            justify-content: center;
-            gap: 24px;
-            max-width: 900px;
-            margin: 0 auto;
+            gap: 12px;
         }
 
         .provider-badge {
-            background: var(--color-bg);
-            border: 1px solid var(--color-border);
-            padding: 16px 28px;
+            background: var(--color-bg-card);
+            padding: 14px 24px;
             border-radius: 12px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 500;
             color: var(--color-text);
-            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+            transition: transform 0.2s;
         }
 
         .provider-badge:hover {
-            border-color: var(--color-accent);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
         }
 
-        /* Downloads Section */
-        .downloads {
+        /* Downloads */
+        .downloads-section {
             padding: 100px 0;
         }
 
         .download-cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 24px;
-            max-width: 900px;
-            margin: 0 auto;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
         }
 
         .download-card {
-            background: var(--color-bg);
-            border: 1px solid var(--color-border);
+            background: var(--color-bg-card);
             border-radius: 16px;
-            padding: 32px;
+            padding: 36px;
             text-align: center;
-            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+            transition: transform 0.2s;
         }
 
         .download-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--color-accent);
-            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
+            transform: translateY(-3px);
         }
 
         .download-card .icon {
-            font-size: 48px;
+            font-size: 40px;
             margin-bottom: 16px;
         }
 
         .download-card h3 {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .download-card .arch {
-            color: var(--color-text-secondary);
+            color: var(--color-text-light);
             font-size: 14px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .download-card .btn {
@@ -542,99 +543,121 @@
             justify-content: center;
         }
 
-        /* Tech Stack Section */
-        .tech-stack {
+        /* Tech Stack */
+        .tech-section {
             padding: 80px 0;
-            background: var(--color-bg-secondary);
         }
 
         .tech-grid {
             display: flex;
             flex-wrap: wrap;
-            justify-content: center;
-            gap: 16px;
+            gap: 10px;
         }
 
         .tech-badge {
-            background: var(--color-bg);
-            border: 1px solid var(--color-border);
-            padding: 12px 24px;
-            border-radius: 8px;
+            background: var(--color-bg-card);
+            padding: 12px 22px;
+            border-radius: 10px;
             font-size: 14px;
             font-weight: 500;
             color: var(--color-text-secondary);
         }
 
-        /* Open Source Section */
-        .open-source {
+        /* Open Source / CTA */
+        .cta-section {
             padding: 100px 0;
+        }
+
+        .cta-card {
+            background: var(--color-bg-card);
+            border-radius: 24px;
+            padding: 80px 60px;
             text-align: center;
         }
 
-        .open-source h2 {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 24px;
+        .cta-card h2 {
+            font-size: clamp(28px, 3.5vw, 40px);
+            font-weight: 400;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
         }
 
-        .open-source p {
+        .cta-card p {
             color: var(--color-text-secondary);
-            font-size: 18px;
-            max-width: 600px;
-            margin: 0 auto 32px;
+            font-size: 17px;
+            max-width: 550px;
+            margin: 0 auto 36px;
+            line-height: 1.7;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Social links */
+        .social-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--color-text-light);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .social-link:hover {
+            color: var(--color-accent);
         }
 
         /* Footer */
         footer {
-            padding: 60px 0 40px;
-            background: var(--color-bg-tertiary);
+            padding: 40px 0;
             text-align: center;
-            border-top: 1px solid var(--color-border);
         }
 
         .footer-content {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 24px;
+            padding: 0 40px;
         }
 
         .footer-links {
             display: flex;
             justify-content: center;
             gap: 32px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
         .footer-links a {
-            color: var(--color-text-secondary);
+            color: var(--color-text-light);
             text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-            transition: color 0.3s;
+            font-size: 14px;
+            transition: color 0.2s;
         }
 
         .footer-links a:hover {
             color: var(--color-accent);
         }
 
-        .footer-divider {
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(90deg, var(--color-accent), #6366f1);
-            margin: 0 auto 24px;
-            border-radius: 2px;
-        }
-
         footer p {
-            color: var(--color-text-secondary);
-            font-size: 14px;
+            color: var(--color-text-light);
+            font-size: 13px;
         }
 
         footer p a {
             color: var(--color-accent);
             text-decoration: none;
-            font-weight: 500;
         }
 
         footer p a:hover {
@@ -642,12 +665,31 @@
         }
 
         .footer-copyright {
-            margin-top: 16px;
-            color: #94a3b8;
-            font-size: 13px;
+            margin-top: 8px;
+            color: var(--color-text-light);
+            font-size: 12px;
         }
 
         /* Responsive */
+        @media (max-width: 900px) {
+            .hero-layout {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+
+            .hero-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .download-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             .nav-links {
                 display: none;
@@ -657,27 +699,33 @@
                 padding: 120px 0 60px;
             }
 
-            .hero .tagline {
-                font-size: 20px;
+            .container {
+                padding: 0 20px;
             }
 
-            .hero p {
-                font-size: 16px;
+            nav {
+                padding: 16px 20px;
+            }
+
+            .hero-left h1 {
+                font-size: 36px;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                justify-content: center;
+            }
+
+            .cta-card {
+                padding: 48px 24px;
             }
 
             .cta-buttons {
                 flex-direction: column;
                 align-items: center;
-            }
-
-            .btn {
-                width: 100%;
-                max-width: 300px;
-                justify-content: center;
-            }
-
-            .philosophy .quote {
-                font-size: 22px;
             }
         }
     </style>
@@ -687,9 +735,9 @@
         <nav>
             <a href="#" class="logo">dot<span>Pilot</span></a>
             <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#providers">Providers</a></li>
-                <li><a href="#downloads">Downloads</a></li>
+                <li><a href="#features">features</a></li>
+                <li><a href="#providers">providers</a></li>
+                <li><a href="#downloads">downloads</a></li>
                 <li><a href="https://github.com/managedcode/dotPilot" target="_blank">GitHub</a></li>
             </ul>
             <span class="version-badge">v{{VERSION}}</span>
@@ -699,101 +747,92 @@
     <main>
         <section class="hero">
             <div class="container">
-                <h1>Local <span class="highlight">Agent Orchestrator</span></h1>
-                <p class="tagline">Run AI Agents Locally. Build Workflows. Own Your Data.</p>
-                <p>Open source desktop platform for running multiple AI agents locally. Connect to Codex, Claude Code, GitHub Copilot, Gemini, or use local models. Build agentic workflows with Microsoft Agent Framework. Written in C# and .NET.</p>
-                <div class="cta-buttons">
-                    <a href="https://github.com/managedcode/dotPilot/releases/latest" class="btn btn-primary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        Download v{{VERSION}}
-                    </a>
-                    <a href="https://github.com/managedcode/dotPilot" class="btn btn-secondary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
-                        View Source
-                    </a>
+                <div class="hero-layout">
+                    <div class="hero-left">
+                        <h1>Your <span class="highlight">agents.</span> Your <span class="bold">stack.</span> Your rules.</h1>
+                        <a href="https://github.com/managedcode/dotPilot/releases/latest" class="btn btn-dark">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download v{{VERSION}}
+                        </a>
+                    </div>
+                    <div class="hero-right">
+                        <p>Open source local agent orchestrator built with C# and .NET. Run multiple AI agents locally, build workflows, connect to Codex, Claude Code, GitHub Copilot, Gemini, or use local models. 100% private, no cloud required.</p>
+                        <div class="hero-buttons">
+                            <a href="https://github.com/managedcode/dotPilot" class="btn btn-outline">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                </svg>
+                                View Source
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div class="social-links">
-                    <a href="https://www.youtube.com/@ManagedCode" target="_blank" class="social-link">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                        YouTube
-                    </a>
-                    <a href="https://github.com/managedcode/dotPilot" target="_blank" class="social-link">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
-                        GitHub
-                    </a>
-                    <a href="https://dotpilot.managed-code.com" target="_blank" class="social-link">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="2" y1="12" x2="22" y2="12"/>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                        </svg>
-                        Website
-                    </a>
+
+                <div class="hero-cards">
+                    <div class="hero-card hero-card-gradient">
+                        <div class="card-label">Built with Microsoft Agent Framework</div>
+                        <h3>Run multiple agents simultaneously</h3>
+                        <p>Each agent runs locally with its own context, tools, and capabilities. Sequential, parallel, and handoff patterns. Full control over your agent fleet.</p>
+                    </div>
+                    <div class="hero-card">
+                        <div class="card-label">100% Local Execution</div>
+                        <h3>Your data never leaves your machine</h3>
+                        <p>No cloud dependency. SQLite persistence. Full privacy and control. Connect to any provider or run completely offline.</p>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="philosophy">
+        <section id="features" class="section">
             <div class="container">
-                <div class="philosophy-content">
-                    <h2>Our Vision</h2>
-                    <p class="quote">"Intent becomes the interface"</p>
-                    <p>We believe the future of human-AI interaction is about expressing what you need, not clicking through interfaces. dotPilot is our experiment in building that future — a production-ready .NET application that proves modern, beautiful software can be built on the Microsoft stack.</p>
+                <div class="section-header">
+                    <h2>Everything you need to orchestrate AI agents locally.</h2>
                 </div>
-            </div>
-        </section>
-
-        <section id="features" class="features">
-            <div class="container">
-                <h2 class="section-title">What You Can Do</h2>
                 <div class="features-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">🤖</div>
+                        <div class="feature-number">1</div>
                         <h3>Run Multiple Agents</h3>
-                        <p>Launch and manage multiple AI agents simultaneously. Each agent runs locally with its own context, tools, and capabilities. Full control over your agent fleet.</p>
+                        <p>Launch and manage multiple AI agents simultaneously. Each agent runs locally with its own context, tools, and capabilities.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🔄</div>
+                        <div class="feature-number">2</div>
                         <h3>Build Workflows</h3>
-                        <p>Create agentic workflows using Microsoft Agent Framework. Sequential, parallel, handoff patterns. Orchestrate complex multi-agent tasks with streaming and checkpoints.</p>
+                        <p>Create agentic workflows using Microsoft Agent Framework. Sequential, parallel, handoff patterns with streaming and checkpoints.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🔌</div>
+                        <div class="feature-number">3</div>
                         <h3>Any Provider</h3>
-                        <p>Connect to Codex CLI, Claude Code, GitHub Copilot, Gemini through SDK integrations. Use your favorite AI providers or run completely local with LLamaSharp and ONNX.</p>
+                        <p>Connect to Codex CLI, Claude Code, GitHub Copilot, Gemini through SDK integrations. Or run completely local with LLamaSharp and ONNX.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🏠</div>
+                        <div class="feature-number">4</div>
                         <h3>100% Local</h3>
-                        <p>Everything runs on your machine. Your data never leaves your device. No cloud dependency. SQLite persistence. Full privacy and control.</p>
+                        <p>Everything runs on your machine. Your data never leaves your device. No cloud dependency. SQLite persistence. Full privacy.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">💬</div>
+                        <div class="feature-number">5</div>
                         <h3>Natural Language First</h3>
-                        <p>Create agents by describing what you need. Generate agent profiles, prompts, and tool configurations from natural language. Intent-driven interface.</p>
+                        <p>Create agents by describing what you need. Generate agent profiles, prompts, and tool configurations from natural language.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">📊</div>
+                        <div class="feature-number">6</div>
                         <h3>Observable</h3>
-                        <p>OpenTelemetry integration for tracing every agent action, tool call, and workflow step. Fleet board for real-time monitoring of all active sessions.</p>
+                        <p>OpenTelemetry integration for tracing every agent action, tool call, and workflow step. Fleet board for real-time monitoring.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="providers" class="providers">
+        <section id="providers" class="providers-section">
             <div class="container">
-                <h2 class="section-title">Supported Providers</h2>
+                <div class="section-header">
+                    <h2>Works with your favorite providers.</h2>
+                    <p>Connect to cloud providers or run completely local. No vendor lock-in, no compromises.</p>
+                </div>
                 <div class="providers-grid">
                     <span class="provider-badge">Codex CLI</span>
                     <span class="provider-badge">Claude Code</span>
@@ -807,35 +846,40 @@
             </div>
         </section>
 
-        <section id="downloads" class="downloads">
+        <section id="downloads" class="downloads-section">
             <div class="container">
-                <h2 class="section-title">Downloads</h2>
+                <div class="section-header">
+                    <h2>Download dotPilot.</h2>
+                    <p>Available for macOS, Windows, and Linux. Free and open source.</p>
+                </div>
                 <div class="download-cards">
                     <div class="download-card">
-                        <div class="icon">🍎</div>
+                        <div class="icon">&#63743;</div>
                         <h3>macOS</h3>
                         <p class="arch">Apple Silicon (arm64)</p>
-                        <a href="{{MACOS_URL}}" class="btn btn-primary">Download .dmg</a>
+                        <a href="{{MACOS_URL}}" class="btn btn-dark">Download .dmg</a>
                     </div>
                     <div class="download-card">
-                        <div class="icon">🪟</div>
+                        <div class="icon">&#8862;</div>
                         <h3>Windows</h3>
                         <p class="arch">x64</p>
-                        <a href="{{WINDOWS_URL}}" class="btn btn-primary">Download .exe</a>
+                        <a href="{{WINDOWS_URL}}" class="btn btn-dark">Download .exe</a>
                     </div>
                     <div class="download-card">
-                        <div class="icon">🐧</div>
+                        <div class="icon">&#9881;</div>
                         <h3>Linux</h3>
                         <p class="arch">x64 Snap Package</p>
-                        <a href="{{LINUX_URL}}" class="btn btn-primary">Download .snap</a>
+                        <a href="{{LINUX_URL}}" class="btn btn-dark">Download .snap</a>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section class="tech-stack">
+        <section class="tech-section">
             <div class="container">
-                <h2 class="section-title">Built With</h2>
+                <div class="section-header">
+                    <h2>Built with.</h2>
+                </div>
                 <div class="tech-grid">
                     <span class="tech-badge">C#</span>
                     <span class="tech-badge">.NET 10</span>
@@ -848,23 +892,47 @@
             </div>
         </section>
 
-        <section class="open-source">
+        <section class="cta-section">
             <div class="container">
-                <h2>Building in Public</h2>
-                <p>dotPilot is fully open source. Join us on GitHub, watch our progress on YouTube, share your feedback, and help shape the future of local AI agents.</p>
-                <div class="cta-buttons">
-                    <a href="https://github.com/managedcode/dotPilot" class="btn btn-primary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
-                        Star on GitHub
-                    </a>
-                    <a href="https://www.youtube.com/@ManagedCode" class="btn btn-secondary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                        Watch on YouTube
-                    </a>
+                <div class="cta-card">
+                    <h2>Building in public.</h2>
+                    <p>dotPilot is fully open source. Join us on GitHub, watch our progress on YouTube, and help shape the future of local AI agents.</p>
+                    <div class="cta-buttons">
+                        <a href="https://github.com/managedcode/dotPilot" class="btn btn-dark">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            Star on GitHub
+                        </a>
+                        <a href="https://www.youtube.com/@ManagedCode" class="btn btn-outline">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                            Watch on YouTube
+                        </a>
+                    </div>
+                    <div class="social-links">
+                        <a href="https://www.youtube.com/@ManagedCode" target="_blank" class="social-link">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                            YouTube
+                        </a>
+                        <a href="https://github.com/managedcode/dotPilot" target="_blank" class="social-link">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            GitHub
+                        </a>
+                        <a href="https://dotpilot.managed-code.com" target="_blank" class="social-link">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" y1="12" x2="22" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                            Website
+                        </a>
+                    </div>
                 </div>
             </div>
         </section>
@@ -879,7 +947,6 @@
                 <a href="https://github.com/managedcode/dotPilot/releases" target="_blank">Releases</a>
                 <a href="/sitemap.xml">Sitemap</a>
             </div>
-            <div class="footer-divider"></div>
             <p>
                 Open source project by <a href="https://managed-code.com" target="_blank">ManagedCode</a>
             </p>
