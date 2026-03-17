@@ -27,6 +27,9 @@ public sealed class SettingsModelTests
     [Test]
     public async Task ToggleSelectedProviderUpdatesProjectionToTheSelectedRealProvider()
     {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
         await using var fixture = CreateFixture();
         var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
         _ = await model.Providers;
