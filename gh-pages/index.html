@@ -59,8 +59,8 @@
     <meta name="apple-mobile-web-app-title" content="dotPilot">
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#FF7E5D">
-    <meta name="msapplication-TileColor" content="#FF7E5D">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="msapplication-TileColor" content="#2563eb">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,13 +179,16 @@
 
     <style>
         :root {
-            --color-accent: #FF7E5D;
-            --color-accent-hover: #ff9478;
-            --color-bg: #0a0a0a;
-            --color-bg-secondary: #141414;
-            --color-text: #ffffff;
-            --color-text-secondary: #a0a0a0;
-            --color-border: #2a2a2a;
+            --color-accent: #2563eb;
+            --color-accent-hover: #1d4ed8;
+            --color-accent-light: #dbeafe;
+            --color-bg: #ffffff;
+            --color-bg-secondary: #f8fafc;
+            --color-bg-tertiary: #f1f5f9;
+            --color-text: #0f172a;
+            --color-text-secondary: #64748b;
+            --color-border: #e2e8f0;
+            --color-border-hover: #cbd5e1;
             --font-family: 'Host Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
@@ -220,8 +223,8 @@
             left: 0;
             right: 0;
             z-index: 100;
-            background: rgba(10, 10, 10, 0.9);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--color-border);
         }
 
@@ -264,7 +267,7 @@
 
         .version-badge {
             background: var(--color-accent);
-            color: var(--color-bg);
+            color: #ffffff;
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 14px;
@@ -275,6 +278,7 @@
         .hero {
             padding: 160px 0 80px;
             text-align: center;
+            background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-secondary) 100%);
         }
 
         .hero h1 {
@@ -282,10 +286,11 @@
             font-weight: 700;
             margin-bottom: 24px;
             line-height: 1.1;
+            color: var(--color-text);
         }
 
         .hero h1 .highlight {
-            background: linear-gradient(120deg, var(--color-accent) 0%, #ff9478 100%);
+            background: linear-gradient(120deg, var(--color-accent) 0%, #3b82f6 50%, #6366f1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -318,7 +323,7 @@
             align-items: center;
             gap: 8px;
             padding: 16px 32px;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: 600;
             text-decoration: none;
@@ -327,22 +332,25 @@
 
         .btn-primary {
             background: var(--color-accent);
-            color: var(--color-bg);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
         }
 
         .btn-primary:hover {
             background: var(--color-accent-hover);
             transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
         }
 
         .btn-secondary {
-            background: transparent;
+            background: var(--color-bg);
             color: var(--color-text);
             border: 1px solid var(--color-border);
         }
 
         .btn-secondary:hover {
-            border-color: var(--color-text-secondary);
+            border-color: var(--color-border-hover);
+            background: var(--color-bg-secondary);
             transform: translateY(-2px);
         }
 
@@ -416,22 +424,23 @@
         }
 
         .feature-card {
-            background: var(--color-bg-secondary);
+            background: var(--color-bg);
             border: 1px solid var(--color-border);
             border-radius: 16px;
             padding: 32px;
-            transition: transform 0.3s, border-color 0.3s;
+            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
 
         .feature-card:hover {
             transform: translateY(-4px);
             border-color: var(--color-accent);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
         }
 
         .feature-icon {
             width: 48px;
             height: 48px;
-            background: linear-gradient(120deg, var(--color-accent) 0%, #ff9478 100%);
+            background: var(--color-accent-light);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -474,12 +483,13 @@
             font-size: 16px;
             font-weight: 500;
             color: var(--color-text);
-            transition: border-color 0.3s, transform 0.3s;
+            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
         }
 
         .provider-badge:hover {
             border-color: var(--color-accent);
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
         }
 
         /* Downloads Section */
@@ -496,17 +506,18 @@
         }
 
         .download-card {
-            background: var(--color-bg-secondary);
+            background: var(--color-bg);
             border: 1px solid var(--color-border);
             border-radius: 16px;
             padding: 32px;
             text-align: center;
-            transition: transform 0.3s, border-color 0.3s;
+            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
 
         .download-card:hover {
             transform: translateY(-4px);
             border-color: var(--color-accent);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
         }
 
         .download-card .icon {
@@ -573,12 +584,12 @@
             margin: 0 auto 32px;
         }
 
-        /* Footer - Light gradient style inspired by aibase.fr */
+        /* Footer */
         footer {
             padding: 60px 0 40px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #dee2e6 100%);
+            background: var(--color-bg-tertiary);
             text-align: center;
-            border-top: none;
+            border-top: 1px solid var(--color-border);
         }
 
         .footer-content {
@@ -596,7 +607,7 @@
         }
 
         .footer-links a {
-            color: #495057;
+            color: var(--color-text-secondary);
             text-decoration: none;
             font-weight: 500;
             font-size: 15px;
@@ -610,13 +621,13 @@
         .footer-divider {
             width: 60px;
             height: 3px;
-            background: linear-gradient(90deg, var(--color-accent), #ff9478);
+            background: linear-gradient(90deg, var(--color-accent), #6366f1);
             margin: 0 auto 24px;
             border-radius: 2px;
         }
 
         footer p {
-            color: #6c757d;
+            color: var(--color-text-secondary);
             font-size: 14px;
         }
 
@@ -632,7 +643,7 @@
 
         .footer-copyright {
             margin-top: 16px;
-            color: #868e96;
+            color: #94a3b8;
             font-size: 13px;
         }
 
