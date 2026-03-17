@@ -213,6 +213,7 @@ For this app:
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners
 - desktop release assets must be native installable or directly executable outputs for each OS, not archives of raw publish folders; package the real `.exe`, `.snap`, `.dmg`, `.pkg`, `Setup.exe`, or equivalent runnable installer/app artifact instead of zipping intermediate publish directories
 - desktop release versions must use the `ApplicationDisplayVersion` value in `DotPilot/DotPilot.csproj` as a manually maintained two-segment prefix, with CI appending the final segment from the build number (for example `0.0.<build-number>`)
+- until the user explicitly changes the versioning policy, the manually maintained `ApplicationDisplayVersion` prefix for desktop releases must stay `0.0`, not `1.0`
 - the release workflow must not take ownership of the first two version segments; those remain manually edited in source, while CI supplies only the last numeric segment and matching release tag/application version values
 - for CI and release automation in this solution, prefer existing `dotnet` and `MSBuild` capabilities plus small workflow-native steps over Python or adding a separate helper project for simple versioning and release-note tasks
 - prefer MIT-licensed GitHub and NuGet dependencies when they materially accelerate delivery and align with the current architecture

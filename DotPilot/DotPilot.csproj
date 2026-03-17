@@ -12,7 +12,7 @@
         <!-- App Identifier -->
         <ApplicationId>com.companyname.DotPilot</ApplicationId>
         <!-- Versions -->
-        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationDisplayVersion>0.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
         <!-- Package Publisher -->
         <ApplicationPublisher>O=DotPilot</ApplicationPublisher>
