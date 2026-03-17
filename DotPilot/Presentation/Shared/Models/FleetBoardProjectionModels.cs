@@ -1,4 +1,4 @@
-using DotPilot.Core.ControlPlaneDomain;
+using DotPilot.Core;
 using Microsoft.UI.Xaml.Data;
 
 namespace DotPilot.Presentation;

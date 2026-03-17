@@ -241,7 +241,7 @@ jobs:
         shell: bash
         working-directory: ./DotPilot
         run: |
-          dotnet publish DotPilot.csproj \
+          sudo dotnet publish DotPilot.csproj \
             -c Release \
             -f net10.0-desktop \
             -r linux-x64 \
@@ -253,6 +253,8 @@ jobs:
             -p:UnoSnapcraftAdditionalParameters=--destructive-mode \
             -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
             -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
+
+          sudo chown -R "$USER:$USER" ./bin/Release/net10.0-desktop/linux-x64
 
       - name: Stage Linux Release Asset
         shell: bash

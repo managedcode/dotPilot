@@ -4,7 +4,7 @@ namespace DotPilot.UITests.Harness;
 public sealed class BrowserTestHostTests
 {
     [Test]
-    public void RunArgumentsKeepUiAutomationEnabledWithoutDisablingBuildChecks()
+    public void RunArgumentsReuseThePrebuiltUiAutomationBrowserHost()
     {
         const string projectPath = "/repo/DotPilot/DotPilot.csproj";
 
@@ -18,7 +18,7 @@ public sealed class BrowserTestHostTests
         Assert.That(arguments, Does.Contain("-p:IsUiAutomationMappingEnabled=True"));
         Assert.That(arguments, Does.Contain("--project"));
         Assert.That(arguments, Does.Contain(projectPath));
+        Assert.That(arguments, Does.Contain("--no-build"));
         Assert.That(arguments, Does.Contain("--no-launch-profile"));
-        Assert.That(arguments, Does.Not.Contain("--no-build"));
     }
 }

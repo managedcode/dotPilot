@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using DotPilot.Core.ChatSessions;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,14 +13,14 @@ internal static class AgentProviderStatusSnapshotReader
     private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
     private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
     private const string ReadySummaryFormat = "{0} CLI is ready for local desktop execution.";
-    private const string ProfileAuthoringAvailableSummaryFormat =
-        "{0} profile authoring is available, but live desktop execution is not available in this app yet.";
+    private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan RedirectDrainTimeout = TimeSpan.FromSeconds(1);
+    private const string VersionSeparator = "version";
+    private const string EmptyOutput = "";
     private static readonly System.Text.CompositeFormat MissingCliSummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(MissingCliSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadySummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(ReadySummaryFormat);
-    private static readonly System.Text.CompositeFormat ProfileAuthoringAvailableCompositeFormat =
-        System.Text.CompositeFormat.Parse(ProfileAuthoringAvailableSummaryFormat);
 
     public static async Task<IReadOnlyList<ProviderStatusProbeResult>> BuildAsync(
         LocalAgentSessionDbContext dbContext,
@@ -30,18 +32,18 @@ internal static class AgentProviderStatusSnapshotReader
             .ToDictionaryAsync(
                 preference => (AgentProviderKind)preference.ProviderKind,
                 cancellationToken);
-        var profiles = AgentSessionProviderCatalog.All;
+        var providerKinds = Enum.GetValues<AgentProviderKind>();
 
         return await Task.Run(
             async () =>
             {
-                List<ProviderStatusProbeResult> results = new(profiles.Count);
-                foreach (var profile in profiles)
+                List<ProviderStatusProbeResult> results = new(providerKinds.Length);
+                foreach (var providerKind in providerKinds)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     results.Add(await BuildProviderStatusAsync(
-                        profile,
-                        GetProviderPreference(profile.Kind, preferences),
+                        providerKind,
+                        GetProviderPreference(providerKind, preferences),
                         cancellationToken).ConfigureAwait(false));
                 }
 
@@ -65,76 +67,72 @@ internal static class AgentProviderStatusSnapshotReader
     }
 
     private static async ValueTask<ProviderStatusProbeResult> BuildProviderStatusAsync(
-        AgentSessionProviderProfile profile,
+        AgentProviderKind providerKind,
         ProviderPreferenceRecord preference,
         CancellationToken cancellationToken)
     {
-        var providerId = AgentSessionDeterministicIdentity.CreateProviderId(profile.CommandName);
+        var isBuiltIn = providerKind.IsBuiltIn();
+        var commandName = providerKind.GetCommandName();
+        var displayName = providerKind.GetDisplayName();
+        var defaultModelName = isBuiltIn ? providerKind.GetDefaultModelName() : string.Empty;
+        var installCommand = providerKind.GetInstallCommand();
+        var fallbackModels = isBuiltIn ? providerKind.GetSupportedModelNames() : [];
+        var providerId = AgentSessionDeterministicIdentity.CreateProviderId(commandName);
         var actions = new List<ProviderActionDescriptor>();
         var details = new List<ProviderDetailDescriptor>();
         string? executablePath = null;
-        var installedVersion = profile.IsBuiltIn ? profile.DefaultModelName : (string?)null;
-        var suggestedModelName = profile.DefaultModelName;
+        var installedVersion = isBuiltIn ? defaultModelName : (string?)null;
+        var suggestedModelName = defaultModelName;
         var supportedModelNames = ResolveSupportedModels(
-            profile.DefaultModelName,
-            profile.DefaultModelName,
-            profile.SupportedModelNames,
+            defaultModelName,
+            defaultModelName,
+            fallbackModels,
             []);
         var status = AgentProviderStatus.Ready;
         var statusSummary = BuiltInStatusSummary;
-        var canCreateAgents = profile.IsBuiltIn;
+        var canCreateAgents = isBuiltIn;
 
-        if (OperatingSystem.IsBrowser() && !profile.IsBuiltIn)
+        if (OperatingSystem.IsBrowser() && !isBuiltIn)
         {
-            details.Add(new ProviderDetailDescriptor("Install command", profile.InstallCommand));
-            actions.Add(new ProviderActionDescriptor("Install", "Run this on desktop.", profile.InstallCommand));
+            details.Add(new ProviderDetailDescriptor("Install command", installCommand));
+            actions.Add(new ProviderActionDescriptor("Install", "Run this on desktop.", installCommand));
             status = AgentProviderStatus.Unsupported;
             statusSummary = BrowserStatusSummary;
             canCreateAgents = preference.IsEnabled;
         }
-        else if (!profile.IsBuiltIn)
+        else if (!isBuiltIn)
         {
-            executablePath = AgentSessionCommandProbe.ResolveExecutablePath(profile.CommandName);
+            executablePath = ResolveExecutablePath(commandName);
             if (string.IsNullOrWhiteSpace(executablePath))
             {
-                details.Add(new ProviderDetailDescriptor("Install command", profile.InstallCommand));
-                actions.Add(new ProviderActionDescriptor("Install", "Install the CLI, then refresh settings.", profile.InstallCommand));
+                details.Add(new ProviderDetailDescriptor("Install command", installCommand));
+                actions.Add(new ProviderActionDescriptor("Install", "Install the CLI, then refresh settings.", installCommand));
                 status = AgentProviderStatus.RequiresSetup;
-                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, MissingCliSummaryCompositeFormat, profile.DisplayName);
+                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, MissingCliSummaryCompositeFormat, displayName);
                 canCreateAgents = false;
             }
             else
             {
-                var metadata = await ResolveMetadataAsync(profile, executablePath, cancellationToken).ConfigureAwait(false);
+                var metadata = await ResolveMetadataAsync(providerKind, executablePath, cancellationToken).ConfigureAwait(false);
                 installedVersion = metadata.InstalledVersion;
-                if (!LooksLikeInstalledVersion(installedVersion, profile.CommandName))
+                if (!LooksLikeInstalledVersion(installedVersion, commandName))
                 {
-                    installedVersion = AgentSessionCommandProbe.ReadVersion(executablePath, ["--version"]);
+                    installedVersion = ReadVersion(executablePath, ["--version"]);
                 }
 
-                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{profile.CommandName} --version"));
-                suggestedModelName = ResolveSuggestedModel(profile.DefaultModelName, metadata.SuggestedModelName);
+                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{commandName} --version"));
+                suggestedModelName = ResolveSuggestedModel(
+                    defaultModelName,
+                    metadata.SuggestedModelName,
+                    metadata.SupportedModels);
                 supportedModelNames = ResolveSupportedModels(
-                    profile.DefaultModelName,
+                    defaultModelName,
                     suggestedModelName,
-                    profile.SupportedModelNames,
+                    fallbackModels,
                     metadata.SupportedModels);
                 details.AddRange(CreateProviderDetails(installedVersion, suggestedModelName, supportedModelNames));
-
-                if (profile.SupportsLiveExecution)
-                {
-                    statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadySummaryCompositeFormat, profile.DisplayName);
-                    canCreateAgents = true;
-                }
-                else
-                {
-                    status = AgentProviderStatus.Unsupported;
-                    statusSummary = string.Format(
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        ProfileAuthoringAvailableCompositeFormat,
-                        profile.DisplayName);
-                    canCreateAgents = true;
-                }
+                statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, ReadySummaryCompositeFormat, displayName);
+                canCreateAgents = true;
             }
         }
 
@@ -148,9 +146,9 @@ internal static class AgentProviderStatusSnapshotReader
         return new ProviderStatusProbeResult(
             new ProviderStatusDescriptor(
                 providerId,
-                profile.Kind,
-                profile.DisplayName,
-                profile.CommandName,
+                providerKind,
+                displayName,
+                commandName,
                 status,
                 statusSummary,
                 suggestedModelName,
@@ -164,17 +162,16 @@ internal static class AgentProviderStatusSnapshotReader
     }
 
     private static async ValueTask<ProviderCliMetadataSnapshot> ResolveMetadataAsync(
-        AgentSessionProviderProfile profile,
+        AgentProviderKind providerKind,
         string executablePath,
         CancellationToken cancellationToken)
     {
-        return profile.Kind switch
+        return providerKind switch
         {
             AgentProviderKind.Codex => CreateCodexSnapshot(CodexCliMetadataReader.TryRead(executablePath)),
-            AgentProviderKind.ClaudeCode => ClaudeCodeCliMetadataReader.TryRead(executablePath, profile),
+            AgentProviderKind.ClaudeCode => ClaudeCodeCliMetadataReader.TryRead(executablePath),
             AgentProviderKind.GitHubCopilot => await CopilotCliMetadataReader.TryReadAsync(
                 executablePath,
-                profile,
                 cancellationToken).ConfigureAwait(false),
             _ => new ProviderCliMetadataSnapshot(null, null, []),
         };
@@ -188,11 +185,20 @@ internal static class AgentProviderStatusSnapshotReader
             metadata?.AvailableModels ?? []);
     }
 
-    private static string ResolveSuggestedModel(string defaultModelName, string? suggestedModelName)
+    private static string ResolveSuggestedModel(
+        string defaultModelName,
+        string? suggestedModelName,
+        IReadOnlyList<string> discoveredModels)
     {
-        return string.IsNullOrWhiteSpace(suggestedModelName)
+        if (!string.IsNullOrWhiteSpace(suggestedModelName))
+        {
+            return suggestedModelName;
+        }
+
+        var discoveredModel = discoveredModels.FirstOrDefault(static model => !string.IsNullOrWhiteSpace(model));
+        return string.IsNullOrWhiteSpace(discoveredModel)
             ? defaultModelName
-            : suggestedModelName;
+            : discoveredModel;
     }
 
     private static bool LooksLikeInstalledVersion(string? installedVersion, string commandName)
@@ -250,7 +256,10 @@ internal static class AgentProviderStatusSnapshotReader
             details.Add(new ProviderDetailDescriptor("Installed version", installedVersion));
         }
 
-        details.Add(new ProviderDetailDescriptor("Suggested model", suggestedModelName));
+        if (!string.IsNullOrWhiteSpace(suggestedModelName))
+        {
+            details.Add(new ProviderDetailDescriptor("Suggested model", suggestedModelName));
+        }
 
         var supportedModels = FormatSupportedModels(supportedModelNames);
         if (!string.IsNullOrWhiteSpace(supportedModels))
@@ -287,5 +296,193 @@ internal static class AgentProviderStatusSnapshotReader
         return remaining > 0
             ? $"{summary} (+{remaining} more)"
             : summary;
+    }
+
+    private static string? ResolveExecutablePath(string commandName)
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            return null;
+        }
+
+        var searchPaths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var searchPath in searchPaths)
+        {
+            foreach (var candidate in EnumerateCandidates(searchPath, commandName))
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string ReadVersion(string executablePath, IReadOnlyList<string> arguments)
+    {
+        var output = ReadOutput(executablePath, arguments);
+        var firstLine = output
+            .Split(Environment.NewLine, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return EmptyOutput;
+        }
+
+        var separatorIndex = firstLine.IndexOf(VersionSeparator, StringComparison.OrdinalIgnoreCase);
+        return separatorIndex >= 0
+            ? firstLine[(separatorIndex + VersionSeparator.Length)..].Trim(' ', ':')
+            : firstLine.Trim();
+    }
+
+    private static string ReadOutput(string executablePath, IReadOnlyList<string> arguments)
+    {
+        var execution = Execute(executablePath, arguments);
+        if (!execution.Succeeded)
+        {
+            return EmptyOutput;
+        }
+
+        return string.IsNullOrWhiteSpace(execution.StandardOutput)
+            ? execution.StandardError
+            : execution.StandardOutput;
+    }
+
+    private static ToolchainCommandExecution Execute(string executablePath, IReadOnlyList<string> arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executablePath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        Process? process;
+        try
+        {
+            process = Process.Start(startInfo);
+        }
+        catch
+        {
+            return ToolchainCommandExecution.LaunchFailed;
+        }
+
+        if (process is null)
+        {
+            return ToolchainCommandExecution.LaunchFailed;
+        }
+
+        using (process)
+        {
+            var standardOutputTask = ObserveRedirectedStream(process.StandardOutput.ReadToEndAsync());
+            var standardErrorTask = ObserveRedirectedStream(process.StandardError.ReadToEndAsync());
+
+            if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
+            {
+                TryTerminate(process);
+                WaitForTermination(process);
+
+                return new ToolchainCommandExecution(
+                    true,
+                    false,
+                    AwaitStreamRead(standardOutputTask),
+                    AwaitStreamRead(standardErrorTask));
+            }
+
+            return new ToolchainCommandExecution(
+                true,
+                process.ExitCode == 0,
+                AwaitStreamRead(standardOutputTask),
+                AwaitStreamRead(standardErrorTask));
+        }
+    }
+
+    private static IEnumerable<string> EnumerateCandidates(string searchPath, string commandName)
+    {
+        yield return Path.Combine(searchPath, commandName);
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            yield break;
+        }
+
+        foreach (var extension in (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT")
+                     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            yield return Path.Combine(searchPath, string.Concat(commandName, extension));
+        }
+    }
+
+    private static Task<string> ObserveRedirectedStream(Task<string> readTask)
+    {
+        _ = readTask.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return readTask;
+    }
+
+    private static string AwaitStreamRead(Task<string> readTask)
+    {
+        try
+        {
+            if (!readTask.Wait(RedirectDrainTimeout))
+            {
+                return EmptyOutput;
+            }
+
+            return readTask.GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return EmptyOutput;
+        }
+    }
+
+    private static void TryTerminate(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void WaitForTermination(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.WaitForExit((int)RedirectDrainTimeout.TotalMilliseconds);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private readonly record struct ToolchainCommandExecution(bool Launched, bool Succeeded, string StandardOutput, string StandardError)
+    {
+        public static ToolchainCommandExecution LaunchFailed => new(false, false, EmptyOutput, EmptyOutput);
     }
 }

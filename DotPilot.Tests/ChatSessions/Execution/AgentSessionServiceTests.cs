@@ -1,6 +1,6 @@
+using DotPilot.Core;
 using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
-using DotPilot.Core.ControlPlaneDomain;
 using DotPilot.Tests.Providers;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;

@@ -12,7 +12,10 @@ public class TestBase
 {
     private const string AttachedAppCleanupOperationName = "attached app";
     private const string BrowserAppCleanupOperationName = "browser app";
+    private const string BrowserProfileCleanupOperationName = "browser profile";
     private const string BrowserHostCleanupOperationName = "browser host";
+    private const string BrowserDisableServiceWorkerArgument = "--disable-service-worker";
+    private const string BrowserProfileDirectoryPrefix = "dotpilot-uitest-browser-";
     private const string ShowBrowserEnvironmentVariableName = "DOTPILOT_UITEST_SHOW_BROWSER";
     private const string BrowserWindowSizeArgumentPrefix = "--window-size=";
     private const int BrowserWindowWidth = 1440;
@@ -27,6 +30,7 @@ public class TestBase
             : null;
     private static readonly bool _browserHeadless = ResolveBrowserHeadless();
     private IApp? _app;
+    private string? _browserProfileDirectory;
 
     static TestBase()
     {
@@ -70,8 +74,14 @@ public class TestBase
     public void SetUpTest()
     {
         HarnessLog.Write($"Starting setup for '{TestContext.CurrentContext.Test.Name}'.");
+        if (Constants.CurrentPlatform == UITestPlatform.Browser)
+        {
+            BrowserTestHost.EnsureStarted(Constants.WebAssemblyDefaultUri);
+            _browserProfileDirectory = CreateBrowserProfileDirectory();
+        }
+
         App = Constants.CurrentPlatform == UITestPlatform.Browser
-            ? StartBrowserApp(_browserAutomation!)
+            ? StartBrowserApp(_browserAutomation!, _browserProfileDirectory!)
             : AppInitializer.AttachToApp();
         HarnessLog.Write($"Setup completed for '{TestContext.CurrentContext.Test.Name}'.");
     }
@@ -96,6 +106,17 @@ public class TestBase
         }
 
         _app = null;
+
+        if (Constants.CurrentPlatform == UITestPlatform.Browser && !string.IsNullOrWhiteSpace(_browserProfileDirectory))
+        {
+            var browserProfileDirectory = _browserProfileDirectory;
+            TryCleanup(
+                () => CleanupBrowserProfileDirectory(browserProfileDirectory),
+                BrowserProfileCleanupOperationName,
+                cleanupFailures);
+        }
+
+        _browserProfileDirectory = null;
 
         if (cleanupFailures.Count == 1)
         {
@@ -2760,7 +2781,7 @@ public class TestBase
 #endif
     }
 
-    private static IApp StartBrowserApp(BrowserAutomationSettings browserAutomation)
+    private static IApp StartBrowserApp(BrowserAutomationSettings browserAutomation, string browserProfileDirectory)
     {
         HarnessLog.Write("Starting browser app instance.");
         var configurator = Uno.UITest.Selenium.ConfigureApp.WebAssembly
@@ -2770,6 +2791,8 @@ public class TestBase
             .ScreenShotsPath(AppContext.BaseDirectory)
             .WindowSize(BrowserWindowWidth, BrowserWindowHeight)
             .SeleniumArgument($"{BrowserWindowSizeArgumentPrefix}{BrowserWindowWidth},{BrowserWindowHeight}")
+            .SeleniumArgument(BrowserDisableServiceWorkerArgument)
+            .SeleniumArgument($"--user-data-dir={browserProfileDirectory}")
             .Headless(_browserHeadless);
 
         configurator = configurator.DriverPath(browserAutomation.DriverPath);
@@ -2782,6 +2805,25 @@ public class TestBase
         var browserApp = configurator.StartApp();
         HarnessLog.Write("Browser app instance started.");
         return browserApp;
+    }
+
+    private static string CreateBrowserProfileDirectory()
+    {
+        var browserProfileDirectory = Path.Combine(
+            Path.GetTempPath(),
+            string.Concat(BrowserProfileDirectoryPrefix, Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(browserProfileDirectory);
+        return browserProfileDirectory;
+    }
+
+    private static void CleanupBrowserProfileDirectory(string? browserProfileDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(browserProfileDirectory) || !Directory.Exists(browserProfileDirectory))
+        {
+            return;
+        }
+
+        Directory.Delete(browserProfileDirectory, recursive: true);
     }
 
     private static void TryCleanup(Action cleanupAction, string operationName, List<Exception> cleanupFailures)

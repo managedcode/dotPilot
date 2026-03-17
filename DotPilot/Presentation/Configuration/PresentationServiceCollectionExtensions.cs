@@ -10,6 +10,7 @@ internal static class PresentationServiceCollectionExtensions
 
         services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddSingleton<ShellNavigationNotifier>();
+        services.AddSingleton<SessionSelectionNotifier>();
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddSingleton<UiDispatcher>();
         services.AddSingleton<DesktopSleepPreventionService>();

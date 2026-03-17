@@ -9,10 +9,9 @@ internal static class ClaudeCodeCliMetadataReader
     private const string SettingsFileName = "settings.json";
     private const string SuggestedModelPropertyName = "model";
 
-    public static ProviderCliMetadataSnapshot TryRead(string executablePath, AgentSessionProviderProfile profile)
+    public static ProviderCliMetadataSnapshot TryRead(string executablePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
-        ArgumentNullException.ThrowIfNull(profile);
 
         var configuredModel = ReadSuggestedModelFromSettings();
         try
@@ -36,7 +35,7 @@ internal static class ClaudeCodeCliMetadataReader
             return new ProviderCliMetadataSnapshot(
                 InstalledVersion: null,
                 configuredModel,
-                profile.SupportedModelNames);
+                AgentProviderKind.ClaudeCode.GetSupportedModelNames());
         }
     }
 

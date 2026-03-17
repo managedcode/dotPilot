@@ -1,4 +1,3 @@
-using DotPilot.Core.ControlPlaneDomain;
 
 namespace DotPilot.Core.ChatSessions.Contracts;
 

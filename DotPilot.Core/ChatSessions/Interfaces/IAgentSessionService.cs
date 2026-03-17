@@ -1,4 +1,3 @@
-using DotPilot.Core.ControlPlaneDomain;
 using ManagedCode.Communication;
 
 namespace DotPilot.Core.ChatSessions.Interfaces;

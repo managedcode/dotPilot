@@ -8,29 +8,47 @@ namespace DotPilot.Tests.Settings;
 public sealed class SettingsModelTests
 {
     [Test]
-    public async Task ToggleSelectedProviderUpdatesProjectionToEnabledDebugProvider()
+    public async Task ProvidersExposeOnlyTheThreeRealConsoleProvidersAndDefaultToCodex()
     {
         await using var fixture = CreateFixture();
         var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
 
         var providers = await model.Providers;
-        providers.Should().ContainSingle(provider => provider.Kind == AgentProviderKind.Debug);
-        (await model.SelectedProviderTitle).Should().Be("Debug Provider");
-        (await model.ToggleActionLabel).Should().Be("Disable provider");
+        providers.Select(provider => provider.Kind).Should().ContainInOrder(
+            AgentProviderKind.Codex,
+            AgentProviderKind.ClaudeCode,
+            AgentProviderKind.GitHubCopilot);
+        providers.Should().OnlyContain(provider => provider.Kind != AgentProviderKind.Debug);
+        (await model.SelectedProviderTitle).Should().Be("Codex");
+        (await model.ToggleActionLabel).Should().Be("Enable provider");
         (await model.CanToggleSelectedProvider).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ToggleSelectedProviderUpdatesProjectionToTheSelectedRealProvider()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("codex", "codex version 1.0.0");
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+        _ = await model.Providers;
 
         await model.ToggleSelectedProvider(CancellationToken.None);
 
-        (await model.SelectedProviderTitle).Should().Be("Debug Provider");
-        (await model.ToggleActionLabel).Should().Be("Enable provider");
+        (await model.SelectedProviderTitle).Should().Be("Codex");
+        (await model.ToggleActionLabel).Should().Be("Disable provider");
         (await model.SelectedProvider).Should().NotBeNull();
-        (await model.SelectedProvider)!.IsEnabled.Should().BeFalse();
+        (await model.SelectedProvider)!.IsEnabled.Should().BeTrue();
 
         var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
         workspace.Providers.Should().ContainSingle(provider =>
+            provider.Kind == AgentProviderKind.Codex &&
+            provider.IsEnabled &&
+            provider.CanCreateAgents);
+        workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
-            !provider.IsEnabled &&
-            !provider.CanCreateAgents);
+            provider.IsEnabled);
     }
 
     [Test]
@@ -69,7 +87,7 @@ public sealed class SettingsModelTests
         var details = await model.SelectedProviderDetails;
         details.Should().Contain(detail => detail.Label == "Installed version" && detail.Value == "1.0.3");
         details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4.6");
-        details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("gpt-5", StringComparison.Ordinal));
+        details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value == "claude-opus-4.6");
     }
 
     [Test]
@@ -92,7 +110,9 @@ public sealed class SettingsModelTests
         var details = await model.SelectedProviderDetails;
         details.Should().Contain(detail => detail.Label == "Installed version" && detail.Value == "2.0.75");
         details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4-6");
-        details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("claude-sonnet-4-5", StringComparison.Ordinal));
+        details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("claude-opus-4-6", StringComparison.Ordinal));
     }
 
     [Test]

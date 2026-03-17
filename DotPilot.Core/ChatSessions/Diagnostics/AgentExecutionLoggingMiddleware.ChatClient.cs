@@ -10,7 +10,16 @@ internal sealed partial class AgentExecutionLoggingMiddleware
     {
         ArgumentNullException.ThrowIfNull(chatClient);
 
-        return chatClient
+        var bridgedChatClient = ShouldBridgeSystemInstructions(runContext.ProviderKind)
+            ? chatClient
+                .AsBuilder()
+                .Use(
+                    getResponseFunc: BridgeInstructionsAsync,
+                    getStreamingResponseFunc: BridgeStreamingInstructionsAsync)
+                .Build()
+            : chatClient;
+
+        return bridgedChatClient
             .AsBuilder()
             .Use(
                 getResponseFunc: (messages, options, innerChatClient, cancellationToken) =>
@@ -28,6 +37,11 @@ internal sealed partial class AgentExecutionLoggingMiddleware
                         innerChatClient,
                         cancellationToken))
             .Build();
+    }
+
+    private static bool ShouldBridgeSystemInstructions(AgentProviderKind providerKind)
+    {
+        return providerKind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode;
     }
 
     private async Task<ChatResponse> LogChatResponseAsync(
@@ -183,4 +197,66 @@ internal sealed partial class AgentExecutionLoggingMiddleware
                 stopwatch.Elapsed.TotalMilliseconds);
         }
     }
+
+    private static Task<ChatResponse> BridgeInstructionsAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
+        IChatClient innerChatClient,
+        CancellationToken cancellationToken)
+    {
+        var materializedMessages = MaterializeMessages(messages);
+        var bridgedRequest = CreateBridgedInstructionRequest(materializedMessages, options);
+        return innerChatClient.GetResponseAsync(
+            bridgedRequest.Messages,
+            bridgedRequest.Options,
+            cancellationToken);
+    }
+
+    private static IAsyncEnumerable<ChatResponseUpdate> BridgeStreamingInstructionsAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
+        IChatClient innerChatClient,
+        CancellationToken cancellationToken)
+    {
+        var materializedMessages = MaterializeMessages(messages);
+        var bridgedRequest = CreateBridgedInstructionRequest(materializedMessages, options);
+        return innerChatClient.GetStreamingResponseAsync(
+            bridgedRequest.Messages,
+            bridgedRequest.Options,
+            cancellationToken);
+    }
+
+    private static BridgedInstructionRequest CreateBridgedInstructionRequest(
+        IReadOnlyList<ChatMessage> messages,
+        ChatOptions? options)
+    {
+        if (options is null || string.IsNullOrWhiteSpace(options.Instructions))
+        {
+            return new BridgedInstructionRequest(messages, options);
+        }
+
+        var bridgedOptions = options.Clone();
+        var instructions = bridgedOptions.Instructions!.Trim();
+        bridgedOptions.Instructions = null;
+
+        if (messages.Any(message =>
+                message.Role == ChatRole.System &&
+                string.Equals(message.Text?.Trim(), instructions, StringComparison.Ordinal)))
+        {
+            return new BridgedInstructionRequest(messages, bridgedOptions);
+        }
+
+        var bridgedMessages = new ChatMessage[messages.Count + 1];
+        bridgedMessages[0] = new ChatMessage(ChatRole.System, instructions);
+        for (var index = 0; index < messages.Count; index++)
+        {
+            bridgedMessages[index + 1] = messages[index];
+        }
+
+        return new BridgedInstructionRequest(bridgedMessages, bridgedOptions);
+    }
+
+    private sealed record BridgedInstructionRequest(
+        IReadOnlyList<ChatMessage> Messages,
+        ChatOptions? Options);
 }

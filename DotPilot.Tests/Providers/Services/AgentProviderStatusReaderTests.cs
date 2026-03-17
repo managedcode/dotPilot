@@ -127,7 +127,7 @@ public sealed class AgentProviderStatusReaderTests
     }
 
     [Test]
-    public async Task EnabledExternalProviderWithoutLiveRuntimeStillAllowsProfileAuthoring()
+    public async Task EnabledCopilotProviderReportsReadyRuntimeAndSuggestedModels()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
         commandScope.WriteVersionCommand("copilot", "copilot version 0.0.421");
@@ -140,18 +140,17 @@ public sealed class AgentProviderStatusReaderTests
 
         provider.IsEnabled.Should().BeTrue();
         provider.CanCreateAgents.Should().BeTrue();
-        provider.Status.Should().Be(AgentProviderStatus.Unsupported);
-        provider.StatusSummary.Should().Contain("profile authoring is available");
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("ready for local desktop execution");
         provider.InstalledVersion.Should().Be("0.0.421");
         provider.SuggestedModelName.Should().Be("claude-opus-4.6");
-        provider.SupportedModelNames.Should().Contain("gpt-5");
-        provider.SupportedModelNames.Should().Contain("claude-opus-4.6");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("claude-opus-4.6");
         provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4.6");
-        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("gpt-5", StringComparison.Ordinal));
+        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value == "claude-opus-4.6");
     }
 
     [Test]
-    public async Task EnabledClaudeProviderWithoutLiveRuntimeProjectsSuggestedAndSupportedModels()
+    public async Task EnabledClaudeProviderReportsReadyRuntimeAndSuggestedModels()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
         commandScope.WriteVersionCommand("claude", "claude version 2.0.75");
@@ -164,14 +163,15 @@ public sealed class AgentProviderStatusReaderTests
 
         provider.IsEnabled.Should().BeTrue();
         provider.CanCreateAgents.Should().BeTrue();
-        provider.Status.Should().Be(AgentProviderStatus.Unsupported);
-        provider.StatusSummary.Should().Contain("profile authoring is available");
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("ready for local desktop execution");
         provider.InstalledVersion.Should().Be("2.0.75");
         provider.SuggestedModelName.Should().Be("claude-opus-4-6");
-        provider.SupportedModelNames.Should().Contain("claude-sonnet-4-5");
         provider.SupportedModelNames.Should().Contain("claude-opus-4-6");
         provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "claude-opus-4-6");
-        provider.Details.Should().Contain(detail => detail.Label == "Supported models" && detail.Value.Contains("claude-sonnet-4-5", StringComparison.Ordinal));
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("claude-opus-4-6", StringComparison.Ordinal));
     }
 
     [Test]

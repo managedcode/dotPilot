@@ -3,9 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>dotPilot - Local Agent Orchestrator for .NET</title>
-    <meta name="description" content="Open source local agent orchestrator built with C# and .NET. Run multiple AI agents locally, build workflows, connect to Codex, Claude Code, GitHub Copilot, Gemini, or local models. Powered by Microsoft Agent Framework.">
-    <meta name="keywords" content="AI agents, agent orchestrator, Microsoft Agent Framework, .NET, C#, Uno Platform, local AI, Codex, Claude Code, GitHub Copilot, LLamaSharp, ONNX, agentic workflows, open source">
+    <title>dotPilot - Local Agent Orchestrator for .NET | Run AI Agents Locally</title>
+    <meta name="description" content="Open source local agent orchestrator built with C# and .NET. Run multiple AI agents locally, build workflows, connect to Codex, Claude Code, GitHub Copilot, Gemini, or local models. Powered by Microsoft Agent Framework. 100% private, no cloud required.">
+    <meta name="keywords" content="AI agents, agent orchestrator, Microsoft Agent Framework, .NET, C#, Uno Platform, local AI, Codex, Claude Code, GitHub Copilot, LLamaSharp, ONNX, agentic workflows, open source, AI desktop app, private AI, local LLM, multi-agent system">
+
+    <!-- SEO Meta Tags -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="author" content="ManagedCode">
+    <meta name="publisher" content="ManagedCode">
+    <link rel="canonical" href="https://dotpilot.managed-code.com">
+
+    <!-- GEO Meta Tags -->
+    <meta name="geo.region" content="UA">
+    <meta name="geo.placename" content="Ukraine">
+    <meta name="ICBM" content="50.4501, 30.5234">
+
+    <!-- AEO / Answer Engine Optimization -->
+    <meta name="subject" content="AI Agent Orchestration Software">
+    <meta name="topic" content="Local AI Agent Platform">
+    <meta name="summary" content="dotPilot is a free, open-source desktop application that lets you run multiple AI agents locally on your machine with full privacy.">
+    <meta name="abstract" content="Desktop platform for running AI agents locally. Supports Codex CLI, Claude Code, GitHub Copilot, Gemini, OpenAI, and local models via LLamaSharp and ONNX.">
+    <meta name="classification" content="Software, AI Tools, Developer Tools">
+    <meta name="category" content="AI Software">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-SLJPG729D3"></script>
@@ -17,15 +36,146 @@
     </script>
 
     <!-- Open Graph -->
-    <meta property="og:title" content="dotPilot - Local Agent Orchestrator">
-    <meta property="og:description" content="Open source local agent orchestrator. Run AI agents locally, build workflows, connect to any provider. Built with .NET and Microsoft Agent Framework.">
+    <meta property="og:title" content="dotPilot - Local Agent Orchestrator for .NET">
+    <meta property="og:description" content="Open source local agent orchestrator. Run AI agents locally, build workflows, connect to any provider. Built with .NET and Microsoft Agent Framework. 100% private.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://dotpilot.managed-code.com">
+    <meta property="og:site_name" content="dotPilot">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://dotpilot.managed-code.com/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="dotPilot - Local Agent Orchestrator">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="dotPilot - Local Agent Orchestrator for .NET">
+    <meta name="twitter:description" content="Open source desktop platform for running multiple AI agents locally. Full privacy, no cloud required.">
+    <meta name="twitter:image" content="https://dotpilot.managed-code.com/og-image.png">
+    <meta name="twitter:site" content="@managedcode">
+
+    <!-- Additional SEO -->
+    <meta name="application-name" content="dotPilot">
+    <meta name="apple-mobile-web-app-title" content="dotPilot">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#FF7E5D">
+    <meta name="msapplication-TileColor" content="#FF7E5D">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Schema.org Structured Data for SEO/AEO -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "dotPilot",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": ["Windows", "macOS", "Linux"],
+        "description": "Open source local agent orchestrator built with C# and .NET. Run multiple AI agents locally, build workflows, connect to any AI provider.",
+        "url": "https://dotpilot.managed-code.com",
+        "downloadUrl": "https://github.com/managedcode/dotPilot/releases/latest",
+        "softwareVersion": "{{VERSION}}",
+        "author": {
+            "@type": "Organization",
+            "name": "ManagedCode",
+            "url": "https://managed-code.com"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "ManagedCode",
+            "url": "https://managed-code.com"
+        },
+        "license": "https://github.com/managedcode/dotPilot/blob/main/LICENSE",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "featureList": [
+            "Run multiple AI agents simultaneously",
+            "Build agentic workflows with Microsoft Agent Framework",
+            "Connect to Codex CLI, Claude Code, GitHub Copilot, Gemini",
+            "Local LLM support via LLamaSharp and ONNX",
+            "100% local execution with full privacy",
+            "OpenTelemetry integration for observability",
+            "SQLite persistence",
+            "Cross-platform: Windows, macOS, Linux"
+        ],
+        "screenshot": "https://dotpilot.managed-code.com/screenshot.png",
+        "softwareRequirements": ".NET 10 Runtime",
+        "programmingLanguage": "C#",
+        "isAccessibleForFree": true
+    }
+    </script>
+
+    <!-- FAQ Schema for AEO -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "What is dotPilot?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "dotPilot is an open-source local agent orchestrator built with C# and .NET. It allows you to run multiple AI agents locally on your machine, build agentic workflows, and connect to various AI providers like Codex CLI, Claude Code, GitHub Copilot, and Gemini, or use local models."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Is dotPilot free to use?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes, dotPilot is completely free and open source. You can download it from GitHub and use it without any cost. It's licensed under an open-source license."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Does dotPilot require an internet connection?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "dotPilot can run 100% locally without internet when using local models via LLamaSharp or ONNX. For cloud providers like OpenAI, Claude, or Gemini, internet connectivity is required to communicate with their APIs."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What AI providers does dotPilot support?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "dotPilot supports Codex CLI, Claude Code, GitHub Copilot, Gemini, OpenAI API, Azure OpenAI, and local models through LLamaSharp and ONNX Runtime."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What platforms does dotPilot run on?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "dotPilot is cross-platform and runs on Windows (x64), macOS (Apple Silicon arm64), and Linux (x64 via Snap package)."
+                }
+            }
+        ]
+    }
+    </script>
+
+    <!-- Organization Schema -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "ManagedCode",
+        "url": "https://managed-code.com",
+        "logo": "https://managed-code.com/logo.png",
+        "sameAs": [
+            "https://github.com/managedcode",
+            "https://www.youtube.com/@ManagedCode"
+        ]
+    }
+    </script>
 
     <style>
         :root {
@@ -423,25 +573,67 @@
             margin: 0 auto 32px;
         }
 
-        /* Footer */
+        /* Footer - Light gradient style inspired by aibase.fr */
         footer {
-            padding: 40px 0;
-            border-top: 1px solid var(--color-border);
+            padding: 60px 0 40px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #dee2e6 100%);
             text-align: center;
+            border-top: none;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #495057;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: var(--color-accent);
+        }
+
+        .footer-divider {
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-accent), #ff9478);
+            margin: 0 auto 24px;
+            border-radius: 2px;
         }
 
         footer p {
-            color: var(--color-text-secondary);
+            color: #6c757d;
             font-size: 14px;
         }
 
-        footer a {
+        footer p a {
             color: var(--color-accent);
             text-decoration: none;
+            font-weight: 500;
         }
 
-        footer a:hover {
+        footer p a:hover {
             text-decoration: underline;
+        }
+
+        .footer-copyright {
+            margin-top: 16px;
+            color: #868e96;
+            font-size: 13px;
         }
 
         /* Responsive */
@@ -668,12 +860,20 @@
     </main>
 
     <footer>
-        <div class="container">
-            <p>
-                Open source project by <a href="https://dotpilot.managed-code.com" target="_blank">ManagedCode</a> ·
-                <a href="https://github.com/managedcode/dotPilot" target="_blank">GitHub</a> ·
-                <a href="https://www.youtube.com/@ManagedCode" target="_blank">YouTube</a> ·
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://github.com/managedcode/dotPilot" target="_blank">GitHub</a>
+                <a href="https://www.youtube.com/@ManagedCode" target="_blank">YouTube</a>
                 <a href="https://github.com/managedcode/dotPilot/issues" target="_blank">Issues</a>
+                <a href="https://github.com/managedcode/dotPilot/releases" target="_blank">Releases</a>
+                <a href="/sitemap.xml">Sitemap</a>
+            </div>
+            <div class="footer-divider"></div>
+            <p>
+                Open source project by <a href="https://managed-code.com" target="_blank">ManagedCode</a>
+            </p>
+            <p class="footer-copyright">
+                &copy; 2025 ManagedCode. All rights reserved. Licensed under MIT.
             </p>
         </div>
     </footer>

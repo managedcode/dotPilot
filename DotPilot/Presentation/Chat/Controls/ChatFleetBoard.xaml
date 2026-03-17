@@ -1,6 +1,7 @@
 <UserControl x:Class="DotPilot.Presentation.Controls.ChatFleetBoard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DotPilot.Presentation.Controls"
              xmlns:presentation="using:DotPilot.Presentation"
              AutomationProperties.AutomationId="ChatFleetBoardSection">
   <UserControl.Resources>
@@ -46,44 +47,6 @@
       </Button>
     </DataTemplate>
 
-    <DataTemplate x:Key="FleetProviderTemplate"
-                  x:DataType="presentation:FleetBoardProviderItem">
-      <Border Background="{StaticResource AppInputSurfaceBrush}"
-              BorderBrush="{StaticResource AppOutlineBrush}"
-              BorderThickness="1"
-              CornerRadius="10"
-              Padding="12,10"
-              AutomationProperties.AutomationId="ChatFleetProviderItem">
-        <StackPanel Spacing="6">
-          <Grid ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock FontSize="12.5"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource AppPrimaryTextBrush}"
-                       Text="{x:Bind DisplayName}" />
-
-            <Border Grid.Column="1"
-                    Background="{x:Bind StatusBrush}"
-                    CornerRadius="999"
-                    Padding="8,2">
-              <TextBlock FontSize="10"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource AppPrimaryTextBrush}"
-                         Text="{x:Bind StatusLabel}" />
-            </Border>
-          </Grid>
-
-          <TextBlock FontSize="11.5"
-                     Foreground="{StaticResource AppMutedTextBrush}"
-                     Text="{x:Bind Summary}"
-                     TextWrapping="WrapWholeWords" />
-        </StackPanel>
-      </Border>
-    </DataTemplate>
   </UserControl.Resources>
 
   <StackPanel Spacing="12">
@@ -125,8 +88,13 @@
                  Text="PROVIDER HEALTH" />
 
       <ItemsControl AutomationProperties.AutomationId="ChatFleetProvidersList"
-                    ItemTemplate="{StaticResource FleetProviderTemplate}"
-                    ItemsSource="{Binding FleetBoard.Providers}" />
+                    ItemsSource="{Binding FleetBoard.Providers}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <controls:ChatFleetProviderCard />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
   </StackPanel>
 </UserControl>

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
+using DotPilot.Core;
 using DotPilot.Core.AgentBuilder;
-using DotPilot.Core.ControlPlaneDomain;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Data;
 
@@ -12,6 +12,7 @@ public partial record AgentBuilderModel(
     AgentPromptDraftGenerator draftGenerator,
     WorkspaceProjectionNotifier workspaceProjectionNotifier,
     ShellNavigationNotifier shellNavigationNotifier,
+    SessionSelectionNotifier sessionSelectionNotifier,
     ILogger<AgentBuilderModel> logger)
 {
     private const string EmptyProviderDisplayName = "Select a provider";
@@ -830,8 +831,11 @@ public partial record AgentBuilderModel(
             return;
         }
 
+        var session = sessionResult.Value!;
+
         _workspaceRefresh.Raise();
         workspaceProjectionNotifier.Publish();
+        sessionSelectionNotifier.Request(session.Session.Id);
         if (!string.IsNullOrWhiteSpace(successMessage))
         {
             await OperationMessage.SetAsync(successMessage, cancellationToken);
