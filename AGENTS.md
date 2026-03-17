@@ -392,6 +392,7 @@ Ask first:
 
 ### Likes
 
+- Verify `Uno Platform`, packaging, and CI-fix decisions against the latest official docs and current web sources when working on release or tooling failures, so the repo does not keep stale workflow assumptions.
 - Keep regression coverage tied to real operator flows: when agent creation changes, tests should cover creating an agent, choosing a valid provider model, and sending at least one message through the resulting session path.
 - Keep the first provider baseline deliberately small: the operator-visible provider list should stay focused on the three real console providers, and each one needs automated create-agent plus `hello -> hello reply` smoke coverage before extra provider features are added.
 - Keep operator-visible provider models unseeded: supported and suggested model lists for real providers must come from live CLI metadata or explicit operator input, not from hardcoded fallback catalogs.

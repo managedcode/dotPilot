@@ -124,7 +124,9 @@ jobs:
             -warnaserror \
             -m:1 \
             -p:BuildInParallel=false \
+            -p:CI=true \
             -p:SelfContained=true \
+            -p:TargetFrameworks=net10.0-desktop \
             -p:PackageFormat=dmg \
             -p:CodesignKey=- \
             -p:DiskImageSigningKey=- \
@@ -146,7 +148,7 @@ jobs:
           cp "${source_path}" "${target_path}"
 
       - name: Upload macOS Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotpilot-release-macos
           path: ./artifacts/releases/*.dmg
@@ -180,7 +182,9 @@ jobs:
           -warnaserror
           -m:1
           -p:BuildInParallel=false
+          -p:CI=true
           -p:SelfContained=true
+          -p:TargetFrameworks=net10.0-desktop
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:IncludeAllContentForSelfExtract=true
@@ -201,7 +205,7 @@ jobs:
           Copy-Item $sourcePath $targetPath -Force
 
       - name: Upload Windows Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotpilot-release-windows
           path: ./artifacts/releases/*.exe
@@ -241,20 +245,20 @@ jobs:
         shell: bash
         working-directory: ./DotPilot
         run: |
-          sudo dotnet publish DotPilot.csproj \
+          dotnet publish DotPilot.csproj \
             -c Release \
             -f net10.0-desktop \
             -r linux-x64 \
             -warnaserror \
             -m:1 \
             -p:BuildInParallel=false \
+            -p:CI=true \
             -p:SelfContained=true \
+            -p:TargetFrameworks=net10.0-desktop \
             -p:PackageFormat=snap \
             -p:UnoSnapcraftAdditionalParameters=--destructive-mode \
             -p:ApplicationDisplayVersion=${{ needs.prepare_release.outputs.release_version }} \
             -p:ApplicationVersion=${{ needs.prepare_release.outputs.application_version }}
-
-          sudo chown -R "$USER:$USER" ./bin/Release/net10.0-desktop/linux-x64
 
       - name: Stage Linux Release Asset
         shell: bash
@@ -271,7 +275,7 @@ jobs:
           cp "${source_path}" "${target_path}"
 
       - name: Upload Linux Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotpilot-release-linux
           path: ./artifacts/releases/*.snap
@@ -297,7 +301,7 @@ jobs:
         run: git fetch --tags --force
 
       - name: Download Release Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./artifacts/release-assets
 
