@@ -39,6 +39,7 @@ jobs:
           if [[ "$release_info" == "{}" ]] || [[ -z "$(echo "$release_info" | jq -r '.tag_name // empty')" ]]; then
             echo "No releases found, using default values"
             echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+            echo "publish_date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
             echo "macos_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
             echo "windows_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
             echo "linux_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
@@ -46,6 +47,8 @@ jobs:
           fi
 
           version=$(echo "$release_info" | jq -r '.tag_name' | sed 's/^v//')
+          publish_date=$(echo "$release_info" | jq -r '.published_at' | cut -d'T' -f1)
+          echo "publish_date=${publish_date}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
           macos_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | contains("macos")) | .browser_download_url' | head -n 1)
@@ -62,11 +65,15 @@ jobs:
           mkdir -p ./site
 
           cp ./gh-pages/index.html ./site/index.html
+          cp ./gh-pages/sitemap.xml ./site/sitemap.xml
+          cp ./gh-pages/robots.txt ./site/robots.txt
 
           sed -i "s|{{VERSION}}|${{ steps.release.outputs.version }}|g" ./site/index.html
           sed -i "s|{{MACOS_URL}}|${{ steps.release.outputs.macos_url }}|g" ./site/index.html
           sed -i "s|{{WINDOWS_URL}}|${{ steps.release.outputs.windows_url }}|g" ./site/index.html
           sed -i "s|{{LINUX_URL}}|${{ steps.release.outputs.linux_url }}|g" ./site/index.html
+
+          sed -i "s|{{PUBLISH_DATE}}|${{ steps.release.outputs.publish_date }}|g" ./site/sitemap.xml
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

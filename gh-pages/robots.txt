@@ -1,0 +1,11 @@
+# robots.txt for dotPilot
+# https://dotpilot.managed-code.com
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://dotpilot.managed-code.com/sitemap.xml
+
+# Crawl-delay (optional, be nice to bots)
+Crawl-delay: 1
