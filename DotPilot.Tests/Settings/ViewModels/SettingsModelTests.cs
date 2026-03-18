@@ -12,7 +12,7 @@ public sealed class SettingsModelTests
     private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(100);
 
     [Test]
-    public async Task ProvidersExposeOnlyTheThreeRealConsoleProvidersAndDefaultToCodex()
+    public async Task ProvidersExposeAllRealConsoleProvidersAndDefaultToCodex()
     {
         await using var fixture = CreateFixture();
         var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
@@ -21,7 +21,8 @@ public sealed class SettingsModelTests
         providers.Select(provider => provider.Kind).Should().ContainInOrder(
             AgentProviderKind.Codex,
             AgentProviderKind.ClaudeCode,
-            AgentProviderKind.GitHubCopilot);
+            AgentProviderKind.GitHubCopilot,
+            AgentProviderKind.Gemini);
         providers.Should().OnlyContain(provider => provider.Kind != AgentProviderKind.Debug);
         (await model.SelectedProviderTitle).Should().Be("Codex");
         (await model.ToggleActionLabel).Should().Be("Enable provider");
@@ -117,6 +118,31 @@ public sealed class SettingsModelTests
         details.Should().Contain(detail =>
             detail.Label == "Supported models" &&
             detail.Value.Contains("claude-opus-4-6", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesGeminiSuggestedAndSupportedModels()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        commandScope.WriteVersionCommand("gemini", "gemini-cli 0.34.0");
+        commandScope.WriteGeminiMetadata("gemini-2.5-pro", "gemini-2.5-pro", "gemini-2.5-flash");
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Gemini, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.Gemini);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail => detail.Label == "Installed version" && detail.Value == "0.34.0");
+        details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "gemini-2.5-pro");
+        details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("gemini-2.5-flash", StringComparison.Ordinal));
     }
 
     [Test]

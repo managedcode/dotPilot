@@ -217,6 +217,29 @@ public sealed class AgentBuilderModelTests
     }
 
     [Test]
+    public async Task HandleProviderSelectionChangedUsesGeminiProviderKindParameterWhenNoProviderOptionIsProvided()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteVersionCommand("gemini", "gemini-cli 0.34.0");
+        commandScope.WriteGeminiMetadata("gemini-2.5-pro", "gemini-2.5-pro", "gemini-2.5-flash");
+
+        await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Gemini, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        await model.HandleProviderSelectionChanged(AgentProviderKind.Gemini, CancellationToken.None);
+
+        (await model.BuilderProviderDisplayName).Should().Be("Gemini");
+        (await model.BuilderSuggestedModelName).Should().Be("gemini-2.5-pro");
+        (await model.SelectedProvider).Should().NotBeNull();
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Gemini);
+    }
+
+    [Test]
     public async Task HandleProviderSelectionChangedUsesTheProvidedProviderWhenThePreviousProviderRemainsPopulated()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));

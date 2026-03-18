@@ -587,6 +587,6 @@ public partial record SettingsModel
 
     private static bool IsVisibleProvider(AgentProviderKind kind)
     {
-        return kind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.GitHubCopilot;
+        return kind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.GitHubCopilot or AgentProviderKind.Gemini;
     }
 }

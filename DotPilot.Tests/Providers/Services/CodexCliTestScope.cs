@@ -204,6 +204,49 @@ internal sealed class CodexCliTestScope : IDisposable
             }));
     }
 
+    public void WriteGeminiMetadata(
+        string defaultModel,
+        params string[] models)
+    {
+        var configDirectory = Path.Combine(
+            Environment.GetEnvironmentVariable("HOME") ?? rootPath,
+            ".gemini");
+        Directory.CreateDirectory(configDirectory);
+        File.WriteAllText(
+            Path.Combine(configDirectory, "config.toml"),
+            string.Join(
+                Environment.NewLine,
+                $"model = \"{defaultModel}\"",
+                string.Empty));
+
+        var payload = new
+        {
+            models = models.Select(model => new
+            {
+                slug = model,
+                display_name = model,
+                description = $"Test model {model}",
+                visibility = "list",
+                supported_in_api = true,
+                supported_reasoning_levels = new[]
+                {
+                    new
+                    {
+                        effort = "low",
+                    },
+                    new
+                    {
+                        effort = "high",
+                    },
+                },
+            }),
+        };
+
+        File.WriteAllText(
+            Path.Combine(configDirectory, "models_cache.json"),
+            JsonSerializer.Serialize(payload));
+    }
+
     private string GetCounterFilePath(string commandName)
     {
         return Path.Combine(rootPath, commandName + ".count");

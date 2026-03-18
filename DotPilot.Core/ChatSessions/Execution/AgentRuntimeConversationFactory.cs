@@ -6,12 +6,17 @@ using ManagedCode.ClaudeCodeSharpSDK.Extensions.AI;
 using ManagedCode.CodexSharpSDK.Client;
 using ManagedCode.CodexSharpSDK.Configuration;
 using ManagedCode.CodexSharpSDK.Extensions.AI;
+using ManagedCode.GeminiSharpSDK.Configuration;
+using ManagedCode.GeminiSharpSDK.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ClaudeThreadOptions = ManagedCode.ClaudeCodeSharpSDK.Client.ThreadOptions;
 using CodexThreadOptions = ManagedCode.CodexSharpSDK.Client.ThreadOptions;
+using GeminiApprovalMode = ManagedCode.GeminiSharpSDK.Client.ApprovalMode;
+using GeminiSandboxMode = ManagedCode.GeminiSharpSDK.Client.SandboxMode;
+using GeminiThreadOptions = ManagedCode.GeminiSharpSDK.Client.ThreadOptions;
 
 namespace DotPilot.Core.ChatSessions;
 
@@ -206,6 +211,26 @@ internal sealed class AgentRuntimeConversationFactory(
                 {
                     Model = modelName,
                     WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
+                },
+            });
+        }
+
+        if (providerKind == AgentProviderKind.Gemini)
+        {
+            var geminiExecutablePath = ResolveExecutablePath(providerKind);
+            return new GeminiChatClient(new GeminiChatClientOptions
+            {
+                GeminiOptions = new GeminiOptions
+                {
+                    GeminiExecutablePath = geminiExecutablePath,
+                },
+                DefaultModel = modelName,
+                DefaultThreadOptions = new GeminiThreadOptions
+                {
+                    Model = modelName,
+                    WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
+                    SandboxMode = GeminiSandboxMode.WorkspaceWrite,
+                    ApprovalPolicy = GeminiApprovalMode.Yolo,
                 },
             });
         }

@@ -1,3 +1,5 @@
+using ManagedCode.GeminiSharpSDK.Models;
+
 namespace DotPilot.Core.Providers;
 
 internal static class AgentProviderKindExtensions
@@ -10,6 +12,7 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.Codex => "codex",
             AgentProviderKind.ClaudeCode => "claude",
             AgentProviderKind.GitHubCopilot => "copilot",
+            AgentProviderKind.Gemini => "gemini",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -22,6 +25,7 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.Codex => "gpt-5",
             AgentProviderKind.ClaudeCode => "claude-sonnet-4-5",
             AgentProviderKind.GitHubCopilot => "gpt-5",
+            AgentProviderKind.Gemini => GeminiModels.Gemini25Pro,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -34,6 +38,7 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.Codex => "Codex",
             AgentProviderKind.ClaudeCode => "Claude Code",
             AgentProviderKind.GitHubCopilot => "GitHub Copilot",
+            AgentProviderKind.Gemini => "Gemini",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -46,6 +51,7 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.Codex => "npm install -g @openai/codex",
             AgentProviderKind.ClaudeCode => "npm install -g @anthropic-ai/claude-code",
             AgentProviderKind.GitHubCopilot => "npm install -g @github/copilot",
+            AgentProviderKind.Gemini => "npm install -g @google/gemini-cli",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -58,6 +64,12 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.Codex => [],
             AgentProviderKind.ClaudeCode => [],
             AgentProviderKind.GitHubCopilot => [],
+            AgentProviderKind.Gemini =>
+            [
+                GeminiModels.Gemini25Pro,
+                GeminiModels.Gemini25Flash,
+                GeminiModels.Gemini25FlashLite,
+            ],
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }

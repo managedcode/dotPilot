@@ -45,6 +45,24 @@ public sealed class AgentPromptDraftGeneratorTests
         draft.ModelName.Should().Be("debug-echo");
     }
 
+    [Test]
+    public async Task CreateManualDraftAsyncUsesGeminiWhenItIsTheOnlyEnabledRealProvider()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentPromptDraftGeneratorTests));
+        commandScope.WriteVersionCommand("gemini", "gemini-cli 0.34.0");
+        commandScope.WriteGeminiMetadata("gemini-2.5-pro", "gemini-2.5-pro", "gemini-2.5-flash");
+
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Gemini, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var draft = await fixture.Generator.CreateManualDraftAsync(CancellationToken.None);
+
+        draft.ProviderKind.Should().Be(AgentProviderKind.Gemini);
+        draft.ModelName.Should().Be("gemini-2.5-pro");
+    }
+
     private static TestFixture CreateFixture()
     {
         var services = new ServiceCollection();

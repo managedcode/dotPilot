@@ -173,6 +173,7 @@ internal static class AgentProviderStatusSnapshotReader
             AgentProviderKind.GitHubCopilot => await CopilotCliMetadataReader.TryReadAsync(
                 executablePath,
                 cancellationToken).ConfigureAwait(false),
+            AgentProviderKind.Gemini => GeminiCliMetadataReader.TryRead(executablePath),
             _ => new ProviderCliMetadataSnapshot(null, null, []),
         };
     }

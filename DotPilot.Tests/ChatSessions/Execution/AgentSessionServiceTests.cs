@@ -28,7 +28,7 @@ public sealed class AgentSessionServiceTests
             agent.Name == AgentSessionDefaults.SystemAgentName &&
             agent.ProviderKind == AgentProviderKind.Debug &&
             agent.ModelName == AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug));
-        workspace.Providers.Should().HaveCount(4);
+        workspace.Providers.Should().HaveCount(5);
         workspace.Providers.Should().ContainSingle(provider => provider.Kind == AgentProviderKind.Debug);
         workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
