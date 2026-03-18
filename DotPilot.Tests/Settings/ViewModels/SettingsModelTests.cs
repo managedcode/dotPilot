@@ -1,3 +1,4 @@
+using DotPilot.Core.AgentBuilder;
 using DotPilot.Core.ChatSessions;
 using DotPilot.Tests.Providers;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,9 @@ namespace DotPilot.Tests.Settings;
 [NonParallelizable]
 public sealed class SettingsModelTests
 {
+    private const int DeleteRetryCount = 10;
+    private static readonly TimeSpan DeleteRetryDelay = TimeSpan.FromMilliseconds(100);
+
     [Test]
     public async Task ProvidersExposeOnlyTheThreeRealConsoleProvidersAndDefaultToCodex()
     {
@@ -136,6 +140,60 @@ public sealed class SettingsModelTests
     }
 
     [Test]
+    public async Task RequestAndCancelDeleteAllDataUpdatesConfirmationProjection()
+    {
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        await model.RequestDeleteAllData(CancellationToken.None);
+
+        (await model.ShowDeleteAllDataConfirmation).Should().BeTrue();
+        (await model.StatusMessage).Should().Be("Confirm deletion to remove all local DotPilot data and reset the app.");
+
+        await model.CancelDeleteAllData(CancellationToken.None);
+
+        (await model.ShowDeleteAllDataConfirmation).Should().BeFalse();
+        (await model.StatusMessage).Should().Be("Delete-all-data request cancelled.");
+    }
+
+    [Test]
+    public async Task ConfirmDeleteAllDataResetsWorkspaceAndPreferences()
+    {
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+        await model.SelectComposerSendBehavior("EnterInsertsNewLine", CancellationToken.None);
+        var agent = (await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Profile Reset Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Use the debug provider for settings reset coverage.",
+                "Profile reset test agent."),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.WorkspaceState.CreateSessionAsync(
+            new CreateSessionCommand("Profile reset session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        File.Exists(fixture.PreferencesFilePath).Should().BeTrue();
+
+        await model.RequestDeleteAllData(CancellationToken.None);
+        await model.ConfirmDeleteAllData(CancellationToken.None);
+
+        (await model.ShowDeleteAllDataConfirmation).Should().BeFalse();
+        (await model.IsEnterSendsSelected).Should().BeTrue();
+        (await model.IsEnterInsertsNewLineSelected).Should().BeFalse();
+        (await model.StatusMessage).Should().Be("All local DotPilot data was deleted and the app was reset to defaults.");
+        File.Exists(fixture.PreferencesFilePath).Should().BeFalse();
+
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        workspace.Sessions.Should().BeEmpty();
+        workspace.Agents.Should().ContainSingle(agentSummary =>
+            agentSummary.Name == AgentSessionDefaults.SystemAgentName &&
+            agentSummary.ProviderKind == AgentProviderKind.Debug);
+        workspace.Agents.Should().NotContain(agentSummary => agentSummary.Id == agent.Id);
+    }
+
+    [Test]
     public async Task RefreshIgnoresCancellationDuringProviderProbe()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
@@ -156,9 +214,15 @@ public sealed class SettingsModelTests
 
     private static TestFixture CreateFixture()
     {
+        var tempRoot = CreateTempRootDirectory();
+        var preferencesFilePath = Path.Combine(tempRoot, "preferences", "operator-preferences.json");
         var services = new ServiceCollection();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<WorkspaceProjectionNotifier>();
+        services.AddSingleton(new OperatorPreferencesStorageOptions
+        {
+            FilePath = preferencesFilePath,
+        });
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddAgentSessions(new AgentSessionStorageOptions
         {
@@ -168,18 +232,59 @@ public sealed class SettingsModelTests
 
         var provider = services.BuildServiceProvider();
         var workspaceState = provider.GetRequiredService<IAgentWorkspaceState>();
-        return new TestFixture(provider, workspaceState);
+        return new TestFixture(provider, workspaceState, tempRoot, preferencesFilePath);
     }
 
-    private sealed class TestFixture(ServiceProvider provider, IAgentWorkspaceState workspaceState) : IAsyncDisposable
+    private static string CreateTempRootDirectory()
     {
+        var path = Path.Combine(Path.GetTempPath(), "dotpilot-settings-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static async Task DeleteDirectoryWithRetryAsync(string path)
+    {
+        for (var attempt = 0; attempt < DeleteRetryCount; attempt++)
+        {
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < DeleteRetryCount - 1)
+            {
+                await Task.Delay(DeleteRetryDelay);
+            }
+            catch (UnauthorizedAccessException) when (attempt < DeleteRetryCount - 1)
+            {
+                await Task.Delay(DeleteRetryDelay);
+            }
+        }
+    }
+
+    private sealed class TestFixture(
+        ServiceProvider provider,
+        IAgentWorkspaceState workspaceState,
+        string tempRootPath,
+        string preferencesFilePath) : IAsyncDisposable
+    {
+        private readonly string _tempRootPath = tempRootPath;
+
         public ServiceProvider Provider { get; } = provider;
 
         public IAgentWorkspaceState WorkspaceState { get; } = workspaceState;
 
-        public ValueTask DisposeAsync()
+        public string PreferencesFilePath { get; } = preferencesFilePath;
+
+        public async ValueTask DisposeAsync()
         {
-            return Provider.DisposeAsync();
+            await Provider.DisposeAsync();
+            await DeleteDirectoryWithRetryAsync(_tempRootPath);
         }
     }
 }

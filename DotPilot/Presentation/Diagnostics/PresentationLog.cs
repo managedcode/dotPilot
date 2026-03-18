@@ -140,6 +140,15 @@ internal static partial class SettingsModelLog
         Message = "Selected provider from settings. Provider={ProviderKind} DisplayName={DisplayName}.")]
     public static partial void ProviderSelected(ILogger logger, AgentProviderKind providerKind, string displayName);
 
+    [LoggerMessage(EventId = 2205, Level = LogLevel.Information, Message = "Requested delete-all-data confirmation from profile settings.")]
+    public static partial void DeleteAllDataRequested(ILogger logger);
+
+    [LoggerMessage(EventId = 2206, Level = LogLevel.Information, Message = "Cancelled delete-all-data confirmation from profile settings.")]
+    public static partial void DeleteAllDataCancelled(ILogger logger);
+
+    [LoggerMessage(EventId = 2207, Level = LogLevel.Information, Message = "Confirmed delete-all-data action from profile settings.")]
+    public static partial void DeleteAllDataConfirmed(ILogger logger);
+
     [LoggerMessage(EventId = 2204, Level = LogLevel.Error, Message = "Provider settings operation failed.")]
     public static partial void Failure(ILogger logger, Exception exception);
 }

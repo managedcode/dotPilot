@@ -347,6 +347,7 @@ public sealed class ChatModelTests
         services.AddSingleton<WorkspaceProjectionNotifier>();
         services.AddSingleton<SessionSelectionNotifier>();
         services.AddSingleton<UiDispatcher>();
+        services.AddSingleton(new OperatorPreferencesStorageOptions());
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
         services.AddAgentSessions(new AgentSessionStorageOptions
         {

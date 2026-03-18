@@ -14,6 +14,11 @@ internal sealed class AgentWorkspaceState(IAgentSessionService agentSessionServi
         return agentSessionService.RefreshWorkspaceAsync(cancellationToken);
     }
 
+    public ValueTask<Result<AgentWorkspaceSnapshot>> ResetWorkspaceAsync(CancellationToken cancellationToken)
+    {
+        return agentSessionService.ResetWorkspaceAsync(cancellationToken);
+    }
+
     public ValueTask<Result<SessionTranscriptSnapshot>> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken)
     {
         return agentSessionService.GetSessionAsync(sessionId, cancellationToken);
