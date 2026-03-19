@@ -14,6 +14,7 @@ This file is the required start-here architecture map for non-trivial tasks.
 - **Extraction rule:** large non-UI features start in `DotPilot.Core`, but once a slice becomes big enough to need its own boundary, it should move into a dedicated DLL that references `DotPilot.Core`, while the desktop app references that feature DLL directly.
 - **Solution-shape rule:** solution folders may group projects by stable categories such as libraries and tests, but extracted subsystems must still keep their own files, namespaces, and project-local rules inside their real project directory.
 - **Verification boundary:** [../DotPilot.Tests/](../DotPilot.Tests/) covers caller-visible runtime, persistence, contract, and view-model flows through public boundaries. [../DotPilot.UITests/](../DotPilot.UITests/) covers the desktop operator journey from provider setup to streaming chat.
+- **Release website rule:** the desktop release path owns the GitHub Pages publish for [../gh-pages/](../gh-pages/); the site version badge and release download links must resolve from the same CI-derived release version and assets as the GitHub Release.
 
 ## Scoping
 
@@ -30,6 +31,7 @@ flowchart LR
   Root["dotPilot repository root"]
   Governance["AGENTS.md"]
   Architecture["docs/Architecture.md"]
+  Site["gh-pages static website"]
   Ui["DotPilot Uno desktop shell"]
   Core["DotPilot.Core contracts + shared application code"]
   Unit["DotPilot.Tests"]
@@ -37,6 +39,7 @@ flowchart LR
 
   Root --> Governance
   Root --> Architecture
+  Root --> Site
   Root --> Ui
   Root --> Core
   Root --> Unit

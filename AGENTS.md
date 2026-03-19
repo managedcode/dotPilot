@@ -208,6 +208,7 @@ For this app:
 - meaningful GitHub review comments must be evaluated and fixed when they still apply even if the original PR was closed; closed review threads are not a reason to ignore valid engineering feedback
 - PR bodies for issue-backed work must use GitHub closing references such as `Closes #14` so merged work closes the tracked issue automatically
 - the release workflow must run automatically on pushes to `main`, build desktop apps, and publish the GitHub Release without requiring a manual dispatch
+- the release path must also publish the GitHub Pages site after the GitHub Release is created, and every site version or download reference must resolve from that release's actual version and assets instead of fallback literals such as `1.0.0`
 - repository rules for `main` must keep an explicit org-admin bypass path for required status checks so repository administrators can perform direct emergency or operator-owned pushes without deadlocking the branch policy
 - after changing GitHub rulesets, workflows, or release packaging, verify against the specific live blocked operation or failing run instead of assuming the policy or YAML change solved the issue
 - desktop app build or publish jobs must use native runners for their target OS: macOS artifacts on macOS runners, Windows artifacts on Windows runners, and Linux artifacts on Linux runners

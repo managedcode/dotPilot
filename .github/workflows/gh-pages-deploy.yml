@@ -1,14 +1,6 @@
 name: Deploy GitHub Pages
 
 on:
-  release:
-    types: [published]
-  push:
-    branches:
-      - main
-    paths:
-      - 'gh-pages/**'
-      - '.github/workflows/gh-pages-deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,30 +27,42 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_info=$(gh api repos/${{ github.repository }}/releases/latest 2>/dev/null || echo '{}')
+          releases_url="https://github.com/${{ github.repository }}/releases"
 
           if [[ "$release_info" == "{}" ]] || [[ -z "$(echo "$release_info" | jq -r '.tag_name // empty')" ]]; then
-            echo "No releases found, using default values"
-            echo "version=1.0.0" >> "$GITHUB_OUTPUT"
-            echo "publish_date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-            echo "macos_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
-            echo "windows_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
-            echo "linux_url=https://github.com/${{ github.repository }}/releases" >> "$GITHUB_OUTPUT"
+            echo "No releases found, using the repo version prefix"
+            version_prefix="$(sed -n "s:.*<DotPilotVersionPrefix[^>]*>\\([^<]*\\)</DotPilotVersionPrefix>.*:\\1:p" ./Directory.Build.props | head -n 1)"
+            if [[ -z "${version_prefix}" ]]; then
+              version_prefix="0.0"
+            fi
+
+            {
+              echo "version=${version_prefix}"
+              echo "publish_date=$(date +%Y-%m-%d)"
+              echo "release_url=${releases_url}"
+              echo "macos_url=${releases_url}"
+              echo "windows_url=${releases_url}"
+              echo "linux_url=${releases_url}"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           version=$(echo "$release_info" | jq -r '.tag_name' | sed 's/^v//')
           publish_date=$(echo "$release_info" | jq -r '.published_at' | cut -d'T' -f1)
-          echo "publish_date=${publish_date}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          release_url=$(echo "$release_info" | jq -r '.html_url // empty')
 
           macos_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | contains("macos")) | .browser_download_url' | head -n 1)
           windows_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | contains("windows")) | .browser_download_url' | head -n 1)
           linux_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | contains("linux")) | .browser_download_url' | head -n 1)
 
-          releases_url="https://github.com/${{ github.repository }}/releases/latest"
-          echo "macos_url=${macos_url:-$releases_url}" >> "$GITHUB_OUTPUT"
-          echo "windows_url=${windows_url:-$releases_url}" >> "$GITHUB_OUTPUT"
-          echo "linux_url=${linux_url:-$releases_url}" >> "$GITHUB_OUTPUT"
+          {
+            echo "publish_date=${publish_date}"
+            echo "version=${version}"
+            echo "release_url=${release_url:-$releases_url}"
+            echo "macos_url=${macos_url:-$releases_url}"
+            echo "windows_url=${windows_url:-$releases_url}"
+            echo "linux_url=${linux_url:-$releases_url}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Prepare Site
         run: |
@@ -69,6 +73,7 @@ jobs:
           cp ./gh-pages/robots.txt ./site/robots.txt
 
           sed -i "s|{{VERSION}}|${{ steps.release.outputs.version }}|g" ./site/index.html
+          sed -i "s|{{RELEASE_URL}}|${{ steps.release.outputs.release_url }}|g" ./site/index.html
           sed -i "s|{{MACOS_URL}}|${{ steps.release.outputs.macos_url }}|g" ./site/index.html
           sed -i "s|{{WINDOWS_URL}}|${{ steps.release.outputs.windows_url }}|g" ./site/index.html
           sed -i "s|{{LINUX_URL}}|${{ steps.release.outputs.linux_url }}|g" ./site/index.html
