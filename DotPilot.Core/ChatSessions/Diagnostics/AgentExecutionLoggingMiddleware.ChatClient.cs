@@ -41,7 +41,7 @@ internal sealed partial class AgentExecutionLoggingMiddleware
 
     private static bool ShouldBridgeSystemInstructions(AgentProviderKind providerKind)
     {
-        return providerKind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode;
+        return providerKind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.Gemini or AgentProviderKind.Onnx or AgentProviderKind.LlamaSharp;
     }
 
     private async Task<ChatResponse> LogChatResponseAsync(

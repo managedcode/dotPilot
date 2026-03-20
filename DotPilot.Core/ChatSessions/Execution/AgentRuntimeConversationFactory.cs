@@ -6,12 +6,18 @@ using ManagedCode.ClaudeCodeSharpSDK.Extensions.AI;
 using ManagedCode.CodexSharpSDK.Client;
 using ManagedCode.CodexSharpSDK.Configuration;
 using ManagedCode.CodexSharpSDK.Extensions.AI;
+using ManagedCode.GeminiSharpSDK.Configuration;
+using ManagedCode.GeminiSharpSDK.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntimeGenAI;
 using ClaudeThreadOptions = ManagedCode.ClaudeCodeSharpSDK.Client.ThreadOptions;
 using CodexThreadOptions = ManagedCode.CodexSharpSDK.Client.ThreadOptions;
+using GeminiApprovalMode = ManagedCode.GeminiSharpSDK.Client.ApprovalMode;
+using GeminiSandboxMode = ManagedCode.GeminiSharpSDK.Client.SandboxMode;
+using GeminiThreadOptions = ManagedCode.GeminiSharpSDK.Client.ThreadOptions;
 
 namespace DotPilot.Core.ChatSessions;
 
@@ -210,6 +216,41 @@ internal sealed class AgentRuntimeConversationFactory(
             });
         }
 
+        if (providerKind == AgentProviderKind.Gemini)
+        {
+            var geminiExecutablePath = ResolveExecutablePath(providerKind);
+            return new GeminiChatClient(new GeminiChatClientOptions
+            {
+                GeminiOptions = new GeminiOptions
+                {
+                    GeminiExecutablePath = geminiExecutablePath,
+                },
+                DefaultModel = modelName,
+                DefaultThreadOptions = new GeminiThreadOptions
+                {
+                    Model = modelName,
+                    WorkingDirectory = ResolvePlaygroundDirectory(sessionId),
+                    SandboxMode = GeminiSandboxMode.WorkspaceWrite,
+                    ApprovalPolicy = GeminiApprovalMode.Yolo,
+                },
+            });
+        }
+
+        if (providerKind == AgentProviderKind.Onnx)
+        {
+            var modelPath = ResolveLocalModelPath(providerKind);
+            return new OnnxRuntimeGenAIChatClient(modelPath);
+        }
+
+        if (providerKind == AgentProviderKind.LlamaSharp)
+        {
+            var modelPath = ResolveLocalModelPath(providerKind);
+            var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+            return new LlamaLocalChatClient(
+                modelPath,
+                loggerFactory?.CreateLogger<LlamaLocalChatClient>());
+        }
+
         throw new InvalidOperationException(
             string.Format(
                 CultureInfo.InvariantCulture,
@@ -292,7 +333,23 @@ internal sealed class AgentRuntimeConversationFactory(
 
     private static bool ShouldUseFolderChatHistory(AgentProviderKind providerKind)
     {
-        return providerKind == AgentProviderKind.Debug;
+        return providerKind is AgentProviderKind.Debug or AgentProviderKind.Onnx or AgentProviderKind.LlamaSharp;
+    }
+
+    private static string ResolveLocalModelPath(AgentProviderKind providerKind)
+    {
+        var configuration = LocalModelProviderConfigurationReader.Read(providerKind);
+        if (configuration.IsReady && !string.IsNullOrWhiteSpace(configuration.ModelPath))
+        {
+            return configuration.ModelPath;
+        }
+
+        throw new InvalidOperationException(
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} is not configured. Set {1} before starting a local session.",
+                providerKind.GetDisplayName(),
+                configuration.PrimaryEnvironmentVariableName));
     }
 
     private static string? ResolveExecutablePath(AgentProviderKind providerKind)

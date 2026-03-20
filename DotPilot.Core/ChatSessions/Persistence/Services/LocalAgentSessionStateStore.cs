@@ -69,6 +69,19 @@ internal sealed class LocalAgentSessionStateStore(AgentSessionStorageOptions sto
         await WriteTextAsync(path, payload, cancellationToken);
     }
 
+    public async ValueTask ClearAsync(CancellationToken cancellationToken)
+    {
+        _memorySessions.Clear();
+        if (UseTransientStore())
+        {
+            return;
+        }
+
+        await LocalStorageDeletion.DeleteDirectoryIfExistsAsync(
+            AgentSessionStoragePaths.ResolveRuntimeSessionDirectory(storageOptions),
+            cancellationToken);
+    }
+
     private string GetPath(SessionId sessionId)
     {
         var directory = AgentSessionStoragePaths.ResolveRuntimeSessionDirectory(storageOptions);

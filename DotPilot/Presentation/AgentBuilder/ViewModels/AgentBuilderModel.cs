@@ -17,7 +17,7 @@ public partial record AgentBuilderModel(
 {
     private const string EmptyProviderDisplayName = "Select a provider";
     private const string EmptyProviderStatusSummary =
-        "Enable Codex, Claude Code, or GitHub Copilot in Providers before saving the profile.";
+        "Enable Codex, Claude Code, GitHub Copilot, or Gemini in Providers before saving the profile.";
     private const string EmptyProviderCommandName = "";
     private const string EmptyModelHelperText =
         "Select an enabled provider to load its supported models.";

@@ -7,6 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="LLamaSharp" />
+        <PackageReference Include="LLamaSharp.Backend.Cpu" />
         <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK" />
         <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AgentFramework" />
         <PackageReference Include="ManagedCode.ClaudeCodeSharpSDK.Extensions.AI" />
@@ -15,6 +17,8 @@
         <PackageReference Include="ManagedCode.CodexSharpSDK.Extensions.AI" />
         <PackageReference Include="ManagedCode.Communication" />
         <PackageReference Include="GitHub.Copilot.SDK" />
+        <PackageReference Include="ManagedCode.GeminiSharpSDK.Extensions.AgentFramework" />
+        <PackageReference Include="ManagedCode.GeminiSharpSDK.Extensions.AI" />
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.GitHub.Copilot" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" />
@@ -22,6 +26,7 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
         <PackageReference Include="Microsoft.Extensions.AI" />
+        <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" />
         <PackageReference Include="Microsoft.Orleans.Server" />
     </ItemGroup>
 

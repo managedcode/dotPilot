@@ -496,6 +496,9 @@ public partial record ChatModel
             AgentProviderKind.Codex => DesignBrushPalette.CodeAvatarBrush,
             AgentProviderKind.ClaudeCode => DesignBrushPalette.AnalyticsAvatarBrush,
             AgentProviderKind.GitHubCopilot => DesignBrushPalette.AvatarVariantDanishBrush,
+            AgentProviderKind.Gemini => DesignBrushPalette.AvatarVariantEmilyBrush,
+            AgentProviderKind.Onnx => DesignBrushPalette.AvatarVariantFrankBrush,
+            AgentProviderKind.LlamaSharp => DesignBrushPalette.DesignAvatarBrush,
             _ => DesignBrushPalette.CodeAvatarBrush,
         };
     }

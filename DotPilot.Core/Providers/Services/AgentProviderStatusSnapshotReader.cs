@@ -13,6 +13,8 @@ internal static class AgentProviderStatusSnapshotReader
     private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
     private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
     private const string ReadySummaryFormat = "{0} CLI is ready for local desktop execution.";
+    private const string ModelPathVariablesLabel = "Model path variables";
+    private const string ConfiguredModelPathLabel = "Configured model path";
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan RedirectDrainTimeout = TimeSpan.FromSeconds(1);
     private const string VersionSeparator = "version";
@@ -74,7 +76,9 @@ internal static class AgentProviderStatusSnapshotReader
         var isBuiltIn = providerKind.IsBuiltIn();
         var commandName = providerKind.GetCommandName();
         var displayName = providerKind.GetDisplayName();
-        var defaultModelName = isBuiltIn ? providerKind.GetDefaultModelName() : string.Empty;
+        var defaultModelName = isBuiltIn || providerKind.IsLocalModelProvider()
+            ? providerKind.GetDefaultModelName()
+            : string.Empty;
         var installCommand = providerKind.GetInstallCommand();
         var fallbackModels = isBuiltIn ? providerKind.GetSupportedModelNames() : [];
         var providerId = AgentSessionDeterministicIdentity.CreateProviderId(commandName);
@@ -99,6 +103,44 @@ internal static class AgentProviderStatusSnapshotReader
             status = AgentProviderStatus.Unsupported;
             statusSummary = BrowserStatusSummary;
             canCreateAgents = preference.IsEnabled;
+        }
+        else if (providerKind.IsLocalModelProvider())
+        {
+            var configuration = LocalModelProviderConfigurationReader.Read(providerKind);
+            details.Add(new ProviderDetailDescriptor(
+                ModelPathVariablesLabel,
+                string.Join(", ", configuration.EnvironmentVariableNames)));
+            actions.Add(new ProviderActionDescriptor(
+                "Set model path",
+                providerKind.GetLocalModelSetupSummary(),
+                configuration.SetupCommand));
+
+            if (!string.IsNullOrWhiteSpace(configuration.ModelPath))
+            {
+                details.Add(new ProviderDetailDescriptor(ConfiguredModelPathLabel, configuration.ModelPath));
+            }
+
+            if (!configuration.IsReady)
+            {
+                status = AgentProviderStatus.RequiresSetup;
+                statusSummary = providerKind.GetLocalModelMissingSummary();
+                canCreateAgents = false;
+            }
+            else
+            {
+                suggestedModelName = ResolveSuggestedModel(
+                    defaultModelName,
+                    configuration.SuggestedModelName,
+                    []);
+                supportedModelNames = ResolveSupportedModels(
+                    defaultModelName,
+                    suggestedModelName,
+                    [],
+                    configuration.SuggestedModelName is null ? [] : [configuration.SuggestedModelName]);
+                details.AddRange(CreateProviderDetails(installedVersion, suggestedModelName, supportedModelNames));
+                statusSummary = providerKind.GetLocalModelReadySummary();
+                canCreateAgents = true;
+            }
         }
         else if (!isBuiltIn)
         {
@@ -173,6 +215,7 @@ internal static class AgentProviderStatusSnapshotReader
             AgentProviderKind.GitHubCopilot => await CopilotCliMetadataReader.TryReadAsync(
                 executablePath,
                 cancellationToken).ConfigureAwait(false),
+            AgentProviderKind.Gemini => GeminiCliMetadataReader.TryRead(executablePath),
             _ => new ProviderCliMetadataSnapshot(null, null, []),
         };
     }

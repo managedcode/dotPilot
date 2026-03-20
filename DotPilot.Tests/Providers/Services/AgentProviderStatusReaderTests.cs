@@ -175,6 +175,77 @@ public sealed class AgentProviderStatusReaderTests
     }
 
     [Test]
+    public async Task EnabledGeminiProviderReportsReadyRuntimeAndSuggestedModels()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        commandScope.WriteVersionCommand("gemini", "gemini-cli 0.34.0");
+        commandScope.WriteGeminiMetadata("gemini-2.5-pro", "gemini-2.5-pro", "gemini-2.5-flash");
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Gemini, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.IsEnabled.Should().BeTrue();
+        provider.CanCreateAgents.Should().BeTrue();
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("ready for local desktop execution");
+        provider.InstalledVersion.Should().Be("0.34.0");
+        provider.SuggestedModelName.Should().Be("gemini-2.5-pro");
+        provider.SupportedModelNames.Should().Contain("gemini-2.5-flash");
+        provider.Details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "gemini-2.5-pro");
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("gemini-2.5-flash", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task EnabledOnnxProviderReportsReadyRuntimeWhenModelDirectoryIsConfigured()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        var modelPath = commandScope.WriteOnnxModelDirectory();
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.IsEnabled.Should().BeTrue();
+        provider.CanCreateAgents.Should().BeTrue();
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("ready for desktop execution");
+        provider.SuggestedModelName.Should().Be("phi-4-mini-instruct-onnx");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("phi-4-mini-instruct-onnx");
+        provider.Details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Model path variables" &&
+            detail.Value.Contains("DOTPILOT_ONNX_MODEL_PATH", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task EnabledLlamaSharpProviderReportsReadyRuntimeWhenGgufFileIsConfigured()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        var modelPath = commandScope.WriteLlamaSharpModelFile();
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.IsEnabled.Should().BeTrue();
+        provider.CanCreateAgents.Should().BeTrue();
+        provider.Status.Should().Be(AgentProviderStatus.Ready);
+        provider.StatusSummary.Should().Contain("ready for desktop execution");
+        provider.SuggestedModelName.Should().Be("llama-3.2-3b-instruct");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("llama-3.2-3b-instruct");
+        provider.Details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Model path variables" &&
+            detail.Value.Contains("DOTPILOT_LLAMASHARP_MODEL_PATH", StringComparison.Ordinal));
+    }
+
+    [Test]
     public async Task ConcurrentReadsShareOneInFlightProviderProbe()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));

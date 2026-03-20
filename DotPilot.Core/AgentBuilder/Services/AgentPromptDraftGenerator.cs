@@ -102,6 +102,14 @@ public sealed class AgentPromptDraftGenerator(
             }
         }
 
+        var firstCreatableRealProvider = providers.FirstOrDefault(static provider =>
+            provider.CanCreateAgents &&
+            provider.Kind != AgentProviderKind.Debug);
+        if (firstCreatableRealProvider is not null)
+        {
+            return firstCreatableRealProvider;
+        }
+
         return providers.FirstOrDefault(static provider => provider.Kind == AgentProviderKind.Debug)
             ?? new ProviderStatusDescriptor(
                 AgentSessionDeterministicIdentity.CreateProviderId("debug"),
@@ -125,7 +133,10 @@ public sealed class AgentPromptDraftGenerator(
         {
             yield return AgentProviderKind.Codex;
             yield return AgentProviderKind.GitHubCopilot;
+            yield return AgentProviderKind.Gemini;
             yield return AgentProviderKind.ClaudeCode;
+            yield return AgentProviderKind.Onnx;
+            yield return AgentProviderKind.LlamaSharp;
             yield return AgentProviderKind.Debug;
             yield break;
         }
@@ -133,15 +144,21 @@ public sealed class AgentPromptDraftGenerator(
         if (ContainsAny(prompt, "research", "search", "summarize", "summary", "writing", "content", "docs", "analysis"))
         {
             yield return AgentProviderKind.ClaudeCode;
+            yield return AgentProviderKind.Gemini;
             yield return AgentProviderKind.Codex;
             yield return AgentProviderKind.GitHubCopilot;
+            yield return AgentProviderKind.Onnx;
+            yield return AgentProviderKind.LlamaSharp;
             yield return AgentProviderKind.Debug;
             yield break;
         }
 
         yield return AgentProviderKind.Codex;
+        yield return AgentProviderKind.Gemini;
         yield return AgentProviderKind.ClaudeCode;
         yield return AgentProviderKind.GitHubCopilot;
+        yield return AgentProviderKind.Onnx;
+        yield return AgentProviderKind.LlamaSharp;
         yield return AgentProviderKind.Debug;
     }
 

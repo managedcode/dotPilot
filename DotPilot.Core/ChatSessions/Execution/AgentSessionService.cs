@@ -6,12 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace DotPilot.Core.ChatSessions;
 
-internal sealed class AgentSessionService(
+internal sealed partial class AgentSessionService(
     IDbContextFactory<LocalAgentSessionDbContext> dbContextFactory,
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
     ISessionActivityMonitor sessionActivityMonitor,
     IAgentProviderStatusReader providerStatusReader,
     AgentRuntimeConversationFactory runtimeConversationFactory,
+    LocalAgentSessionStateStore sessionStateStore,
+    LocalAgentChatHistoryStore chatHistoryStore,
+    AgentSessionStorageOptions storageOptions,
     TimeProvider timeProvider,
     ILogger<AgentSessionService> logger)
     : IAgentSessionService, IDisposable
@@ -862,6 +865,12 @@ internal sealed class AgentSessionService(
             if (providerKind.IsBuiltIn())
             {
                 continue;
+            }
+
+            if (providerKind.IsLocalModelProvider() &&
+                LocalModelProviderConfigurationReader.Read(providerKind).IsReady)
+            {
+                return providerKind;
             }
 
             if (!string.IsNullOrWhiteSpace(ResolveExecutablePath(providerKind.GetCommandName())))

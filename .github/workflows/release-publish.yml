@@ -80,6 +80,8 @@ jobs:
     timeout-minutes: 60
     needs:
       - prepare_release
+    outputs:
+      asset_name: ${{ steps.stage_asset.outputs.asset_name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -133,11 +135,13 @@ jobs:
             -p:DotPilotBuildNumber=${{ needs.prepare_release.outputs.application_version }}
 
       - name: Stage macOS Release Asset
+        id: stage_asset
         shell: bash
         run: |
           mkdir -p ./artifacts/releases
           source_path="./DotPilot/bin/Release/net10.0-desktop/${{ steps.macos_rid.outputs.rid }}/publish/DotPilot.dmg"
-          target_path="./artifacts/releases/dotpilot-${{ needs.prepare_release.outputs.release_version }}-${{ steps.macos_rid.outputs.asset_suffix }}.dmg"
+          asset_name="dotpilot-${{ needs.prepare_release.outputs.release_version }}-${{ steps.macos_rid.outputs.asset_suffix }}.dmg"
+          target_path="./artifacts/releases/${asset_name}"
 
           if [[ ! -f "${source_path}" ]]; then
             echo "Expected macOS release asset was not produced: ${source_path}" >&2
@@ -145,6 +149,7 @@ jobs:
           fi
 
           cp "${source_path}" "${target_path}"
+          echo "asset_name=${asset_name}" >> "$GITHUB_OUTPUT"
 
       - name: Upload macOS Release Artifact
         uses: actions/upload-artifact@v7
@@ -160,6 +165,8 @@ jobs:
     timeout-minutes: 60
     needs:
       - prepare_release
+    outputs:
+      asset_name: ${{ steps.stage_asset.outputs.asset_name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -190,17 +197,20 @@ jobs:
           -p:DotPilotBuildNumber=${{ needs.prepare_release.outputs.application_version }}
 
       - name: Stage Windows Release Asset
+        id: stage_asset
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path .\artifacts\releases | Out-Null
           $sourcePath = ".\DotPilot\bin\Release\net10.0-desktop\win-x64\publish\DotPilot.exe"
-          $targetPath = ".\artifacts\releases\dotpilot-${{ needs.prepare_release.outputs.release_version }}-windows-x64.exe"
+          $assetName = "dotpilot-${{ needs.prepare_release.outputs.release_version }}-windows-x64.exe"
+          $targetPath = ".\artifacts\releases\$assetName"
 
           if (-not (Test-Path $sourcePath)) {
             throw "Expected Windows release asset was not produced: $sourcePath"
           }
 
           Copy-Item $sourcePath $targetPath -Force
+          "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload Windows Release Artifact
         uses: actions/upload-artifact@v7
@@ -216,6 +226,8 @@ jobs:
     timeout-minutes: 60
     needs:
       - prepare_release
+    outputs:
+      asset_name: ${{ steps.stage_asset.outputs.asset_name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -260,11 +272,13 @@ jobs:
           sudo chown -R "$USER:$USER" ./bin/Release/net10.0-desktop/linux-x64
 
       - name: Stage Linux Release Asset
+        id: stage_asset
         shell: bash
         run: |
           mkdir -p ./artifacts/releases
           source_path="$(find ./DotPilot/bin/Release/net10.0-desktop/linux-x64/publish -maxdepth 1 -type f -name '*.snap' | sort | head -n 1)"
-          target_path="./artifacts/releases/dotpilot-${{ needs.prepare_release.outputs.release_version }}-linux-x64.snap"
+          asset_name="dotpilot-${{ needs.prepare_release.outputs.release_version }}-linux-x64.snap"
+          target_path="./artifacts/releases/${asset_name}"
 
           if [[ -z "${source_path}" || ! -f "${source_path}" ]]; then
             echo "Expected Linux snap release asset was not produced." >&2
@@ -272,6 +286,7 @@ jobs:
           fi
 
           cp "${source_path}" "${target_path}"
+          echo "asset_name=${asset_name}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Linux Release Artifact
         uses: actions/upload-artifact@v7
@@ -396,3 +411,75 @@ jobs:
           fi
 
           "${release_command[@]}"
+
+  publish_site:
+    name: Publish Release Website
+    runs-on: ubuntu-latest
+    needs:
+      - prepare_release
+      - publish_macos
+      - publish_windows
+      - publish_linux
+      - create_release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Prepare Release Website
+        shell: bash
+        env:
+          MACOS_ASSET_NAME: ${{ needs.publish_macos.outputs.asset_name }}
+          WINDOWS_ASSET_NAME: ${{ needs.publish_windows.outputs.asset_name }}
+          LINUX_ASSET_NAME: ${{ needs.publish_linux.outputs.asset_name }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.prepare_release.outputs.release_version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p ./site
+
+          cp ./gh-pages/index.html ./site/index.html
+          cp ./gh-pages/sitemap.xml ./site/sitemap.xml
+          cp ./gh-pages/robots.txt ./site/robots.txt
+
+          release_url="https://github.com/${REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          macos_url="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${MACOS_ASSET_NAME}"
+          windows_url="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${WINDOWS_ASSET_NAME}"
+          linux_url="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${LINUX_ASSET_NAME}"
+          publish_date="$(date -u +%Y-%m-%d)"
+
+          sed -i "s|{{VERSION}}|${RELEASE_VERSION}|g" ./site/index.html
+          sed -i "s|{{RELEASE_URL}}|${release_url}|g" ./site/index.html
+          sed -i "s|{{MACOS_URL}}|${macos_url}|g" ./site/index.html
+          sed -i "s|{{WINDOWS_URL}}|${windows_url}|g" ./site/index.html
+          sed -i "s|{{LINUX_URL}}|${linux_url}|g" ./site/index.html
+          sed -i "s|{{PUBLISH_DATE}}|${publish_date}|g" ./site/sitemap.xml
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./site
+
+  deploy_site:
+    name: Deploy Release Website
+    runs-on: ubuntu-latest
+    needs:
+      - publish_site
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

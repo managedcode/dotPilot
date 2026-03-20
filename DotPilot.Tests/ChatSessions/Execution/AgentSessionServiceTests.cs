@@ -28,7 +28,7 @@ public sealed class AgentSessionServiceTests
             agent.Name == AgentSessionDefaults.SystemAgentName &&
             agent.ProviderKind == AgentProviderKind.Debug &&
             agent.ModelName == AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug));
-        workspace.Providers.Should().HaveCount(4);
+        workspace.Providers.Should().HaveCount(5);
         workspace.Providers.Should().ContainSingle(provider => provider.Kind == AgentProviderKind.Debug);
         workspace.Providers.Should().ContainSingle(provider =>
             provider.Kind == AgentProviderKind.Debug &&
@@ -176,6 +176,50 @@ public sealed class AgentSessionServiceTests
         session.Entries.Should().ContainSingle(entry =>
             entry.Kind == SessionStreamEntryKind.Status &&
             entry.Text.Contains("Session created", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task ResetWorkspaceAsyncClearsPersistedDataAndReseedsDefaultState()
+    {
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "reset-store.db");
+        var options = CreateSqliteOptions(tempRoot, databasePath);
+        await using var fixture = CreateFixture(options, tempRoot);
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Resettable Agent");
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Resettable session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        await foreach (var _ in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "persist runtime state"),
+                           CancellationToken.None))
+        {
+        }
+
+        Directory.CreateDirectory(options.PlaygroundDirectoryPath!);
+        await File.WriteAllTextAsync(
+            Path.Combine(options.PlaygroundDirectoryPath!, "scratch.txt"),
+            "transient playground artifact",
+            CancellationToken.None);
+
+        Directory.Exists(options.RuntimeSessionDirectoryPath!).Should().BeTrue();
+        Directory.Exists(options.ChatHistoryDirectoryPath!).Should().BeTrue();
+        Directory.Exists(options.PlaygroundDirectoryPath!).Should().BeTrue();
+
+        var workspace = (await fixture.Service.ResetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+
+        workspace.Sessions.Should().BeEmpty();
+        workspace.Agents.Should().ContainSingle(agentSummary =>
+            agentSummary.Name == AgentSessionDefaults.SystemAgentName &&
+            agentSummary.ProviderKind == AgentProviderKind.Debug &&
+            agentSummary.ModelName == AgentSessionDefaults.GetDefaultModel(AgentProviderKind.Debug));
+        workspace.Agents.Should().NotContain(agentSummary => agentSummary.Id == agent.Id);
+        workspace.Providers.Should().ContainSingle(provider =>
+            provider.Kind == AgentProviderKind.Debug &&
+            provider.IsEnabled &&
+            provider.CanCreateAgents);
+        Directory.Exists(options.RuntimeSessionDirectoryPath!).Should().BeFalse();
+        Directory.Exists(options.ChatHistoryDirectoryPath!).Should().BeFalse();
+        Directory.Exists(options.PlaygroundDirectoryPath!).Should().BeFalse();
     }
 
     [Test]

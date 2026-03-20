@@ -1,0 +1,55 @@
+<UserControl x:Class="DotPilot.Presentation.Controls.ProfileSettingsSection"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel AutomationProperties.AutomationId="ProfileSettingsSection"
+              Visibility="{Binding ShowProfileSection}"
+              Spacing="18">
+    <StackPanel Spacing="4">
+      <TextBlock Style="{StaticResource SettingsSectionTitleTextStyle}"
+                 Text="Profile &amp; local data" />
+      <TextBlock Style="{StaticResource SettingsSectionSubtitleTextStyle}"
+                 Text="Manage the local operator profile and clear persisted DotPilot data from this machine."
+                 TextWrapping="WrapWholeWords" />
+    </StackPanel>
+
+    <Border Style="{StaticResource SettingsOptionCardStyle}">
+      <StackPanel Spacing="12">
+        <TextBlock Style="{StaticResource ChatComposerLabelTextStyle}"
+                   Text="Delete all local data" />
+        <TextBlock Style="{StaticResource SettingsSectionSubtitleTextStyle}"
+                   Text="This removes saved agents, sessions, transcripts, provider preferences, local runtime files, and message preferences. External CLI installs and auth are not touched."
+                   TextWrapping="WrapWholeWords" />
+
+        <Grid ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <Button AutomationProperties.AutomationId="RequestDeleteAllDataButton"
+                  Command="{Binding RequestDeleteAllDataCommand}"
+                  Style="{StaticResource SecondaryActionButtonStyle}">
+            <TextBlock Text="Delete all data" />
+          </Button>
+
+          <Button Grid.Column="1"
+                  AutomationProperties.AutomationId="ConfirmDeleteAllDataButton"
+                  Command="{Binding ConfirmDeleteAllDataCommand}"
+                  Style="{StaticResource DangerActionButtonStyle}"
+                  Visibility="{Binding ShowDeleteAllDataConfirmation}">
+            <TextBlock Text="Confirm delete" />
+          </Button>
+
+          <Button Grid.Column="2"
+                  AutomationProperties.AutomationId="CancelDeleteAllDataButton"
+                  Command="{Binding CancelDeleteAllDataCommand}"
+                  Style="{StaticResource SecondaryActionButtonStyle}"
+                  Visibility="{Binding ShowDeleteAllDataConfirmation}">
+            <TextBlock Text="Cancel" />
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

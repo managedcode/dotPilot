@@ -35,6 +35,7 @@ We will split GitHub Actions into two explicit workflows:
    - publishes desktop release assets for macOS, Windows, and Linux as real packaged outputs instead of raw publish-folder archives
    - uses `.dmg` for macOS, a self-contained single-file `.exe` for Windows, and `.snap` for Linux
    - creates the GitHub Release
+   - publishes the `gh-pages` website after the GitHub Release is created, using the same resolved release version and release asset URLs
    - prepends repo-owned feature summaries and feature-doc links to GitHub-generated release notes
 
 ## Decision Diagram
@@ -50,6 +51,7 @@ flowchart LR
   Version["Version resolved from DotPilot.csproj prefix + CI build number"]
   Publish["Desktop packaged assets (.dmg, .exe, .snap)"]
   GitHubRelease["GitHub Release with feature notes"]
+  Website["GitHub Pages site"]
 
   Change --> Validation
   Validation --> Quality
@@ -59,6 +61,7 @@ flowchart LR
   Release --> Version
   Release --> Publish
   Release --> GitHubRelease
+  Release --> Website
 ```
 
 ## Alternatives Considered
@@ -90,6 +93,7 @@ That makes release quality depend on operator memory instead of repo-owned histo
 - Desktop publish artifacts move to the workflow that actually needs them.
 - Release notes now combine GitHub-generated notes with repo-owned feature context.
 - Release numbers stay predictable: humans own the major/minor prefix in source and CI owns the last segment.
+- The public website now updates in the same release path as the desktop artifacts, so version and download links stay in sync with the published release.
 
 ### Negative
 

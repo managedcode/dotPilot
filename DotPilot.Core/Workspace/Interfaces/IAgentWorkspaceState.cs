@@ -8,6 +8,8 @@ public interface IAgentWorkspaceState
 
     ValueTask<Result<AgentWorkspaceSnapshot>> RefreshWorkspaceAsync(CancellationToken cancellationToken);
 
+    ValueTask<Result<AgentWorkspaceSnapshot>> ResetWorkspaceAsync(CancellationToken cancellationToken);
+
     ValueTask<Result<SessionTranscriptSnapshot>> GetSessionAsync(SessionId sessionId, CancellationToken cancellationToken);
 
     ValueTask<Result<AgentProfileSummary>> CreateAgentAsync(

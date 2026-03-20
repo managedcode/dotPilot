@@ -132,6 +132,30 @@ internal static partial class AgentSessionServiceLog
     public static partial void WorkspaceLoadFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
+        EventId = 1227,
+        Level = LogLevel.Information,
+        Message = "Resetting local workspace data.")]
+    public static partial void WorkspaceResetStarted(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1228,
+        Level = LogLevel.Information,
+        Message = "Reset local workspace data and restored first-run defaults.")]
+    public static partial void WorkspaceResetCompleted(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1229,
+        Level = LogLevel.Warning,
+        Message = "Workspace reset blocked because active sessions are still running. ActiveSessionCount={ActiveSessionCount}.")]
+    public static partial void WorkspaceResetBlocked(ILogger logger, int activeSessionCount);
+
+    [LoggerMessage(
+        EventId = 1230,
+        Level = LogLevel.Error,
+        Message = "Workspace reset failed.")]
+    public static partial void WorkspaceResetFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
         EventId = 1203,
         Level = LogLevel.Information,
         Message = "Loaded session transcript. SessionId={SessionId} EntryCount={EntryCount} ParticipantCount={ParticipantCount}.")]

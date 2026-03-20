@@ -2,7 +2,8 @@ using System.Text.Json;
 
 namespace DotPilot.Presentation;
 
-public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore, IDisposable
+public sealed class LocalOperatorPreferencesStore(OperatorPreferencesStorageOptions storageOptions)
+    : IOperatorPreferencesStore, IDisposable
 {
     private const string PreferencesDirectoryName = "dotPilot";
     private const string PreferencesFileName = "operator-preferences.json";
@@ -39,7 +40,34 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore, I
         }
     }
 
-    private static async ValueTask<OperatorPreferencesSnapshot> LoadFromDiskAsync(CancellationToken cancellationToken)
+    public async ValueTask<OperatorPreferencesSnapshot> ResetAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var filePath = ResolvePreferencesFilePath();
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(directory) &&
+                Directory.Exists(directory) &&
+                !Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Directory.Delete(directory);
+            }
+
+            return CreateDefaultSnapshot();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async ValueTask<OperatorPreferencesSnapshot> LoadFromDiskAsync(CancellationToken cancellationToken)
     {
         var filePath = ResolvePreferencesFilePath();
         if (!File.Exists(filePath))
@@ -61,7 +89,7 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore, I
         }
     }
 
-    private static async ValueTask SaveToDiskAsync(
+    private async ValueTask SaveToDiskAsync(
         OperatorPreferencesSnapshot snapshot,
         CancellationToken cancellationToken)
     {
@@ -79,8 +107,13 @@ public sealed class LocalOperatorPreferencesStore : IOperatorPreferencesStore, I
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
     }
 
-    private static string ResolvePreferencesFilePath()
+    private string ResolvePreferencesFilePath()
     {
+        if (!string.IsNullOrWhiteSpace(storageOptions.FilePath))
+        {
+            return storageOptions.FilePath;
+        }
+
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var baseDirectory = string.IsNullOrWhiteSpace(localAppData)
             ? Path.Combine(AppContext.BaseDirectory, ".local")

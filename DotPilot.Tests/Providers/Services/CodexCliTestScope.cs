@@ -11,18 +11,30 @@ internal sealed class CodexCliTestScope : IDisposable
     private readonly string? originalPath;
     private readonly string? originalHome;
     private readonly string? originalUserProfile;
+    private readonly string? originalDotPilotOnnxModelPath;
+    private readonly string? originalOnnxModelPath;
+    private readonly string? originalDotPilotLlamaSharpModelPath;
+    private readonly string? originalLlamaSharpModelPath;
     private bool disposed;
 
     private CodexCliTestScope(
         string rootPath,
         string? originalPath,
         string? originalHome,
-        string? originalUserProfile)
+        string? originalUserProfile,
+        string? originalDotPilotOnnxModelPath,
+        string? originalOnnxModelPath,
+        string? originalDotPilotLlamaSharpModelPath,
+        string? originalLlamaSharpModelPath)
     {
         this.rootPath = rootPath;
         this.originalPath = originalPath;
         this.originalHome = originalHome;
         this.originalUserProfile = originalUserProfile;
+        this.originalDotPilotOnnxModelPath = originalDotPilotOnnxModelPath;
+        this.originalOnnxModelPath = originalOnnxModelPath;
+        this.originalDotPilotLlamaSharpModelPath = originalDotPilotLlamaSharpModelPath;
+        this.originalLlamaSharpModelPath = originalLlamaSharpModelPath;
     }
 
     public static CodexCliTestScope Create(string testName)
@@ -30,6 +42,10 @@ internal sealed class CodexCliTestScope : IDisposable
         var originalPath = Environment.GetEnvironmentVariable("PATH");
         var originalHome = Environment.GetEnvironmentVariable("HOME");
         var originalUserProfile = Environment.GetEnvironmentVariable("USERPROFILE");
+        var originalDotPilotOnnxModelPath = Environment.GetEnvironmentVariable("DOTPILOT_ONNX_MODEL_PATH");
+        var originalOnnxModelPath = Environment.GetEnvironmentVariable("ONNX_MODEL_PATH");
+        var originalDotPilotLlamaSharpModelPath = Environment.GetEnvironmentVariable("DOTPILOT_LLAMASHARP_MODEL_PATH");
+        var originalLlamaSharpModelPath = Environment.GetEnvironmentVariable("LLAMASHARP_MODEL_PATH");
         var rootPath = Path.Combine(
             Path.GetTempPath(),
             "DotPilot.Tests",
@@ -43,7 +59,15 @@ internal sealed class CodexCliTestScope : IDisposable
         Environment.SetEnvironmentVariable("HOME", homePath);
         Environment.SetEnvironmentVariable("USERPROFILE", homePath);
 
-        return new CodexCliTestScope(rootPath, originalPath, originalHome, originalUserProfile);
+        return new CodexCliTestScope(
+            rootPath,
+            originalPath,
+            originalHome,
+            originalUserProfile,
+            originalDotPilotOnnxModelPath,
+            originalOnnxModelPath,
+            originalDotPilotLlamaSharpModelPath,
+            originalLlamaSharpModelPath);
     }
 
     public void Dispose()
@@ -56,6 +80,10 @@ internal sealed class CodexCliTestScope : IDisposable
         Environment.SetEnvironmentVariable("PATH", originalPath);
         Environment.SetEnvironmentVariable("HOME", originalHome);
         Environment.SetEnvironmentVariable("USERPROFILE", originalUserProfile);
+        Environment.SetEnvironmentVariable("DOTPILOT_ONNX_MODEL_PATH", originalDotPilotOnnxModelPath);
+        Environment.SetEnvironmentVariable("ONNX_MODEL_PATH", originalOnnxModelPath);
+        Environment.SetEnvironmentVariable("DOTPILOT_LLAMASHARP_MODEL_PATH", originalDotPilotLlamaSharpModelPath);
+        Environment.SetEnvironmentVariable("LLAMASHARP_MODEL_PATH", originalLlamaSharpModelPath);
         DeleteDirectoryWithRetry(rootPath);
 
         disposed = true;
@@ -202,6 +230,66 @@ internal sealed class CodexCliTestScope : IDisposable
             {
                 model,
             }));
+    }
+
+    public void WriteGeminiMetadata(
+        string defaultModel,
+        params string[] models)
+    {
+        var configDirectory = Path.Combine(
+            Environment.GetEnvironmentVariable("HOME") ?? rootPath,
+            ".gemini");
+        Directory.CreateDirectory(configDirectory);
+        File.WriteAllText(
+            Path.Combine(configDirectory, "config.toml"),
+            string.Join(
+                Environment.NewLine,
+                $"model = \"{defaultModel}\"",
+                string.Empty));
+
+        var payload = new
+        {
+            models = models.Select(model => new
+            {
+                slug = model,
+                display_name = model,
+                description = $"Test model {model}",
+                visibility = "list",
+                supported_in_api = true,
+                supported_reasoning_levels = new[]
+                {
+                    new
+                    {
+                        effort = "low",
+                    },
+                    new
+                    {
+                        effort = "high",
+                    },
+                },
+            }),
+        };
+
+        File.WriteAllText(
+            Path.Combine(configDirectory, "models_cache.json"),
+            JsonSerializer.Serialize(payload));
+    }
+
+    public string WriteOnnxModelDirectory(string directoryName = "phi-4-mini-instruct-onnx")
+    {
+        var directoryPath = Path.Combine(rootPath, directoryName);
+        Directory.CreateDirectory(directoryPath);
+        File.WriteAllText(Path.Combine(directoryPath, "genai_config.json"), "{}");
+        Environment.SetEnvironmentVariable("DOTPILOT_ONNX_MODEL_PATH", directoryPath);
+        return directoryPath;
+    }
+
+    public string WriteLlamaSharpModelFile(string fileName = "llama-3.2-3b-instruct.gguf")
+    {
+        var filePath = Path.Combine(rootPath, fileName);
+        File.WriteAllText(filePath, "placeholder model");
+        Environment.SetEnvironmentVariable("DOTPILOT_LLAMASHARP_MODEL_PATH", filePath);
+        return filePath;
     }
 
     private string GetCounterFilePath(string commandName)

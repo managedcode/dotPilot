@@ -35,6 +35,9 @@
   <SolidColorBrush x:Key="AppDarkSurfaceBrush" Color="{StaticResource AppDarkSurfaceColor}" />
   <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppAccentColor}" />
   <SolidColorBrush x:Key="AppSuccessBrush" Color="{StaticResource AppSuccessColor}" />
+  <SolidColorBrush x:Key="AppDangerBrush" Color="{StaticResource ErrorColor}" />
+  <SolidColorBrush x:Key="AppDangerForegroundBrush" Color="{StaticResource OnErrorColor}" />
+  <SolidColorBrush x:Key="AppDangerContainerBrush" Color="{StaticResource ErrorContainerColor}" />
 
   <LinearGradientBrush x:Key="UserAvatarBrush" StartPoint="0,0" EndPoint="1,1">
     <GradientStop Color="#FF667EEA" Offset="0" />
@@ -143,6 +146,11 @@
     <Setter Property="BorderBrush" Value="{StaticResource AppOutlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{StaticResource AppPrimaryTextBrush}" />
+  </Style>
+
+  <Style x:Key="DangerActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryActionButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource AppDangerBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AppDangerForegroundBrush}" />
   </Style>
 
   <Style x:Key="InlineActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryActionButtonStyle}">

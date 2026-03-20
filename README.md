@@ -11,9 +11,9 @@
 [![Download](https://img.shields.io/github/v/release/managedcode/dotPilot?label=Download&style=for-the-badge)](https://github.com/managedcode/dotPilot/releases/latest)
 [![License](https://img.shields.io/github/license/managedcode/dotPilot?style=for-the-badge)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-purple?style=for-the-badge)](https://dotnet.microsoft.com/)
-[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/@ManagedCode)
+[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/@Managed-Code)
 
-[Website](https://dotpilot.managed-code.com) · [Downloads](#downloads) · [Getting Started](#getting-started) · [YouTube](https://www.youtube.com/@ManagedCode) · [Issues](https://github.com/managedcode/dotPilot/issues)
+[Website](https://dotpilot.managed-code.com) · [Downloads](#downloads) · [Getting Started](#getting-started) · [YouTube](https://www.youtube.com/@Managed-Code) · [Issues](https://github.com/managedcode/dotPilot/issues)
 
 ---
 

@@ -7,4 +7,6 @@ public interface IOperatorPreferencesStore
     ValueTask<OperatorPreferencesSnapshot> SetAsync(
         ComposerSendBehavior behavior,
         CancellationToken cancellationToken);
+
+    ValueTask<OperatorPreferencesSnapshot> ResetAsync(CancellationToken cancellationToken);
 }

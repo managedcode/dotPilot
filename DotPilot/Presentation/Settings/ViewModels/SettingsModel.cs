@@ -16,7 +16,7 @@ public partial record SettingsModel
     private const string SelectProviderTitleValue = "Select a provider";
     private const string SelectProviderSummaryValue = "Choose a provider to inspect readiness and install guidance.";
     private const string SettingsTitleValue = "Settings";
-    private const string SettingsSubtitleValue = "Tune providers and message behavior for the local desktop operator.";
+    private const string SettingsSubtitleValue = "Tune providers, profile, and message behavior for the local desktop operator.";
     private const string EnableProviderLabel = "Enable provider";
     private const string DisableProviderLabel = "Disable provider";
     private static readonly ProviderStatusItem EmptySelectedProvider = new(
@@ -77,9 +77,13 @@ public partial record SettingsModel
 
     public IState<bool> IsMessagesSectionSelected => State.Value(this, static () => false);
 
+    public IState<bool> IsProfileSectionSelected => State.Value(this, static () => false);
+
     public IState<bool> ShowProvidersSection => State.Value(this, static () => true);
 
     public IState<bool> ShowMessagesSection => State.Value(this, static () => false);
+
+    public IState<bool> ShowProfileSection => State.Value(this, static () => false);
 
     public IState<ProviderStatusItem> SelectedProvider => State.Value(this, static () => EmptySelectedProvider);
 
@@ -395,8 +399,15 @@ public partial record SettingsModel
         await SelectedSection.SetAsync(section, cancellationToken);
         await IsProvidersSectionSelected.SetAsync(section is SettingsSection.Providers, cancellationToken);
         await IsMessagesSectionSelected.SetAsync(section is SettingsSection.Messages, cancellationToken);
+        await IsProfileSectionSelected.SetAsync(section is SettingsSection.Profile, cancellationToken);
         await ShowProvidersSection.SetAsync(section is SettingsSection.Providers, cancellationToken);
         await ShowMessagesSection.SetAsync(section is SettingsSection.Messages, cancellationToken);
+        await ShowProfileSection.SetAsync(section is SettingsSection.Profile, cancellationToken);
+        if (section is not SettingsSection.Profile)
+        {
+            await ClearDeleteAllDataConfirmationAsync(cancellationToken);
+        }
+
         if (section is SettingsSection.Messages)
         {
             await SynchronizeComposerSendBehaviorAsync(await operatorPreferencesStore.GetAsync(cancellationToken), cancellationToken);
@@ -430,6 +441,12 @@ public partial record SettingsModel
         if (string.Equals(sectionKey, MessagesSectionKey, StringComparison.Ordinal))
         {
             section = SettingsSection.Messages;
+            return true;
+        }
+
+        if (string.Equals(sectionKey, ProfileSectionKey, StringComparison.Ordinal))
+        {
+            section = SettingsSection.Profile;
             return true;
         }
 
@@ -570,6 +587,6 @@ public partial record SettingsModel
 
     private static bool IsVisibleProvider(AgentProviderKind kind)
     {
-        return kind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.GitHubCopilot;
+        return kind is AgentProviderKind.Codex or AgentProviderKind.ClaudeCode or AgentProviderKind.GitHubCopilot or AgentProviderKind.Gemini or AgentProviderKind.Onnx or AgentProviderKind.LlamaSharp;
     }
 }
