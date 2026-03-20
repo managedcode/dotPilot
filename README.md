@@ -125,7 +125,7 @@ Your data never leaves your device unless you explicitly choose a cloud provider
 
 We're developing dotPilot in the open.
 
-- 📺 **YouTube** — [@ManagedCode](https://www.youtube.com/@managed-code)
+- 📺 **YouTube** — [@Managed-Code](https://www.youtube.com/@managed-code)
 - 💬 **Issues** — [GitHub Issues](https://github.com/managedcode/dotPilot/issues)
 - 🌐 **Website** — [dotpilot.managed-code.com](https://dotpilot.managed-code.com)
 
