@@ -35,6 +35,8 @@ public sealed class RealProviderSessionSmokeTests
     [TestCase(AgentProviderKind.ClaudeCode, "Claude Code")]
     [TestCase(AgentProviderKind.GitHubCopilot, "GitHub Copilot")]
     [TestCase(AgentProviderKind.Gemini, "Gemini")]
+    [TestCase(AgentProviderKind.Onnx, "ONNX Runtime GenAI")]
+    [TestCase(AgentProviderKind.LlamaSharp, "LLamaSharp")]
     public async Task CreateAgentAndSendHelloWorksForRealProviderWhenRuntimeIsAvailable(
         AgentProviderKind providerKind,
         string providerDisplayName)

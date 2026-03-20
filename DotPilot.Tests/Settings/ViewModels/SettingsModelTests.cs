@@ -22,7 +22,9 @@ public sealed class SettingsModelTests
             AgentProviderKind.Codex,
             AgentProviderKind.ClaudeCode,
             AgentProviderKind.GitHubCopilot,
-            AgentProviderKind.Gemini);
+            AgentProviderKind.Gemini,
+            AgentProviderKind.Onnx,
+            AgentProviderKind.LlamaSharp);
         providers.Should().OnlyContain(provider => provider.Kind != AgentProviderKind.Debug);
         (await model.SelectedProviderTitle).Should().Be("Codex");
         (await model.ToggleActionLabel).Should().Be("Enable provider");
@@ -143,6 +145,29 @@ public sealed class SettingsModelTests
         details.Should().Contain(detail =>
             detail.Label == "Supported models" &&
             detail.Value.Contains("gemini-2.5-flash", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesOnnxModelPathDetails()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        var modelPath = commandScope.WriteOnnxModelDirectory();
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.Onnx);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        details.Should().Contain(detail =>
+            detail.Label == "Model path variables" &&
+            detail.Value.Contains("DOTPILOT_ONNX_MODEL_PATH", StringComparison.Ordinal));
     }
 
     [Test]

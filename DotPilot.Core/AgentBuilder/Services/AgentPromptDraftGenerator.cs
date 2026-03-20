@@ -135,6 +135,8 @@ public sealed class AgentPromptDraftGenerator(
             yield return AgentProviderKind.GitHubCopilot;
             yield return AgentProviderKind.Gemini;
             yield return AgentProviderKind.ClaudeCode;
+            yield return AgentProviderKind.Onnx;
+            yield return AgentProviderKind.LlamaSharp;
             yield return AgentProviderKind.Debug;
             yield break;
         }
@@ -145,6 +147,8 @@ public sealed class AgentPromptDraftGenerator(
             yield return AgentProviderKind.Gemini;
             yield return AgentProviderKind.Codex;
             yield return AgentProviderKind.GitHubCopilot;
+            yield return AgentProviderKind.Onnx;
+            yield return AgentProviderKind.LlamaSharp;
             yield return AgentProviderKind.Debug;
             yield break;
         }
@@ -153,6 +157,8 @@ public sealed class AgentPromptDraftGenerator(
         yield return AgentProviderKind.Gemini;
         yield return AgentProviderKind.ClaudeCode;
         yield return AgentProviderKind.GitHubCopilot;
+        yield return AgentProviderKind.Onnx;
+        yield return AgentProviderKind.LlamaSharp;
         yield return AgentProviderKind.Debug;
     }
 

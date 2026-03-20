@@ -63,6 +63,23 @@ public sealed class AgentPromptDraftGeneratorTests
         draft.ModelName.Should().Be("gemini-2.5-pro");
     }
 
+    [Test]
+    public async Task CreateManualDraftAsyncUsesOnnxWhenItIsTheOnlyEnabledRealProvider()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentPromptDraftGeneratorTests));
+        commandScope.WriteOnnxModelDirectory();
+
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var draft = await fixture.Generator.CreateManualDraftAsync(CancellationToken.None);
+
+        draft.ProviderKind.Should().Be(AgentProviderKind.Onnx);
+        draft.ModelName.Should().Be("phi-4-mini-instruct-onnx");
+    }
+
     private static TestFixture CreateFixture()
     {
         var services = new ServiceCollection();

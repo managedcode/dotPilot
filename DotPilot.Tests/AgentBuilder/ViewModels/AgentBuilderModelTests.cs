@@ -240,6 +240,28 @@ public sealed class AgentBuilderModelTests
     }
 
     [Test]
+    public async Task HandleProviderSelectionChangedUsesOnnxProviderKindParameterWhenNoProviderOptionIsProvided()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        commandScope.WriteOnnxModelDirectory();
+
+        await using var fixture = await CreateFixtureAsync();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        await model.HandleProviderSelectionChanged(AgentProviderKind.Onnx, CancellationToken.None);
+
+        (await model.BuilderProviderDisplayName).Should().Be("ONNX Runtime GenAI");
+        (await model.BuilderSuggestedModelName).Should().Be("phi-4-mini-instruct-onnx");
+        (await model.SelectedProvider).Should().NotBeNull();
+        (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Onnx);
+    }
+
+    [Test]
     public async Task HandleProviderSelectionChangedUsesTheProvidedProviderWhenThePreviousProviderRemainsPopulated()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));

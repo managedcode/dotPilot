@@ -13,6 +13,8 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.ClaudeCode => "claude",
             AgentProviderKind.GitHubCopilot => "copilot",
             AgentProviderKind.Gemini => "gemini",
+            AgentProviderKind.Onnx => "onnx",
+            AgentProviderKind.LlamaSharp => "llamasharp",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -26,6 +28,8 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.ClaudeCode => "claude-sonnet-4-5",
             AgentProviderKind.GitHubCopilot => "gpt-5",
             AgentProviderKind.Gemini => GeminiModels.Gemini25Pro,
+            AgentProviderKind.Onnx => "phi-4-mini-instruct",
+            AgentProviderKind.LlamaSharp => "llama-3.2-3b-instruct",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -39,6 +43,8 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.ClaudeCode => "Claude Code",
             AgentProviderKind.GitHubCopilot => "GitHub Copilot",
             AgentProviderKind.Gemini => "Gemini",
+            AgentProviderKind.Onnx => "ONNX Runtime GenAI",
+            AgentProviderKind.LlamaSharp => "LLamaSharp",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -52,6 +58,8 @@ internal static class AgentProviderKindExtensions
             AgentProviderKind.ClaudeCode => "npm install -g @anthropic-ai/claude-code",
             AgentProviderKind.GitHubCopilot => "npm install -g @github/copilot",
             AgentProviderKind.Gemini => "npm install -g @google/gemini-cli",
+            AgentProviderKind.Onnx => kind.GetModelPathSetupCommand(),
+            AgentProviderKind.LlamaSharp => kind.GetModelPathSetupCommand(),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -70,6 +78,8 @@ internal static class AgentProviderKindExtensions
                 GeminiModels.Gemini25Flash,
                 GeminiModels.Gemini25FlashLite,
             ],
+            AgentProviderKind.Onnx => [],
+            AgentProviderKind.LlamaSharp => [],
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }

@@ -7,6 +7,8 @@ public enum AgentProviderKind
     ClaudeCode,
     GitHubCopilot,
     Gemini,
+    Onnx,
+    LlamaSharp,
 }
 
 public enum AgentProviderStatus

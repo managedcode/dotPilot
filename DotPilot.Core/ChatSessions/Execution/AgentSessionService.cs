@@ -867,6 +867,12 @@ internal sealed partial class AgentSessionService(
                 continue;
             }
 
+            if (providerKind.IsLocalModelProvider() &&
+                LocalModelProviderConfigurationReader.Read(providerKind).IsReady)
+            {
+                return providerKind;
+            }
+
             if (!string.IsNullOrWhiteSpace(ResolveExecutablePath(providerKind.GetCommandName())))
             {
                 return providerKind;
