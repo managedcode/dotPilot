@@ -6,9 +6,13 @@ namespace DotPilot.Core.ChatSessions;
 internal static class AgentProfileSchemaCompatibilityEnsurer
 {
     private const string AgentProfilesTableName = "AgentProfiles";
+    private const string ProviderPreferencesTableName = "ProviderPreferences";
+    private const string ProviderLocalModelsTableName = "ProviderLocalModels";
     private const string DescriptionColumnName = "Description";
     private const string RoleColumnName = "Role";
     private const string CapabilitiesJsonColumnName = "CapabilitiesJson";
+    private const string LocalModelPathColumnName = "LocalModelPath";
+    private const string AddedAtColumnName = "AddedAt";
 
     public static async Task EnsureAsync(LocalAgentSessionDbContext dbContext, CancellationToken cancellationToken)
     {
@@ -19,8 +23,8 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
             return;
         }
 
-        var existingColumns = await ReadColumnNamesAsync(dbContext, cancellationToken);
-        if (!existingColumns.Contains(DescriptionColumnName, StringComparer.OrdinalIgnoreCase))
+        var agentProfileColumns = await ReadColumnNamesAsync(dbContext, AgentProfilesTableName, cancellationToken);
+        if (!agentProfileColumns.Contains(DescriptionColumnName, StringComparer.OrdinalIgnoreCase))
         {
             await dbContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -30,7 +34,7 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
                 cancellationToken);
         }
 
-        if (!existingColumns.Contains(RoleColumnName, StringComparer.OrdinalIgnoreCase))
+        if (!agentProfileColumns.Contains(RoleColumnName, StringComparer.OrdinalIgnoreCase))
         {
             await dbContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -40,7 +44,7 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
                 cancellationToken);
         }
 
-        if (!existingColumns.Contains(CapabilitiesJsonColumnName, StringComparer.OrdinalIgnoreCase))
+        if (!agentProfileColumns.Contains(CapabilitiesJsonColumnName, StringComparer.OrdinalIgnoreCase))
         {
             await dbContext.Database.ExecuteSqlRawAsync(
                 $"""
@@ -49,10 +53,57 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
                  """,
                 cancellationToken);
         }
+
+        var providerPreferenceColumns = await ReadColumnNamesAsync(dbContext, ProviderPreferencesTableName, cancellationToken);
+        if (!providerPreferenceColumns.Contains(LocalModelPathColumnName, StringComparer.OrdinalIgnoreCase))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $"""
+                 ALTER TABLE "{ProviderPreferencesTableName}"
+                 ADD COLUMN "{LocalModelPathColumnName}" TEXT NULL;
+                 """,
+                cancellationToken);
+        }
+
+        var providerLocalModelColumns = await ReadColumnNamesAsync(dbContext, ProviderLocalModelsTableName, cancellationToken);
+        if (providerLocalModelColumns.Count == 0)
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $"""
+                 CREATE TABLE IF NOT EXISTS "{ProviderLocalModelsTableName}" (
+                     "ProviderKind" INTEGER NOT NULL,
+                     "ModelPath" TEXT NOT NULL,
+                     "{AddedAtColumnName}" TEXT NOT NULL,
+                     CONSTRAINT "PK_{ProviderLocalModelsTableName}" PRIMARY KEY ("ProviderKind", "ModelPath")
+                 );
+                 """,
+                cancellationToken);
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            $"""
+             CREATE INDEX IF NOT EXISTS "IX_{ProviderLocalModelsTableName}_ProviderKind_{AddedAtColumnName}"
+             ON "{ProviderLocalModelsTableName}" ("ProviderKind", "{AddedAtColumnName}");
+             """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            $"""
+             INSERT OR IGNORE INTO "{ProviderLocalModelsTableName}" ("ProviderKind", "ModelPath", "{AddedAtColumnName}")
+             SELECT
+                 "ProviderKind",
+                 "{LocalModelPathColumnName}",
+                 "{ProviderPreferencesTableName}"."UpdatedAt"
+             FROM "{ProviderPreferencesTableName}"
+             WHERE "{LocalModelPathColumnName}" IS NOT NULL
+               AND TRIM("{LocalModelPathColumnName}") <> '';
+             """,
+            cancellationToken);
     }
 
     private static async Task<HashSet<string>> ReadColumnNamesAsync(
         LocalAgentSessionDbContext dbContext,
+        string tableName,
         CancellationToken cancellationToken)
     {
         var connection = dbContext.Database.GetDbConnection();
@@ -65,7 +116,7 @@ internal static class AgentProfileSchemaCompatibilityEnsurer
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = $"""PRAGMA table_info("{AgentProfilesTableName}")""";
+            command.CommandText = $"""PRAGMA table_info("{tableName}")""";
 
             HashSet<string> columns = new(StringComparer.OrdinalIgnoreCase);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace DotPilot.Tests.Providers;
@@ -275,21 +276,60 @@ internal sealed class CodexCliTestScope : IDisposable
             JsonSerializer.Serialize(payload));
     }
 
-    public string WriteOnnxModelDirectory(string directoryName = "phi-4-mini-instruct-onnx")
+    public string WriteOnnxModelDirectory(
+        string directoryName = "phi-4-mini-instruct-onnx",
+        string modelType = "phi3")
     {
         var directoryPath = Path.Combine(rootPath, directoryName);
         Directory.CreateDirectory(directoryPath);
-        File.WriteAllText(Path.Combine(directoryPath, "genai_config.json"), "{}");
+        File.WriteAllText(
+            Path.Combine(directoryPath, "genai_config.json"),
+            JsonSerializer.Serialize(new
+            {
+                model = new
+                {
+                    type = modelType,
+                    decoder = new
+                    {
+                        filename = "model.onnx",
+                    },
+                },
+            }));
+        File.WriteAllText(Path.Combine(directoryPath, "model.onnx"), "placeholder onnx model");
         Environment.SetEnvironmentVariable("DOTPILOT_ONNX_MODEL_PATH", directoryPath);
         return directoryPath;
     }
 
-    public string WriteLlamaSharpModelFile(string fileName = "llama-3.2-3b-instruct.gguf")
+    public string WriteLlamaSharpModelFile(
+        string fileName = "llama-3.2-3b-instruct.gguf",
+        string architecture = "llama")
     {
         var filePath = Path.Combine(rootPath, fileName);
-        File.WriteAllText(filePath, "placeholder model");
+        WriteMinimalGgufModel(filePath, architecture);
         Environment.SetEnvironmentVariable("DOTPILOT_LLAMASHARP_MODEL_PATH", filePath);
         return filePath;
+    }
+
+    private static void WriteMinimalGgufModel(string filePath, string architecture)
+    {
+        using var stream = File.Create(filePath);
+        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: false);
+
+        writer.Write("GGUF"u8.ToArray());
+        writer.Write((uint)3);
+        writer.Write((ulong)0);
+        writer.Write((ulong)1);
+
+        WriteGgufString(writer, "general.architecture");
+        writer.Write((uint)8);
+        WriteGgufString(writer, architecture);
+    }
+
+    private static void WriteGgufString(BinaryWriter writer, string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        writer.Write((ulong)bytes.Length);
+        writer.Write(bytes);
     }
 
     private string GetCounterFilePath(string commandName)

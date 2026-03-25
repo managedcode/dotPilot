@@ -52,6 +52,21 @@ internal sealed class LocalAgentChatHistoryStore(AgentSessionStorageOptions stor
         await WriteAsync(path, combined, cancellationToken);
     }
 
+    public async ValueTask DeleteAsync(
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        var storageKey = sessionId.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+        var path = GetPath(storageKey);
+        if (UseTransientStore())
+        {
+            _memoryHistory.Remove(path);
+            return;
+        }
+
+        await LocalStorageDeletion.DeleteFileIfExistsAsync(path, cancellationToken);
+    }
+
     public async ValueTask ClearAsync(CancellationToken cancellationToken)
     {
         _memoryHistory.Clear();

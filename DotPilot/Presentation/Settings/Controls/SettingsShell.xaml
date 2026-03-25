@@ -332,7 +332,7 @@
                                       Tag="{x:Bind}"
                                       Style="{StaticResource InlineActionButtonStyle}"
                                       VerticalAlignment="Center">
-                                <TextBlock Text="Copy" />
+                                <TextBlock Text="{x:Bind ButtonText}" />
                               </Button>
                             </Grid>
                           </Border>

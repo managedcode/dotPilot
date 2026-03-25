@@ -1,10 +1,18 @@
 
 namespace DotPilot.Core.ChatSessions.Contracts;
 
+public enum ProviderActionKind
+{
+    CopyCommand = 0,
+    PickFile = 1,
+    PickFolder = 2,
+}
+
 public sealed record ProviderActionDescriptor(
     string Label,
     string Summary,
-    string Command);
+    string Command,
+    ProviderActionKind Kind);
 
 public sealed record ProviderDetailDescriptor(
     string Label,

@@ -151,7 +151,7 @@ public sealed class SettingsModelTests
     public async Task SelectProviderSurfacesOnnxModelPathDetails()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
-        var modelPath = commandScope.WriteOnnxModelDirectory();
+        var modelPath = commandScope.WriteOnnxModelDirectory("granite-vision-onnx");
         await using var fixture = CreateFixture();
         (await fixture.WorkspaceState.UpdateProviderAsync(
             new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
@@ -165,9 +165,140 @@ public sealed class SettingsModelTests
 
         var details = await model.SelectedProviderDetails;
         details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "granite-vision-onnx");
         details.Should().Contain(detail =>
             detail.Label == "Model path variables" &&
             detail.Value.Contains("DOTPILOT_ONNX_MODEL_PATH", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesLlamaSharpOpenFileAction()
+    {
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.LlamaSharp);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var actions = await model.SelectedProviderActions;
+        actions.Should().ContainSingle();
+        actions[0].Label.Should().Be("Add model file");
+        actions[0].Kind.Should().Be(ProviderActionKind.PickFile);
+        actions[0].ButtonText.Should().Be("Open");
+    }
+
+    [Test]
+    public async Task SelectProviderSurfacesOnnxOpenFileAction()
+    {
+        await using var fixture = CreateFixture();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.Onnx);
+
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+
+        var actions = await model.SelectedProviderActions;
+        actions.Should().ContainSingle();
+        actions[0].Label.Should().Be("Add genai_config.json");
+        actions[0].Kind.Should().Be(ProviderActionKind.PickFile);
+        actions[0].ButtonText.Should().Be("Open");
+    }
+
+    [Test]
+    public async Task ExecuteProviderActionPersistsPickedLlamaSharpModelPathAndRefreshesProjection()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        var modelPath = commandScope.WriteLlamaSharpModelFile("mistral-nemo-instruct.gguf");
+        await using var fixture = CreateFixture();
+        fixture.LocalModelPathPicker.NextResult = new LocalModelPathPickerResult(modelPath, IsCancelled: false);
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.LlamaSharp);
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+        var action = (await model.SelectedProviderActions).Single();
+
+        await model.ExecuteProviderAction(action, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        details.Should().Contain(detail => detail.Label == "Detected architecture" && detail.Value == "llama");
+        details.Should().Contain(detail => detail.Label == "Suggested model" && detail.Value == "mistral-nemo-instruct");
+        (await model.StatusMessage).Should().Be("LLamaSharp model added.");
+
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        var provider = workspace.Providers.Single(candidate => candidate.Kind == AgentProviderKind.LlamaSharp);
+        provider.SuggestedModelName.Should().Be("mistral-nemo-instruct");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("mistral-nemo-instruct");
+    }
+
+    [Test]
+    public async Task ExecuteProviderActionAddsSecondLlamaSharpModelWithoutReplacingTheFirst()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        var firstModelPath = commandScope.WriteLlamaSharpModelFile("mistral-nemo-instruct.gguf", architecture: "mistral");
+        var secondModelPath = commandScope.WriteLlamaSharpModelFile("qwen-3-4b-instruct.gguf", architecture: "qwen3");
+        await using var fixture = CreateFixture();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var selectedProvider = (await model.Providers).First(provider => provider.Kind == AgentProviderKind.LlamaSharp);
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+        var action = (await model.SelectedProviderActions).Single();
+
+        fixture.LocalModelPathPicker.NextResult = new LocalModelPathPickerResult(firstModelPath, IsCancelled: false);
+        await model.ExecuteProviderAction(action, CancellationToken.None);
+        fixture.LocalModelPathPicker.NextResult = new LocalModelPathPickerResult(secondModelPath, IsCancelled: false);
+        await model.ExecuteProviderAction(action, CancellationToken.None);
+
+        var details = await model.SelectedProviderDetails;
+        details.Should().Contain(detail =>
+            detail.Label == "Configured model paths" &&
+            detail.Value.Contains(firstModelPath, StringComparison.Ordinal) &&
+            detail.Value.Contains(secondModelPath, StringComparison.Ordinal));
+        details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("qwen-3-4b-instruct", StringComparison.Ordinal) &&
+            detail.Value.Contains("mistral-nemo-instruct", StringComparison.Ordinal));
+
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        var provider = workspace.Providers.Single(candidate => candidate.Kind == AgentProviderKind.LlamaSharp);
+        provider.SuggestedModelName.Should().Be("qwen-3-4b-instruct");
+        provider.SupportedModelNames.Should().ContainInOrder("qwen-3-4b-instruct", "mistral-nemo-instruct");
+    }
+
+    [Test]
+    public async Task ExecuteProviderActionRejectsUnsupportedLlamaSharpArchitecture()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(SettingsModelTests));
+        var modelPath = commandScope.WriteLlamaSharpModelFile("Qwen3.5-4B.Q2_K.gguf", architecture: "qwen35");
+        Environment.SetEnvironmentVariable("DOTPILOT_LLAMASHARP_MODEL_PATH", null);
+        Environment.SetEnvironmentVariable("LLAMASHARP_MODEL_PATH", null);
+        await using var fixture = CreateFixture();
+        fixture.LocalModelPathPicker.NextResult = new LocalModelPathPickerResult(modelPath, IsCancelled: false);
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<SettingsModel>(fixture.Provider);
+
+        var providers = await model.Providers;
+        var selectedProvider = providers.First(provider => provider.Kind == AgentProviderKind.LlamaSharp);
+        await model.SelectProvider(selectedProvider, CancellationToken.None);
+        var action = (await model.SelectedProviderActions).Single();
+
+        await model.ExecuteProviderAction(action, CancellationToken.None);
+
+        (await model.StatusMessage).Should().Contain("qwen35");
+        var details = await model.SelectedProviderDetails;
+        details.Should().NotContain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
     }
 
     [Test]
@@ -275,6 +406,8 @@ public sealed class SettingsModelTests
             FilePath = preferencesFilePath,
         });
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
+        var localModelPathPicker = new TestLocalModelPathPicker();
+        services.AddSingleton<ILocalModelPathPicker>(localModelPathPicker);
         services.AddAgentSessions(new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,
@@ -283,7 +416,7 @@ public sealed class SettingsModelTests
 
         var provider = services.BuildServiceProvider();
         var workspaceState = provider.GetRequiredService<IAgentWorkspaceState>();
-        return new TestFixture(provider, workspaceState, tempRoot, preferencesFilePath);
+        return new TestFixture(provider, workspaceState, localModelPathPicker, tempRoot, preferencesFilePath);
     }
 
     private static string CreateTempRootDirectory()
@@ -321,6 +454,7 @@ public sealed class SettingsModelTests
     private sealed class TestFixture(
         ServiceProvider provider,
         IAgentWorkspaceState workspaceState,
+        TestLocalModelPathPicker localModelPathPicker,
         string tempRootPath,
         string preferencesFilePath) : IAsyncDisposable
     {
@@ -330,12 +464,27 @@ public sealed class SettingsModelTests
 
         public IAgentWorkspaceState WorkspaceState { get; } = workspaceState;
 
+        public TestLocalModelPathPicker LocalModelPathPicker { get; } = localModelPathPicker;
+
         public string PreferencesFilePath { get; } = preferencesFilePath;
 
         public async ValueTask DisposeAsync()
         {
             await Provider.DisposeAsync();
             await DeleteDirectoryWithRetryAsync(_tempRootPath);
+        }
+    }
+
+    private sealed class TestLocalModelPathPicker : ILocalModelPathPicker
+    {
+        public LocalModelPathPickerResult NextResult { get; set; } = new(null, IsCancelled: true);
+
+        public ValueTask<LocalModelPathPickerResult> PickAsync(
+            AgentProviderKind providerKind,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(NextResult);
         }
     }
 }

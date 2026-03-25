@@ -62,6 +62,7 @@ public sealed class StartupWorkspaceHydrationTests
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 
             hydration.IsHydrating.Should().BeFalse();
+            hydration.HasCompletedInitialAttempt.Should().BeTrue();
             hydration.IsReady.Should().BeFalse();
 
             await DeleteDirectoryWithRetryAsync(databasePath);
@@ -69,6 +70,7 @@ public sealed class StartupWorkspaceHydrationTests
             await hydration.EnsureHydratedAsync(CancellationToken.None);
 
             hydration.IsHydrating.Should().BeFalse();
+            hydration.HasCompletedInitialAttempt.Should().BeTrue();
             hydration.IsReady.Should().BeTrue();
         }
         finally

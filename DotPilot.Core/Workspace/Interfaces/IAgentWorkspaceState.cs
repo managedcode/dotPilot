@@ -24,8 +24,16 @@ public interface IAgentWorkspaceState
         CreateSessionCommand command,
         CancellationToken cancellationToken);
 
+    ValueTask<Result<AgentWorkspaceSnapshot>> CloseSessionAsync(
+        CloseSessionCommand command,
+        CancellationToken cancellationToken);
+
     ValueTask<Result<ProviderStatusDescriptor>> UpdateProviderAsync(
         UpdateProviderPreferenceCommand command,
+        CancellationToken cancellationToken);
+
+    ValueTask<Result<ProviderStatusDescriptor>> SetLocalModelPathAsync(
+        SetLocalModelPathCommand command,
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Result<SessionStreamEntry>> SendMessageAsync(

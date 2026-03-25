@@ -69,6 +69,20 @@ internal sealed class LocalAgentSessionStateStore(AgentSessionStorageOptions sto
         await WriteTextAsync(path, payload, cancellationToken);
     }
 
+    public async ValueTask DeleteAsync(
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        var path = GetPath(sessionId);
+        if (UseTransientStore())
+        {
+            _memorySessions.Remove(path);
+            return;
+        }
+
+        await LocalStorageDeletion.DeleteFileIfExistsAsync(path, cancellationToken);
+    }
+
     public async ValueTask ClearAsync(CancellationToken cancellationToken)
     {
         _memorySessions.Clear();

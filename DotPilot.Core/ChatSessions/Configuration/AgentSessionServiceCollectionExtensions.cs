@@ -25,6 +25,7 @@ public static class AgentSessionServiceCollectionExtensions
         services.AddSingleton<IAgentSessionService, AgentSessionService>();
         services.AddSingleton<IAgentWorkspaceState, AgentWorkspaceState>();
         services.AddSingleton<IStartupWorkspaceHydration, StartupWorkspaceHydration>();
+        services.AddHostedService<StartupWorkspaceHydrationHostedService>();
         return services;
     }
 

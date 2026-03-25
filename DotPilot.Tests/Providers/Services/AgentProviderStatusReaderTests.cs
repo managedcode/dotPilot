@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DotPilot.Core.ChatSessions;
 using DotPilot.Core.Providers.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -203,7 +204,7 @@ public sealed class AgentProviderStatusReaderTests
     public async Task EnabledOnnxProviderReportsReadyRuntimeWhenModelDirectoryIsConfigured()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
-        var modelPath = commandScope.WriteOnnxModelDirectory();
+        var modelPath = commandScope.WriteOnnxModelDirectory("granite-vision-onnx");
 
         await using var fixture = CreateFixture();
         var provider = (await fixture.Service.UpdateProviderAsync(
@@ -214,9 +215,13 @@ public sealed class AgentProviderStatusReaderTests
         provider.CanCreateAgents.Should().BeTrue();
         provider.Status.Should().Be(AgentProviderStatus.Ready);
         provider.StatusSummary.Should().Contain("ready for desktop execution");
-        provider.SuggestedModelName.Should().Be("phi-4-mini-instruct-onnx");
-        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("phi-4-mini-instruct-onnx");
+        provider.SuggestedModelName.Should().Be("granite-vision-onnx");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("granite-vision-onnx");
         provider.Details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        provider.Details.Should().Contain(detail => detail.Label == "Detected model type" && detail.Value == "phi3");
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Supported model types" &&
+            detail.Value.Contains("decoder", StringComparison.Ordinal));
         provider.Details.Should().Contain(detail =>
             detail.Label == "Model path variables" &&
             detail.Value.Contains("DOTPILOT_ONNX_MODEL_PATH", StringComparison.Ordinal));
@@ -226,7 +231,7 @@ public sealed class AgentProviderStatusReaderTests
     public async Task EnabledLlamaSharpProviderReportsReadyRuntimeWhenGgufFileIsConfigured()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
-        var modelPath = commandScope.WriteLlamaSharpModelFile();
+        var modelPath = commandScope.WriteLlamaSharpModelFile("mistral-nemo-instruct.gguf");
 
         await using var fixture = CreateFixture();
         var provider = (await fixture.Service.UpdateProviderAsync(
@@ -237,12 +242,118 @@ public sealed class AgentProviderStatusReaderTests
         provider.CanCreateAgents.Should().BeTrue();
         provider.Status.Should().Be(AgentProviderStatus.Ready);
         provider.StatusSummary.Should().Contain("ready for desktop execution");
-        provider.SuggestedModelName.Should().Be("llama-3.2-3b-instruct");
-        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("llama-3.2-3b-instruct");
+        provider.SuggestedModelName.Should().Be("mistral-nemo-instruct");
+        provider.SupportedModelNames.Should().ContainSingle().Which.Should().Be("mistral-nemo-instruct");
         provider.Details.Should().Contain(detail => detail.Label == "Configured model path" && detail.Value == modelPath);
+        provider.Details.Should().Contain(detail => detail.Label == "Detected architecture" && detail.Value == "llama");
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Supported architectures" &&
+            detail.Value.Contains("llama", StringComparison.Ordinal));
         provider.Details.Should().Contain(detail =>
             detail.Label == "Model path variables" &&
             detail.Value.Contains("DOTPILOT_LLAMASHARP_MODEL_PATH", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task EnabledLlamaSharpProviderSurfacesEveryAddedModel()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        var firstModelPath = commandScope.WriteLlamaSharpModelFile("mistral-nemo-instruct.gguf", architecture: "mistral");
+        var secondModelPath = commandScope.WriteLlamaSharpModelFile("qwen-3-4b-instruct.gguf", architecture: "qwen3");
+
+        await using var fixture = CreateFixture();
+        _ = (await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, firstModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, secondModelPath),
+            CancellationToken.None)).ShouldSucceed();
+
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.SuggestedModelName.Should().Be("qwen-3-4b-instruct");
+        provider.SupportedModelNames.Should().ContainInOrder("qwen-3-4b-instruct", "mistral-nemo-instruct");
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Configured model paths" &&
+            detail.Value.Contains(firstModelPath, StringComparison.Ordinal) &&
+            detail.Value.Contains(secondModelPath, StringComparison.Ordinal));
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Supported models" &&
+            detail.Value.Contains("qwen-3-4b-instruct", StringComparison.Ordinal) &&
+            detail.Value.Contains("mistral-nemo-instruct", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task EnabledOnnxProviderReportsErrorForUnsupportedGenAiModelType()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        _ = commandScope.WriteOnnxModelDirectory("unsupported-onnx-model", modelType: "qwen35");
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.Status.Should().Be(AgentProviderStatus.Error);
+        provider.CanCreateAgents.Should().BeFalse();
+        provider.StatusSummary.Should().Contain("qwen35");
+        provider.Details.Should().Contain(detail => detail.Label == "Detected model type" && detail.Value == "qwen35");
+    }
+
+    [Test]
+    public async Task EnabledLlamaSharpProviderReportsErrorForUnsupportedArchitecture()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        _ = commandScope.WriteLlamaSharpModelFile("Qwen3.5-4B.Q2_K.gguf", architecture: "qwen35");
+
+        await using var fixture = CreateFixture();
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.Status.Should().Be(AgentProviderStatus.Error);
+        provider.CanCreateAgents.Should().BeFalse();
+        provider.StatusSummary.Should().Contain("qwen35");
+        provider.Details.Should().Contain(detail => detail.Label == "Detected architecture" && detail.Value == "qwen35");
+    }
+
+    [Test]
+    public async Task ReadAsyncFansOutSlowCliProbesInParallel()
+    {
+        const int probeDelayMilliseconds = 450;
+
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentProviderStatusReaderTests));
+        commandScope.WriteCountingVersionCommand("codex", "codex version 1.0.0", delayMilliseconds: probeDelayMilliseconds);
+        commandScope.WriteCodexMetadata("gpt-5.4", "gpt-5.4");
+        commandScope.WriteCountingVersionCommand("claude", "claude version 2.0.75", delayMilliseconds: probeDelayMilliseconds);
+        commandScope.WriteClaudeSettings("claude-opus-4-6");
+        commandScope.WriteCountingVersionCommand("gemini", "gemini-cli 0.34.0", delayMilliseconds: probeDelayMilliseconds);
+        commandScope.WriteGeminiMetadata("gemini-2.5-pro", "gemini-2.5-pro");
+
+        await using var fixture = CreateFixture();
+        _ = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Codex, true),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.ClaudeCode, true),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Gemini, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var reader = fixture.Provider.GetRequiredService<IAgentProviderStatusReader>();
+        reader.Invalidate();
+
+        var startedAt = Stopwatch.GetTimestamp();
+        var providers = await reader.ReadAsync(CancellationToken.None);
+        var elapsed = Stopwatch.GetElapsedTime(startedAt);
+
+        providers.Should().Contain(provider => provider.Kind == AgentProviderKind.Codex);
+        providers.Should().Contain(provider => provider.Kind == AgentProviderKind.ClaudeCode);
+        providers.Should().Contain(provider => provider.Kind == AgentProviderKind.Gemini);
+        elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(1200));
     }
 
     [Test]

@@ -4,6 +4,8 @@ public interface IStartupWorkspaceHydration
 {
     bool IsHydrating { get; }
 
+    bool HasCompletedInitialAttempt { get; }
+
     bool IsReady { get; }
 
     event EventHandler? StateChanged;

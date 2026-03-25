@@ -103,6 +103,130 @@ public sealed class AgentSessionServiceTests
         columns.Should().Contain("Role");
         columns.Should().Contain("CapabilitiesJson");
         columns.Should().Contain("Description");
+
+        await using var providerPreferencesCommand = connection.CreateCommand();
+        providerPreferencesCommand.CommandText = """PRAGMA table_info("ProviderPreferences")""";
+
+        List<string> providerPreferenceColumns = [];
+        await using var providerPreferencesReader = await providerPreferencesCommand.ExecuteReaderAsync(CancellationToken.None);
+        var providerPreferencesNameOrdinal = providerPreferencesReader.GetOrdinal("name");
+        while (await providerPreferencesReader.ReadAsync(CancellationToken.None))
+        {
+            providerPreferenceColumns.Add(providerPreferencesReader.GetString(providerPreferencesNameOrdinal));
+        }
+
+        providerPreferenceColumns.Should().Contain("LocalModelPath");
+
+        await using var providerLocalModelsCommand = connection.CreateCommand();
+        providerLocalModelsCommand.CommandText = """PRAGMA table_info("ProviderLocalModels")""";
+
+        List<string> providerLocalModelColumns = [];
+        await using var providerLocalModelsReader = await providerLocalModelsCommand.ExecuteReaderAsync(CancellationToken.None);
+        var providerLocalModelsNameOrdinal = providerLocalModelsReader.GetOrdinal("name");
+        while (await providerLocalModelsReader.ReadAsync(CancellationToken.None))
+        {
+            providerLocalModelColumns.Add(providerLocalModelsReader.GetString(providerLocalModelsNameOrdinal));
+        }
+
+        providerLocalModelColumns.Should().Contain("ProviderKind");
+        providerLocalModelColumns.Should().Contain("ModelPath");
+        providerLocalModelColumns.Should().Contain("AddedAt");
+    }
+
+    [Test]
+    public async Task SetLocalModelPathAsyncRejectsUnsupportedLlamaSharpArchitecture()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        var invalidModelPath = commandScope.WriteLlamaSharpModelFile(
+            "Qwen3.5-4B.Q2_K.gguf",
+            architecture: "qwen35");
+        await using var fixture = CreateFixture();
+
+        var result = await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, invalidModelPath),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse(result.ToDisplayMessage("Operation should fail."));
+        result.ToDisplayMessage("Operation should fail.").Should().Contain("qwen35");
+
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        var provider = workspace.Providers.Single(candidate => candidate.Kind == AgentProviderKind.LlamaSharp);
+        provider.Status.Should().NotBe(AgentProviderStatus.Ready);
+        provider.CanCreateAgents.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task SetLocalModelPathAsyncAddsAdditionalLlamaSharpModelsToTheSameProviderCatalog()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        var firstModelPath = commandScope.WriteLlamaSharpModelFile("mistral-nemo-instruct.gguf", architecture: "mistral");
+        var secondModelPath = commandScope.WriteLlamaSharpModelFile("qwen-3-4b-instruct.gguf", architecture: "qwen3");
+        await using var fixture = CreateFixture();
+
+        _ = (await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, firstModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, secondModelPath),
+            CancellationToken.None)).ShouldSucceed();
+
+        var provider = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        provider.SuggestedModelName.Should().Be("qwen-3-4b-instruct");
+        provider.SupportedModelNames.Should().ContainInOrder("qwen-3-4b-instruct", "mistral-nemo-instruct");
+        provider.Details.Should().Contain(detail =>
+            detail.Label == "Configured model paths" &&
+            detail.Value.Contains(firstModelPath, StringComparison.Ordinal) &&
+            detail.Value.Contains(secondModelPath, StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task GetWorkspaceAsyncMigratesLegacyLocalModelPathIntoTheProviderCatalog()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        var legacyModelPath = commandScope.WriteLlamaSharpModelFile("legacy-mistral.gguf", architecture: "mistral");
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "legacy-local-model-store.db");
+        await CreateSchemaAsync(databasePath, includeLegacyColumns: true);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(CancellationToken.None);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO "ProviderPreferences" ("ProviderKind", "IsEnabled", "LocalModelPath", "UpdatedAt")
+                VALUES ($providerKind, 1, $localModelPath, $updatedAt);
+                """;
+            command.Parameters.AddWithValue("$providerKind", (int)AgentProviderKind.LlamaSharp);
+            command.Parameters.AddWithValue("$localModelPath", legacyModelPath);
+            command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow);
+            _ = await command.ExecuteNonQueryAsync(CancellationToken.None);
+        }
+
+        await using var fixture = CreateFixture(CreateSqliteOptions(tempRoot, databasePath), tempRoot);
+
+        var workspace = (await fixture.Service.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        var provider = workspace.Providers.Single(candidate => candidate.Kind == AgentProviderKind.LlamaSharp);
+        provider.SupportedModelNames.Should().Contain("legacy-mistral");
+
+        await using var verificationConnection = new SqliteConnection($"Data Source={databasePath}");
+        await verificationConnection.OpenAsync(CancellationToken.None);
+        await using var verificationCommand = verificationConnection.CreateCommand();
+        verificationCommand.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM "ProviderLocalModels"
+            WHERE "ProviderKind" = $providerKind
+              AND "ModelPath" = $localModelPath;
+            """;
+        verificationCommand.Parameters.AddWithValue("$providerKind", (int)AgentProviderKind.LlamaSharp);
+        verificationCommand.Parameters.AddWithValue("$localModelPath", legacyModelPath);
+        var migratedRows = (long)(await verificationCommand.ExecuteScalarAsync(CancellationToken.None)
+            ?? throw new InvalidOperationException("Migration count query returned null."));
+        migratedRows.Should().Be(1);
     }
 
     [Test]
@@ -175,7 +299,64 @@ public sealed class AgentSessionServiceTests
         session.Session.Title.Should().Be("Session with Session Agent");
         session.Entries.Should().ContainSingle(entry =>
             entry.Kind == SessionStreamEntryKind.Status &&
-            entry.Text.Contains("Session created", StringComparison.Ordinal));
+            entry.Text.Contains("Session started with Session Agent", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task CreateSessionAsyncCreatesPersistedRuntimeStateBeforeTheFirstMessage()
+    {
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "eager-runtime-store.db");
+        var options = CreateSqliteOptions(tempRoot, databasePath);
+        await using var fixture = CreateFixture(options, tempRoot);
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Eager Runtime Agent");
+
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Eager runtime session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        var runtimeFile = Path.Combine(
+            options.RuntimeSessionDirectoryPath!,
+            session.Session.Id.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".json");
+        File.Exists(runtimeFile).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task CloseSessionAsyncRemovesThePersistedSessionAndRuntimeArtifacts()
+    {
+        var tempRoot = CreateTempRootDirectory();
+        var databasePath = Path.Combine(tempRoot, "close-session-store.db");
+        var options = CreateSqliteOptions(tempRoot, databasePath);
+        await using var fixture = CreateFixture(options, tempRoot);
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Closable Agent");
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Closable session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        await foreach (var result in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "persist and close"),
+                           CancellationToken.None))
+        {
+            _ = result.ShouldSucceed();
+        }
+
+        var runtimeFile = Path.Combine(
+            options.RuntimeSessionDirectoryPath!,
+            session.Session.Id.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".json");
+        var historyFile = Path.Combine(
+            options.ChatHistoryDirectoryPath!,
+            session.Session.Id.Value.ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".json");
+        File.Exists(runtimeFile).Should().BeTrue();
+        File.Exists(historyFile).Should().BeTrue();
+
+        var workspace = (await fixture.Service.CloseSessionAsync(
+            new CloseSessionCommand(session.Session.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        workspace.Sessions.Should().BeEmpty();
+        (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).IsSuccess.Should().BeFalse();
+        File.Exists(runtimeFile).Should().BeFalse();
+        File.Exists(historyFile).Should().BeFalse();
     }
 
     [Test]
@@ -295,6 +476,58 @@ public sealed class AgentSessionServiceTests
     }
 
     [Test]
+    public async Task SendMessageAsyncPersistsTranscriptErrorWhenLocalLlamaRuntimeFailsToLoad()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
+        var brokenModelPath = commandScope.WriteLlamaSharpModelFile("broken-mistral.gguf", architecture: "mistral");
+        await using var fixture = CreateFixture();
+        var agent = await EnableDebugAndCreateAgentAsync(fixture.Service, "Editable Session Agent");
+        var session = (await fixture.Service.CreateSessionAsync(
+            new CreateSessionCommand("Editable session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+
+        _ = (await fixture.Service.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, brokenModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.Service.UpdateAgentAsync(
+            new UpdateAgentProfileCommand(
+                agent.Id,
+                "Editable Session Agent",
+                AgentProviderKind.LlamaSharp,
+                "broken-mistral",
+                "Use the selected local llama model.",
+                "Editable agent now points to a local llama model."),
+            CancellationToken.None)).ShouldSucceed();
+
+        List<ManagedCode.Communication.Result<SessionStreamEntry>> streamedResults = [];
+        await foreach (var result in fixture.Service.SendMessageAsync(
+                           new SendSessionMessageCommand(session.Session.Id, "trigger the broken llama model"),
+                           CancellationToken.None))
+        {
+            streamedResults.Add(result);
+        }
+
+        streamedResults.Should().Contain(result => result.IsFailed);
+        streamedResults
+            .Where(result => result.IsSuccess)
+            .Select(result => result.Value!)
+            .Should()
+            .Contain(entry =>
+                entry.Kind == SessionStreamEntryKind.Error &&
+                entry.Text.Contains("LlamaSharp failed before responding", StringComparison.Ordinal) &&
+                entry.Text.Contains("Failed to load model", StringComparison.Ordinal));
+
+        var transcript = (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).ShouldSucceed();
+        transcript.Entries.Should().Contain(entry =>
+            entry.Kind == SessionStreamEntryKind.Error &&
+            entry.Text.Contains("LlamaSharp failed before responding", StringComparison.Ordinal) &&
+            entry.Text.Contains("Failed to load model", StringComparison.Ordinal));
+    }
+
+    [Test]
     public async Task SendMessageAsyncMarksTheSessionAsLiveWhileStreamingIsActive()
     {
         await using var fixture = CreateFixture();
@@ -367,7 +600,7 @@ public sealed class AgentSessionServiceTests
     }
 
     [Test]
-    public async Task SendMessageAsyncReturnsProviderReadinessErrorWhenCodexCliIsMissing()
+    public async Task CreateSessionAsyncReturnsProviderReadinessErrorWhenCodexCliIsMissing()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentSessionServiceTests));
         await using var fixture = CreateFixture();
@@ -378,31 +611,12 @@ public sealed class AgentSessionServiceTests
         var legacyAgentId = Guid.CreateVersion7();
         await SeedLegacyAgentAsync(fixture.Provider, legacyAgentId);
 
-        var session = (await fixture.Service.CreateSessionAsync(
+        var session = await fixture.Service.CreateSessionAsync(
             new CreateSessionCommand("Legacy session", new AgentProfileId(legacyAgentId)),
-            CancellationToken.None)).ShouldSucceed();
+            CancellationToken.None);
 
-        List<SessionStreamEntry> streamedEntries = [];
-        await foreach (var entry in fixture.Service.SendMessageAsync(
-                           new SendSessionMessageCommand(session.Session.Id, "hello legacy"),
-                           CancellationToken.None))
-        {
-            streamedEntries.Add(entry.ShouldSucceed());
-        }
-
-        var reloaded = (await fixture.Service.GetSessionAsync(session.Session.Id, CancellationToken.None)).ShouldSucceed();
-
-        streamedEntries.Should().Contain(entry => entry.Kind == SessionStreamEntryKind.UserMessage);
-        streamedEntries.Should().Contain(entry =>
-            entry.Kind == SessionStreamEntryKind.Error &&
-            entry.Text.Contains("Codex CLI is not installed.", StringComparison.Ordinal));
-        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolStarted);
-        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.ToolCompleted);
-        streamedEntries.Should().NotContain(entry => entry.Kind == SessionStreamEntryKind.AssistantMessage);
-
-        reloaded.Entries.Should().Contain(entry =>
-            entry.Kind == SessionStreamEntryKind.Error &&
-            entry.Text.Contains("Codex CLI is not installed.", StringComparison.Ordinal));
+        session.IsSuccess.Should().BeFalse(session.ToDisplayMessage("Operation should fail."));
+        session.ToDisplayMessage("Operation should fail.").Should().Contain("Codex CLI is not installed.");
     }
 
     [Test]
@@ -632,6 +846,23 @@ public sealed class AgentSessionServiceTests
               """;
 
         await using var command = connection.CreateCommand();
+        var providerPreferencesTableDefinition = includeLegacyColumns
+            ? """
+              CREATE TABLE "ProviderPreferences" (
+                  "ProviderKind" INTEGER NOT NULL CONSTRAINT "PK_ProviderPreferences" PRIMARY KEY,
+                  "IsEnabled" INTEGER NOT NULL,
+                  "LocalModelPath" TEXT NULL,
+                  "UpdatedAt" TEXT NOT NULL
+              );
+              """
+            : """
+              CREATE TABLE "ProviderPreferences" (
+                  "ProviderKind" INTEGER NOT NULL CONSTRAINT "PK_ProviderPreferences" PRIMARY KEY,
+                  "IsEnabled" INTEGER NOT NULL,
+                  "UpdatedAt" TEXT NOT NULL
+              );
+              """;
+
         command.CommandText =
             $"""
               {agentProfilesTableDefinition}
@@ -652,11 +883,7 @@ public sealed class AgentSessionServiceTests
                   "AccentLabel" TEXT NULL,
                   "Timestamp" TEXT NOT NULL
               );
-              CREATE TABLE "ProviderPreferences" (
-                  "ProviderKind" INTEGER NOT NULL CONSTRAINT "PK_ProviderPreferences" PRIMARY KEY,
-                  "IsEnabled" INTEGER NOT NULL,
-                  "UpdatedAt" TEXT NOT NULL
-              );
+              {providerPreferencesTableDefinition}
               CREATE INDEX "IX_Sessions_UpdatedAt" ON "Sessions" ("UpdatedAt");
               CREATE INDEX "IX_SessionEntries_SessionId_Timestamp" ON "SessionEntries" ("SessionId", "Timestamp");
               """;

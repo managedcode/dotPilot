@@ -15,6 +15,7 @@ public partial record ChatModel
     private const string DefaultComposerPlaceholder = "Message your local agent session";
     private const string SendInProgressMessage = "Sending message...";
     private const string StartSessionValidationMessage = "Create an agent before starting a session.";
+    private const string SessionClosedMessage = "Closed the selected session.";
     private const string LocalMemberName = "Local operator";
     private const string LocalMemberSummary = "This desktop instance";
     private static readonly SessionSidebarItem EmptySelectedChat = new(default, string.Empty, string.Empty);
@@ -31,6 +32,7 @@ public partial record ChatModel
     private readonly SemaphoreSlim fleetProviderRefreshGate = new(1, 1);
     private SessionId? pendingSelectedSessionId;
     private AsyncCommand? _startNewSessionCommand;
+    private AsyncCommand? _closeSelectedSessionCommand;
     private AsyncCommand? _submitMessageCommand;
     private readonly Signal _workspaceRefresh = new();
     private readonly Signal _sessionRefresh = new();
@@ -80,6 +82,10 @@ public partial record ChatModel
     public ICommand StartNewSessionCommand =>
         _startNewSessionCommand ??= new AsyncCommand(
             () => StartNewSession(CancellationToken.None));
+
+    public ICommand CloseSelectedSessionCommand =>
+        _closeSelectedSessionCommand ??= new AsyncCommand(
+            () => CloseSelectedSession(CancellationToken.None));
 
     public ICommand SubmitMessageCommand =>
         _submitMessageCommand ??= new AsyncCommand(
@@ -166,6 +172,52 @@ public partial record ChatModel
         return SendMessageCore(messageOverride: null, cancellationToken);
     }
 
+    public async ValueTask CloseSelectedSession(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var selectedChat = (await SelectedChat) ?? EmptySelectedChat;
+            if (IsEmptySelectedChat(selectedChat))
+            {
+                return;
+            }
+
+            var closeResult = await workspaceState.CloseSessionAsync(
+                new CloseSessionCommand(selectedChat.Id),
+                cancellationToken);
+            if (!closeResult.TryGetValue(out var workspace))
+            {
+                await FeedbackMessage.SetAsync(closeResult.ToOperatorMessage("Could not close the session."), cancellationToken);
+                return;
+            }
+
+            var sessions = workspace.Sessions
+                .Select(MapSidebarItem)
+                .ToImmutableList();
+            var nextSelection = workspace.SelectedSessionId is { } selectedSessionId
+                ? FindSessionById(sessions, selectedSessionId)
+                : EmptySelectedChat;
+            if (IsEmptySelectedChat(nextSelection) && sessions.Count > 0)
+            {
+                nextSelection = sessions[0];
+            }
+
+            pendingSelectedSessionId = null;
+            await SelectedChat.UpdateAsync(_ => nextSelection, cancellationToken);
+            await FeedbackMessage.SetAsync(SessionClosedMessage, cancellationToken);
+            _workspaceRefresh.Raise();
+            _sessionRefresh.Raise();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            ChatModelLog.Failure(logger, exception);
+            await FeedbackMessage.SetAsync(exception.Message, cancellationToken);
+        }
+    }
+
     public ValueTask SubmitMessage(CancellationToken cancellationToken)
     {
         return SendMessageCore(messageOverride: null, cancellationToken);
@@ -239,6 +291,8 @@ public partial record ChatModel
             {
                 if (_.IsFailed)
                 {
+                    _workspaceRefresh.Raise();
+                    _sessionRefresh.Raise();
                     await FeedbackMessage.SetAsync(_.ToOperatorMessage("Message send failed."), cancellationToken);
                     sendFailed = true;
                     break;

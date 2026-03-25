@@ -19,7 +19,8 @@ internal sealed partial class AgentSessionService(
     ILogger<AgentSessionService> logger)
     : IAgentSessionService, IDisposable
 {
-    private const string SessionReadyText = "Session created. Send the first message to start the workflow.";
+    private const string SessionReadyTextFormat = "Session started with {0} on {1}. Send a message when ready.";
+    private const string SessionActiveCloseText = "The session is still active. Wait for the current run to finish before closing it.";
     private const string UserAuthor = "You";
     private const string ToolAuthor = "Tool";
     private const string StatusAuthor = "System";
@@ -27,6 +28,8 @@ internal sealed partial class AgentSessionService(
     private const string ToolAccentLabel = "tool";
     private const string StatusAccentLabel = "status";
     private const string ErrorAccentLabel = "error";
+    private static readonly System.Text.CompositeFormat SessionReadyTextCompositeFormat =
+        System.Text.CompositeFormat.Parse(SessionReadyTextFormat);
     private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private bool _initialized;
 
@@ -250,6 +253,8 @@ internal sealed partial class AgentSessionService(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        AgentProfileRecord? agentRecord = null;
+        SessionId sessionId = default;
         try
         {
             await EnsureInitializedAsync(cancellationToken);
@@ -257,26 +262,46 @@ internal sealed partial class AgentSessionService(
             AgentSessionServiceLog.SessionCreationStarted(logger, sessionTitle, command.AgentProfileId);
 
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var agent = await dbContext.AgentProfiles
+            agentRecord = await dbContext.AgentProfiles
                 .FirstOrDefaultAsync(record => record.Id == command.AgentProfileId.Value, cancellationToken);
-            if (agent is null)
+            if (agentRecord is null)
             {
                 return Result<SessionTranscriptSnapshot>.FailNotFound($"Agent '{command.AgentProfileId}' was not found.");
             }
 
+            var providerResult = await GetValidatedSessionProviderAsync(
+                (AgentProviderKind)agentRecord.ProviderKind,
+                cancellationToken);
+            if (providerResult.IsFailed)
+            {
+                return Result<SessionTranscriptSnapshot>.Fail(providerResult.Problem!);
+            }
+            var provider = providerResult.Value!;
+
             var now = timeProvider.GetUtcNow();
-            var sessionId = SessionId.New();
+            sessionId = SessionId.New();
+            await runtimeConversationFactory.InitializeAsync(agentRecord, sessionId, cancellationToken);
             var session = new SessionRecord
             {
                 Id = sessionId.Value,
                 Title = sessionTitle,
-                PrimaryAgentProfileId = agent.Id,
+                PrimaryAgentProfileId = agentRecord.Id,
                 CreatedAt = now,
                 UpdatedAt = now,
             };
 
             dbContext.Sessions.Add(session);
-            dbContext.SessionEntries.Add(CreateEntryRecord(sessionId, SessionStreamEntryKind.Status, StatusAuthor, SessionReadyText, now, accentLabel: StatusAccentLabel));
+            dbContext.SessionEntries.Add(CreateEntryRecord(
+                sessionId,
+                SessionStreamEntryKind.Status,
+                StatusAuthor,
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    SessionReadyTextCompositeFormat,
+                    agentRecord.Name,
+                    provider.DisplayName),
+                now,
+                accentLabel: StatusAccentLabel));
             await dbContext.SaveChangesAsync(cancellationToken);
 
             AgentSessionServiceLog.SessionCreated(logger, sessionId, session.Title, command.AgentProfileId);
@@ -288,8 +313,62 @@ internal sealed partial class AgentSessionService(
         }
         catch (Exception exception)
         {
+            if (agentRecord is not null && sessionId != default)
+            {
+                await TryCloseSessionRuntimeAsync(agentRecord, sessionId);
+            }
+
             AgentSessionServiceLog.SessionCreationFailed(logger, exception, command.Title, command.AgentProfileId);
             return Result<SessionTranscriptSnapshot>.Fail(exception);
+        }
+    }
+
+    public async ValueTask<Result<AgentWorkspaceSnapshot>> CloseSessionAsync(
+        CloseSessionCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        try
+        {
+            await EnsureInitializedAsync(cancellationToken);
+            AgentSessionServiceLog.SessionCloseStarted(logger, command.SessionId);
+
+            if (sessionActivityMonitor.Current.ActiveSessions.Any(descriptor => descriptor.SessionId == command.SessionId))
+            {
+                AgentSessionServiceLog.SessionCloseBlockedActive(logger, command.SessionId);
+                return Result<AgentWorkspaceSnapshot>.FailForbidden(SessionActiveCloseText);
+            }
+
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var session = await dbContext.Sessions
+                .FirstOrDefaultAsync(record => record.Id == command.SessionId.Value, cancellationToken);
+            if (session is null)
+            {
+                return Result<AgentWorkspaceSnapshot>.FailNotFound($"Session '{command.SessionId}' was not found.");
+            }
+
+            var agentRecord = await dbContext.AgentProfiles
+                .FirstOrDefaultAsync(record => record.Id == session.PrimaryAgentProfileId, cancellationToken);
+            await runtimeConversationFactory.CloseAsync(agentRecord, command.SessionId, cancellationToken);
+
+            var entries = await dbContext.SessionEntries
+                .Where(record => record.SessionId == command.SessionId.Value)
+                .ToListAsync(cancellationToken);
+            dbContext.SessionEntries.RemoveRange(entries);
+            dbContext.Sessions.Remove(session);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            AgentSessionServiceLog.SessionClosed(logger, command.SessionId);
+            return await LoadWorkspaceAsync(forceRefreshProviders: false, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SessionCloseFailed(logger, exception, command.SessionId);
+            return Result<AgentWorkspaceSnapshot>.Fail(exception);
         }
     }
 
@@ -332,6 +411,91 @@ internal sealed partial class AgentSessionService(
                 exception,
                 command.ProviderKind,
                 command.IsEnabled);
+            return Result<ProviderStatusDescriptor>.Fail(exception);
+        }
+    }
+
+    public async ValueTask<Result<ProviderStatusDescriptor>> SetLocalModelPathAsync(
+        SetLocalModelPathCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        await EnsureInitializedAsync(cancellationToken);
+        try
+        {
+            if (!command.ProviderKind.IsLocalModelProvider())
+            {
+                return Result<ProviderStatusDescriptor>.Fail(
+                    "UnsupportedProvider",
+                    $"{command.ProviderKind.GetDisplayName()} does not use a local model path.");
+            }
+
+            var localModelPath = command.LocalModelPath.Trim();
+            if (string.IsNullOrWhiteSpace(localModelPath))
+            {
+                return Result<ProviderStatusDescriptor>.Fail(
+                    "MissingModelPath",
+                    "A local model path is required.");
+            }
+
+            var configuration = await LocalModelProviderCompatibilityReader.ReadAsync(
+                command.ProviderKind,
+                localModelPath,
+                cancellationToken);
+            if (!configuration.IsCompatible || string.IsNullOrWhiteSpace(configuration.NormalizedModelPath))
+            {
+                return Result<ProviderStatusDescriptor>.Fail(
+                    configuration.FailureCode ?? "InvalidModelPath",
+                    configuration.FailureMessage ?? command.ProviderKind.GetLocalModelMissingSummary());
+            }
+
+            var normalizedModelPath = configuration.NormalizedModelPath!;
+
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var record = await dbContext.ProviderPreferences
+                .FirstOrDefaultAsync(preference => preference.ProviderKind == (int)command.ProviderKind, cancellationToken);
+            if (record is null)
+            {
+                record = new ProviderPreferenceRecord
+                {
+                    ProviderKind = (int)command.ProviderKind,
+                };
+                dbContext.ProviderPreferences.Add(record);
+            }
+
+            var updatedAt = timeProvider.GetUtcNow();
+            record.LocalModelPath = normalizedModelPath;
+            record.UpdatedAt = updatedAt;
+            var localModelRecord = await dbContext.ProviderLocalModels
+                .FirstOrDefaultAsync(
+                    provider => provider.ProviderKind == (int)command.ProviderKind &&
+                        provider.ModelPath == normalizedModelPath,
+                    cancellationToken);
+            if (localModelRecord is null)
+            {
+                dbContext.ProviderLocalModels.Add(new ProviderLocalModelRecord
+                {
+                    ProviderKind = (int)command.ProviderKind,
+                    ModelPath = normalizedModelPath,
+                    AddedAt = updatedAt,
+                });
+            }
+            else
+            {
+                localModelRecord.AddedAt = updatedAt;
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            InvalidateProviderStatusSnapshot();
+            var providers = await GetProviderStatusesAsync(forceRefresh: true, cancellationToken);
+            var provider = providers.First(status => status.Kind == command.ProviderKind);
+            AgentSessionServiceLog.LocalModelPathUpdated(logger, command.ProviderKind, normalizedModelPath);
+            return Result<ProviderStatusDescriptor>.Succeed(provider);
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.LocalModelPathUpdateFailed(logger, exception, command.ProviderKind);
             return Result<ProviderStatusDescriptor>.Fail(exception);
         }
     }
@@ -497,6 +661,19 @@ internal sealed partial class AgentSessionService(
 
             if (providerStatusResult.IsFailed)
             {
+                var providerFailureEntryResult = await TryAppendSendFailureEntryAsync(
+                    dbContext,
+                    session,
+                    command.SessionId,
+                    agent.Id,
+                    providerDisplayName,
+                    providerStatusResult.Problem!,
+                    cancellationToken);
+                if (providerFailureEntryResult.IsSuccess)
+                {
+                    yield return providerFailureEntryResult;
+                }
+
                 yield return Result<SessionStreamEntry>.Fail(providerStatusResult.Problem!);
                 yield break;
             }
@@ -559,6 +736,19 @@ internal sealed partial class AgentSessionService(
 
             if (runtimeConversationResult.IsFailed)
             {
+                var runtimeFailureEntryResult = await TryAppendSendFailureEntryAsync(
+                    dbContext,
+                    session,
+                    command.SessionId,
+                    agent.Id,
+                    providerDisplayName,
+                    runtimeConversationResult.Problem!,
+                    cancellationToken);
+                if (runtimeFailureEntryResult.IsSuccess)
+                {
+                    yield return runtimeFailureEntryResult;
+                }
+
                 yield return Result<SessionStreamEntry>.Fail(runtimeConversationResult.Problem!);
                 yield break;
             }
@@ -608,94 +798,140 @@ internal sealed partial class AgentSessionService(
                 providerKind,
                 agent.ModelName);
 
-            await using var updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
-                    command.Message.Trim(),
-                    runtimeConversation.Session,
-                    runConfiguration.Options,
-                    cancellationToken)
-                .GetAsyncEnumerator(cancellationToken);
-
-            while (true)
+            IAsyncEnumerator<Microsoft.Agents.AI.AgentResponseUpdate>? updateEnumerator = null;
+            Result<IAsyncEnumerator<Microsoft.Agents.AI.AgentResponseUpdate>> updateEnumeratorResult;
+            try
             {
-                Microsoft.Agents.AI.AgentResponseUpdate? update = null;
-                Result<bool> nextUpdateResult;
-                try
+                updateEnumerator = runtimeConversation.Agent.RunStreamingAsync(
+                        command.Message.Trim(),
+                        runtimeConversation.Session,
+                        runConfiguration.Options,
+                        cancellationToken)
+                    .GetAsyncEnumerator(cancellationToken);
+                updateEnumeratorResult = Result<IAsyncEnumerator<Microsoft.Agents.AI.AgentResponseUpdate>>.Succeed(updateEnumerator);
+            }
+            catch (Exception exception)
+            {
+                AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                updateEnumeratorResult = Result<IAsyncEnumerator<Microsoft.Agents.AI.AgentResponseUpdate>>.Fail(exception);
+            }
+
+            if (updateEnumeratorResult.IsFailed || updateEnumerator is null)
+            {
+                var streamStartFailureEntryResult = await TryAppendSendFailureEntryAsync(
+                    dbContext,
+                    session,
+                    command.SessionId,
+                    agent.Id,
+                    providerDisplayName,
+                    updateEnumeratorResult.Problem!,
+                    cancellationToken);
+                if (streamStartFailureEntryResult.IsSuccess)
                 {
-                    var hasNext = await updateEnumerator.MoveNextAsync();
-                    if (hasNext)
+                    yield return streamStartFailureEntryResult;
+                }
+
+                yield return Result<SessionStreamEntry>.Fail(updateEnumeratorResult.Problem!);
+                yield break;
+            }
+
+            await using (updateEnumerator)
+            {
+                while (true)
+                {
+                    Microsoft.Agents.AI.AgentResponseUpdate? update = null;
+                    Result<bool> nextUpdateResult;
+                    try
                     {
-                        update = updateEnumerator.Current;
-                    }
-
-                    nextUpdateResult = Result<bool>.Succeed(hasNext);
-                }
-                catch (Exception exception)
-                {
-                    AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
-                    nextUpdateResult = Result<bool>.Fail(exception);
-                }
-
-                if (nextUpdateResult.IsFailed)
-                {
-                    yield return Result<SessionStreamEntry>.Fail(nextUpdateResult.Problem!);
-                    yield break;
-                }
-
-                if (!nextUpdateResult.Value)
-                {
-                    break;
-                }
-
-                if (string.IsNullOrEmpty(update?.Text))
-                {
-                    continue;
-                }
-
-                streamedMessageId ??= string.IsNullOrWhiteSpace(update.MessageId)
-                    ? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
-                    : update.MessageId;
-                accumulated.Append(update.Text);
-                Result<SessionStreamEntry> streamedEntryResult;
-                try
-                {
-                    var timestamp = update.CreatedAt ?? timeProvider.GetUtcNow();
-                    if (streamedAssistantEntry is null)
-                    {
-                        streamedAssistantEntry = new SessionEntryRecord
+                        var hasNext = await updateEnumerator.MoveNextAsync();
+                        if (hasNext)
                         {
-                            Id = streamedMessageId,
-                            SessionId = command.SessionId.Value,
-                            AgentProfileId = agent.Id,
-                            Kind = (int)SessionStreamEntryKind.AssistantMessage,
-                            Author = agent.Name,
-                            Text = accumulated.ToString(),
-                            Timestamp = timestamp,
-                        };
-                        dbContext.SessionEntries.Add(streamedAssistantEntry);
+                            update = updateEnumerator.Current;
+                        }
+
+                        nextUpdateResult = Result<bool>.Succeed(hasNext);
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        streamedAssistantEntry.Text = accumulated.ToString();
-                        streamedAssistantEntry.Timestamp = timestamp;
+                        AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                        nextUpdateResult = Result<bool>.Fail(exception);
                     }
 
-                    session.UpdatedAt = timestamp;
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                    streamedEntryResult = Result<SessionStreamEntry>.Succeed(MapEntry(streamedAssistantEntry));
-                }
-                catch (Exception exception)
-                {
-                    AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
-                    streamedEntryResult = Result<SessionStreamEntry>.Fail(exception);
-                }
+                    if (nextUpdateResult.IsFailed)
+                    {
+                        var streamFailureEntryResult = await TryAppendSendFailureEntryAsync(
+                            dbContext,
+                            session,
+                            command.SessionId,
+                            agent.Id,
+                            providerDisplayName,
+                            nextUpdateResult.Problem!,
+                            cancellationToken);
+                        if (streamFailureEntryResult.IsSuccess)
+                        {
+                            yield return streamFailureEntryResult;
+                        }
 
-                if (streamedEntryResult.IsFailed)
-                {
+                        yield return Result<SessionStreamEntry>.Fail(nextUpdateResult.Problem!);
+                        yield break;
+                    }
+
+                    if (!nextUpdateResult.Value)
+                    {
+                        break;
+                    }
+
+                    if (string.IsNullOrEmpty(update?.Text))
+                    {
+                        continue;
+                    }
+
+                    streamedMessageId ??= string.IsNullOrWhiteSpace(update.MessageId)
+                        ? Guid.CreateVersion7().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
+                        : update.MessageId;
+                    accumulated.Append(update.Text);
+                    Result<SessionStreamEntry> streamedEntryResult;
+                    try
+                    {
+                        var timestamp = update.CreatedAt ?? timeProvider.GetUtcNow();
+                        if (streamedAssistantEntry is null)
+                        {
+                            streamedAssistantEntry = new SessionEntryRecord
+                            {
+                                Id = streamedMessageId,
+                                SessionId = command.SessionId.Value,
+                                AgentProfileId = agent.Id,
+                                Kind = (int)SessionStreamEntryKind.AssistantMessage,
+                                Author = agent.Name,
+                                Text = accumulated.ToString(),
+                                Timestamp = timestamp,
+                            };
+                            dbContext.SessionEntries.Add(streamedAssistantEntry);
+                        }
+                        else
+                        {
+                            streamedAssistantEntry.Text = accumulated.ToString();
+                            streamedAssistantEntry.Timestamp = timestamp;
+                        }
+
+                        session.UpdatedAt = timestamp;
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                        streamedEntryResult = Result<SessionStreamEntry>.Succeed(MapEntry(streamedAssistantEntry));
+                    }
+                    catch (Exception exception)
+                    {
+                        AgentSessionServiceLog.SendFailed(logger, exception, command.SessionId, agent.Id);
+                        streamedEntryResult = Result<SessionStreamEntry>.Fail(exception);
+                    }
+
+                    if (streamedEntryResult.IsFailed)
+                    {
+                        yield return streamedEntryResult;
+                        yield break;
+                    }
+
                     yield return streamedEntryResult;
-                    yield break;
                 }
-
-                yield return streamedEntryResult;
             }
 
             Result<SessionStreamEntry> completionResult;
@@ -745,7 +981,52 @@ internal sealed partial class AgentSessionService(
                 completionResult = Result<SessionStreamEntry>.Fail(exception);
             }
 
+            if (completionResult.IsFailed)
+            {
+                var completionFailureEntryResult = await TryAppendSendFailureEntryAsync(
+                    dbContext,
+                    session,
+                    command.SessionId,
+                    agent.Id,
+                    providerDisplayName,
+                    completionResult.Problem!,
+                    cancellationToken);
+                if (completionFailureEntryResult.IsSuccess)
+                {
+                    yield return completionFailureEntryResult;
+                }
+            }
+
             yield return completionResult;
+        }
+    }
+
+    private async ValueTask<Result<ProviderStatusDescriptor>> GetValidatedSessionProviderAsync(
+        AgentProviderKind providerKind,
+        CancellationToken cancellationToken)
+    {
+        var providers = await GetProviderStatusesAsync(forceRefresh: false, cancellationToken);
+        var provider = providers.First(status => status.Kind == providerKind);
+        if (!provider.IsEnabled)
+        {
+            return Result<ProviderStatusDescriptor>.FailForbidden(DisabledProviderSendText);
+        }
+
+        return provider.CanCreateAgents
+            ? Result<ProviderStatusDescriptor>.Succeed(provider)
+            : Result<ProviderStatusDescriptor>.FailForbidden(provider.StatusSummary);
+    }
+
+    private async ValueTask TryCloseSessionRuntimeAsync(
+        AgentProfileRecord agentRecord,
+        SessionId sessionId)
+    {
+        try
+        {
+            await runtimeConversationFactory.CloseAsync(agentRecord, sessionId, CancellationToken.None);
+        }
+        catch
+        {
         }
     }
 
@@ -855,20 +1136,33 @@ internal sealed partial class AgentSessionService(
         LocalAgentSessionDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        var enabledProviderKinds = await dbContext.ProviderPreferences
+        var enabledProviderPreferences = await dbContext.ProviderPreferences
             .Where(record => record.IsEnabled)
-            .Select(record => (AgentProviderKind)record.ProviderKind)
             .ToArrayAsync(cancellationToken);
+        var localModelsByProvider = (await dbContext.ProviderLocalModels
+                .AsNoTracking()
+                .ToListAsync(cancellationToken))
+            .GroupBy(record => (AgentProviderKind)record.ProviderKind)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ProviderLocalModelRecord>)group.ToArray());
 
-        foreach (var providerKind in enabledProviderKinds)
+        foreach (var preference in enabledProviderPreferences)
         {
+            var providerKind = (AgentProviderKind)preference.ProviderKind;
             if (providerKind.IsBuiltIn())
             {
                 continue;
             }
 
             if (providerKind.IsLocalModelProvider() &&
-                LocalModelProviderConfigurationReader.Read(providerKind).IsReady)
+                (await LocalModelProviderConfigurationReader.ReadAsync(
+                    providerKind,
+                    localModelsByProvider.TryGetValue(providerKind, out var localModels)
+                        ? localModels
+                        : Array.Empty<ProviderLocalModelRecord>(),
+                    preference.LocalModelPath,
+                    cancellationToken).ConfigureAwait(false)).IsReady)
             {
                 return providerKind;
             }
@@ -991,6 +1285,47 @@ internal sealed partial class AgentSessionService(
             Timestamp = timestamp,
             AccentLabel = accentLabel,
         };
+    }
+
+    private async ValueTask<Result<SessionStreamEntry>> TryAppendSendFailureEntryAsync(
+        LocalAgentSessionDbContext dbContext,
+        SessionRecord session,
+        SessionId sessionId,
+        Guid agentId,
+        string providerDisplayName,
+        Problem problem,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var failureEntry = CreateEntryRecord(
+                sessionId,
+                SessionStreamEntryKind.Error,
+                StatusAuthor,
+                CreateSendFailureText(providerDisplayName, problem.ToDisplayMessage("Message send failed.")),
+                timeProvider.GetUtcNow(),
+                accentLabel: ErrorAccentLabel);
+            dbContext.SessionEntries.Add(failureEntry);
+            session.UpdatedAt = failureEntry.Timestamp;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result<SessionStreamEntry>.Succeed(MapEntry(failureEntry));
+        }
+        catch (Exception exception)
+        {
+            AgentSessionServiceLog.SendFailed(logger, exception, sessionId, agentId);
+            return Result<SessionStreamEntry>.Fail(exception);
+        }
+    }
+
+    private static string CreateSendFailureText(string providerDisplayName, string message)
+    {
+        var normalizedMessage = string.IsNullOrWhiteSpace(message)
+            ? "Message send failed."
+            : message.Trim();
+        normalizedMessage = normalizedMessage.TrimEnd('.');
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{providerDisplayName} failed before responding: {normalizedMessage}.");
     }
 
     private static string CreateToolStartText(AgentProviderKind providerKind)

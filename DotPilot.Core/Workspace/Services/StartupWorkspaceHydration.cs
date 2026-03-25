@@ -9,6 +9,7 @@ internal sealed class StartupWorkspaceHydration(
 {
     private readonly SemaphoreSlim hydrationGate = new(1, 1);
     private readonly object stateSync = new();
+    private bool hasCompletedInitialAttempt;
     private bool isHydrating;
     private bool isReady;
 
@@ -30,6 +31,17 @@ internal sealed class StartupWorkspaceHydration(
             lock (stateSync)
             {
                 return isReady;
+            }
+        }
+    }
+
+    public bool HasCompletedInitialAttempt
+    {
+        get
+        {
+            lock (stateSync)
+            {
+                return hasCompletedInitialAttempt;
             }
         }
     }
@@ -57,7 +69,10 @@ internal sealed class StartupWorkspaceHydration(
             }
 
             var hydrationSucceeded = false;
-            UpdateState(isHydrating: true, isReady: false);
+            UpdateState(
+                isHydrating: true,
+                isReady: IsReady,
+                hasCompletedInitialAttempt: HasCompletedInitialAttempt);
             StartupWorkspaceHydrationLog.HydrationStarted(logger);
 
             try
@@ -74,7 +89,10 @@ internal sealed class StartupWorkspaceHydration(
             }
             finally
             {
-                UpdateState(isHydrating: false, isReady: hydrationSucceeded);
+                UpdateState(
+                    isHydrating: false,
+                    isReady: hydrationSucceeded,
+                    hasCompletedInitialAttempt: true);
             }
         }
         finally
@@ -98,7 +116,10 @@ internal sealed class StartupWorkspaceHydration(
         return true;
     }
 
-    private void UpdateState(bool isHydrating, bool isReady)
+    private void UpdateState(
+        bool isHydrating,
+        bool isReady,
+        bool hasCompletedInitialAttempt)
     {
         var changed = false;
         lock (stateSync)
@@ -106,6 +127,12 @@ internal sealed class StartupWorkspaceHydration(
             if (this.isHydrating != isHydrating)
             {
                 this.isHydrating = isHydrating;
+                changed = true;
+            }
+
+            if (this.hasCompletedInitialAttempt != hasCompletedInitialAttempt)
+            {
+                this.hasCompletedInitialAttempt = hasCompletedInitialAttempt;
                 changed = true;
             }
 

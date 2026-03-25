@@ -26,6 +26,20 @@
         </Grid>
       </Button>
 
+      <Button AutomationProperties.AutomationId="ChatCloseSessionButton"
+              Command="{Binding CloseSelectedSessionCommand}"
+              Style="{StaticResource SecondaryActionButtonStyle}">
+        <Grid ColumnSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <SymbolIcon Symbol="Cancel" />
+          <TextBlock Grid.Column="1"
+                     Text="Close selected session" />
+        </Grid>
+      </Button>
+
       <ListView AutomationProperties.AutomationId="ChatRecentChatsList"
                 Background="Transparent"
                 BorderBrush="Transparent"

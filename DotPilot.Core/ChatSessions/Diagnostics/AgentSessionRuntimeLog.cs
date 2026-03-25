@@ -77,6 +77,28 @@ internal static partial class AgentRuntimeConversationFactoryLog
         Level = LogLevel.Information,
         Message = "Using transient runtime conversation path. SessionId={SessionId} AgentId={AgentId}.")]
     public static partial void TransientRuntimeConversation(ILogger logger, SessionId sessionId, Guid agentId);
+
+    [LoggerMessage(
+        EventId = 1106,
+        Level = LogLevel.Information,
+        Message = "Closing runtime conversation state. SessionId={SessionId} AgentId={AgentId}.")]
+    public static partial void CloseStarted(ILogger logger, SessionId sessionId, Guid agentId);
+
+    [LoggerMessage(
+        EventId = 1107,
+        Level = LogLevel.Information,
+        Message = "Closed runtime conversation state. SessionId={SessionId} AgentId={AgentId}.")]
+    public static partial void SessionClosed(ILogger logger, SessionId sessionId, Guid agentId);
+
+    [LoggerMessage(
+        EventId = 1108,
+        Level = LogLevel.Warning,
+        Message = "Provider-side session teardown failed. SessionId={SessionId} AgentId={AgentId}. Closing local session artifacts anyway.")]
+    public static partial void ProviderSessionTeardownFailed(
+        ILogger logger,
+        Exception exception,
+        SessionId sessionId,
+        Guid agentId);
 }
 
 internal static partial class AgentSessionServiceLog
@@ -260,6 +282,30 @@ internal static partial class AgentSessionServiceLog
         AgentProfileId agentId);
 
     [LoggerMessage(
+        EventId = 1223,
+        Level = LogLevel.Information,
+        Message = "Closing session. SessionId={SessionId}.")]
+    public static partial void SessionCloseStarted(ILogger logger, SessionId sessionId);
+
+    [LoggerMessage(
+        EventId = 1233,
+        Level = LogLevel.Information,
+        Message = "Closed session. SessionId={SessionId}.")]
+    public static partial void SessionClosed(ILogger logger, SessionId sessionId);
+
+    [LoggerMessage(
+        EventId = 1234,
+        Level = LogLevel.Warning,
+        Message = "Session close blocked because the session is still active. SessionId={SessionId}.")]
+    public static partial void SessionCloseBlockedActive(ILogger logger, SessionId sessionId);
+
+    [LoggerMessage(
+        EventId = 1235,
+        Level = LogLevel.Error,
+        Message = "Session close failed. SessionId={SessionId}.")]
+    public static partial void SessionCloseFailed(ILogger logger, Exception exception, SessionId sessionId);
+
+    [LoggerMessage(
         EventId = 1210,
         Level = LogLevel.Information,
         Message = "Updated provider preference. Provider={ProviderKind} IsEnabled={IsEnabled}.")]
@@ -277,6 +323,24 @@ internal static partial class AgentSessionServiceLog
         Exception exception,
         AgentProviderKind providerKind,
         bool isEnabled);
+
+    [LoggerMessage(
+        EventId = 1231,
+        Level = LogLevel.Information,
+        Message = "Updated local model path. Provider={ProviderKind} ModelPath={ModelPath}.")]
+    public static partial void LocalModelPathUpdated(
+        ILogger logger,
+        AgentProviderKind providerKind,
+        string modelPath);
+
+    [LoggerMessage(
+        EventId = 1232,
+        Level = LogLevel.Error,
+        Message = "Local model path update failed. Provider={ProviderKind}.")]
+    public static partial void LocalModelPathUpdateFailed(
+        ILogger logger,
+        Exception exception,
+        AgentProviderKind providerKind);
 
     [LoggerMessage(
         EventId = 1212,

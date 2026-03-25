@@ -22,3 +22,12 @@ internal static partial class StartupWorkspaceHydrationLog
         Message = "Startup workspace hydration failed.")]
     public static partial void HydrationFailed(ILogger logger, Exception exception);
 }
+
+internal static partial class StartupWorkspaceHydrationHostedServiceLog
+{
+    [LoggerMessage(
+        EventId = 1503,
+        Level = LogLevel.Error,
+        Message = "Startup workspace hydration background task failed.")]
+    public static partial void HydrationStartFailed(ILogger logger, Exception exception);
+}

@@ -13,6 +13,7 @@ internal static class PresentationServiceCollectionExtensions
         services.AddSingleton<SessionSelectionNotifier>();
         services.AddSingleton(new OperatorPreferencesStorageOptions());
         services.AddSingleton<IOperatorPreferencesStore, LocalOperatorPreferencesStore>();
+        services.AddSingleton<ILocalModelPathPicker, DesktopLocalModelPathPicker>();
         services.AddSingleton<UiDispatcher>();
         services.AddSingleton<DesktopSleepPreventionService>();
         services.AddSingleton<ShellViewModel>();

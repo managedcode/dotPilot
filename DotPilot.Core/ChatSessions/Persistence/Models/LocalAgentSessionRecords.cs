@@ -59,5 +59,16 @@ internal sealed class ProviderPreferenceRecord
 
     public bool IsEnabled { get; set; }
 
+    public string? LocalModelPath { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+internal sealed class ProviderLocalModelRecord
+{
+    public int ProviderKind { get; set; }
+
+    public string ModelPath { get; set; } = string.Empty;
+
+    public DateTimeOffset AddedAt { get; set; }
 }

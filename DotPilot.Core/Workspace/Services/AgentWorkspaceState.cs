@@ -45,11 +45,25 @@ internal sealed class AgentWorkspaceState(IAgentSessionService agentSessionServi
         return agentSessionService.CreateSessionAsync(command, cancellationToken);
     }
 
+    public ValueTask<Result<AgentWorkspaceSnapshot>> CloseSessionAsync(
+        CloseSessionCommand command,
+        CancellationToken cancellationToken)
+    {
+        return agentSessionService.CloseSessionAsync(command, cancellationToken);
+    }
+
     public ValueTask<Result<ProviderStatusDescriptor>> UpdateProviderAsync(
         UpdateProviderPreferenceCommand command,
         CancellationToken cancellationToken)
     {
         return agentSessionService.UpdateProviderAsync(command, cancellationToken);
+    }
+
+    public ValueTask<Result<ProviderStatusDescriptor>> SetLocalModelPathAsync(
+        SetLocalModelPathCommand command,
+        CancellationToken cancellationToken)
+    {
+        return agentSessionService.SetLocalModelPathAsync(command, cancellationToken);
     }
 
     public IAsyncEnumerable<Result<SessionStreamEntry>> SendMessageAsync(

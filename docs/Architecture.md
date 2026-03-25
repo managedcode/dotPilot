@@ -7,9 +7,10 @@ This file is the required start-here architecture map for non-trivial tasks.
 ## Summary
 
 - **Product shape:** `DotPilot` is a desktop chat client for local agent sessions. The default operator flow is: open settings, verify providers, create or edit an agent profile, start or resume a session, send a message, and watch streaming status/tool output in the transcript while the chat info panel surfaces a compact fleet board for live-session visibility and provider health.
-- **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings.
+- **Presentation boundary:** [../DotPilot/](../DotPilot/) is the `Uno Platform` shell only. It owns desktop startup, routes, XAML composition, `MVUX` screen models plus generated view-model proxies, and visible operator flows such as session list, transcript, agent creation, and provider settings, but it does not own provider startup orchestration or runtime hydration logic.
 - **Core boundary:** [../DotPilot.Core/](../DotPilot.Core/) is the shared non-UI contract and application layer. It owns explicit shared roots such as `Identifiers`, `Contracts`, `Models`, `Policies`, and `Workspace`, plus operational slices such as `AgentBuilder`, `ChatSessions`, `Providers`, and `HttpDiagnostics`, including the local session runtime and persistence paths used by the desktop app.
-- **Startup hydration rule:** app startup is allowed to perform one splash-time provider/CLI hydration pass and reuse that provider snapshot for ordinary workspace reads until the operator explicitly refreshes readiness or changes provider preferences.
+- **Session lifecycle rule:** `CreateSessionAsync` is an eager start, not a placeholder. Creating a chat session must create the durable projection and initialize the backing runtime/provider conversation in the same Core-owned flow. Closing a session must tear down provider/runtime state and local session artifacts before the session disappears from the workspace.
+- **Startup initialization rule:** `DotPilot.Core` owns a startup task that fans out one bounded probe per provider/CLI in parallel, keeps a startup snapshot/cache for the current app lifetime, and degrades fast to partial results instead of serially blocking the UI.
 - **Live-session desktop rule:** while a session is actively generating, `DotPilot.Core` owns the live-session signal and the desktop host may hold a bounded sleep-prevention lock; the shell must show that state so the operator knows why the machine is being kept awake.
 - **Extraction rule:** large non-UI features start in `DotPilot.Core`, but once a slice becomes big enough to need its own boundary, it should move into a dedicated DLL that references `DotPilot.Core`, while the desktop app references that feature DLL directly.
 - **Solution-shape rule:** solution folders may group projects by stable categories such as libraries and tests, but extracted subsystems must still keep their own files, namespaces, and project-local rules inside their real project directory.
@@ -80,21 +81,24 @@ flowchart TD
   Splash["Startup splash + shell overlay"]
   ViewModels["MVUX screen models + generated view-model proxies"]
   Service["IAgentSessionService"]
-  Hydration["Startup workspace hydration"]
+  StartupTask["Core startup task coordinator"]
+  ProbeFanout["Parallel provider or CLI probe fan-out"]
   LiveActivity["Session activity monitor"]
   WakeLock["Desktop sleep prevention host"]
   ProjectionStore["EF Core + SQLite projections"]
   SessionStore["Folder AgentSession + chat history"]
   ProviderCatalog["Provider catalog + readiness probe"]
-  ProviderSnapshot["Startup-owned provider snapshot"]
+  ProviderSnapshot["Startup-owned provider snapshot cache"]
   ProviderClient["Provider SDK / IChatClient or debug client"]
   Stream["SessionStreamEntry updates"]
 
   Ui --> ViewModels
   Ui --> Splash
-  Splash --> Hydration
-  Hydration --> Service
-  Hydration --> ProviderCatalog
+  Splash --> StartupTask
+  StartupTask --> Service
+  StartupTask --> ProbeFanout
+  ProbeFanout --> ProviderCatalog
+  ProbeFanout --> ProviderSnapshot
   ViewModels --> Service
   Service --> ProjectionStore
   Service --> SessionStore
@@ -124,8 +128,9 @@ sequenceDiagram
   UI->>Service: CreateAgentAsync(...) or UpdateAgentAsync(...)
   Service->>DB: Save or update agent profile
   UI->>Service: CreateSessionAsync(...)
-  Service->>DB: Save session + initial status entry
-  Service->>FS: Create/persist opaque AgentSession
+  Service->>Provider: Initialize runtime/provider session
+  Service->>FS: Persist opaque AgentSession
+  Service->>DB: Save session + ready status entry
   UI->>Service: SendMessageAsync(...)
   Service->>DB: Save user message
   Service->>Provider: Run / stream
@@ -133,6 +138,10 @@ sequenceDiagram
   Service->>DB: Persist transcript entries
   Service->>FS: Persist ChatHistoryProvider state + serialized AgentSession
   Service-->>UI: SessionStreamEntry updates
+  UI->>Service: CloseSessionAsync(...)
+  Service->>Provider: Delete or release runtime/provider session
+  Service->>FS: Delete persisted AgentSession, history, and playground artifacts
+  Service->>DB: Delete session projection and transcript rows
 ```
 
 ## Navigation Index

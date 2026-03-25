@@ -66,4 +66,10 @@ public sealed partial record ProviderDetailItem(
 public sealed partial record ProviderActionItem(
     string Label,
     string Summary,
-    string Command);
+    string Command,
+    ProviderActionKind Kind)
+{
+    public string ButtonText => Kind is ProviderActionKind.PickFile or ProviderActionKind.PickFolder
+        ? "Open"
+        : "Copy";
+}

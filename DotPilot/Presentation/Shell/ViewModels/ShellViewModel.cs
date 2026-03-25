@@ -90,9 +90,10 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     private void ApplyHydrationState()
     {
-        StartupOverlayVisibility = startupWorkspaceHydration.IsReady
-            ? Microsoft.UI.Xaml.Visibility.Collapsed
-            : Microsoft.UI.Xaml.Visibility.Visible;
+        StartupOverlayVisibility = startupWorkspaceHydration.IsHydrating ||
+                                   !startupWorkspaceHydration.HasCompletedInitialAttempt
+            ? Microsoft.UI.Xaml.Visibility.Visible
+            : Microsoft.UI.Xaml.Visibility.Collapsed;
     }
 
     private void ApplyLiveSessionState()

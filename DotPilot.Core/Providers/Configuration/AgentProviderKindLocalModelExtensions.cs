@@ -36,8 +36,28 @@ internal static class AgentProviderKindLocalModelExtensions
     {
         return kind switch
         {
-            AgentProviderKind.Onnx => "Set the ONNX model directory path and refresh settings.",
-            AgentProviderKind.LlamaSharp => "Set the GGUF model file path and refresh settings.",
+            AgentProviderKind.Onnx => "Add a model by choosing its genai_config.json file and dotPilot will validate the containing ONNX Runtime GenAI folder.",
+            AgentProviderKind.LlamaSharp => "Add a GGUF model file and dotPilot will validate its GGUF architecture before saving it.",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+        };
+    }
+
+    public static string GetLocalModelPickerLabel(this AgentProviderKind kind)
+    {
+        return kind switch
+        {
+            AgentProviderKind.Onnx => "Add genai_config.json",
+            AgentProviderKind.LlamaSharp => "Add model file",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+        };
+    }
+
+    public static ProviderActionKind GetLocalModelPickerActionKind(this AgentProviderKind kind)
+    {
+        return kind switch
+        {
+            AgentProviderKind.Onnx => ProviderActionKind.PickFile,
+            AgentProviderKind.LlamaSharp => ProviderActionKind.PickFile,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -46,8 +66,8 @@ internal static class AgentProviderKindLocalModelExtensions
     {
         return kind switch
         {
-            AgentProviderKind.Onnx => "ONNX model directory is not configured or is missing genai_config.json.",
-            AgentProviderKind.LlamaSharp => "LLamaSharp GGUF model file is not configured or cannot be found.",
+            AgentProviderKind.Onnx => "ONNX model path is not configured or the selected folder is not a supported ONNX Runtime GenAI model.",
+            AgentProviderKind.LlamaSharp => "LLamaSharp GGUF model file is not configured or the selected GGUF architecture is not supported by the bundled backend.",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -60,5 +80,15 @@ internal static class AgentProviderKindLocalModelExtensions
             AgentProviderKind.LlamaSharp => "Local LLamaSharp model is ready for desktop execution.",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
+    }
+
+    public static string GetLocalModelDetectedRuntimeTypeLabel(this AgentProviderKind kind)
+    {
+        return LocalModelProviderCompatibilityCatalog.GetDetectedRuntimeTypeLabel(kind);
+    }
+
+    public static string GetLocalModelSupportedRuntimeTypesLabel(this AgentProviderKind kind)
+    {
+        return LocalModelProviderCompatibilityCatalog.GetSupportedRuntimeTypesLabel(kind);
     }
 }

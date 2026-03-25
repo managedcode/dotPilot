@@ -13,8 +13,15 @@ internal static class AgentProviderStatusSnapshotReader
     private const string BuiltInStatusSummary = "Built in and ready for deterministic local testing.";
     private const string MissingCliSummaryFormat = "{0} CLI is not installed.";
     private const string ReadySummaryFormat = "{0} CLI is ready for local desktop execution.";
+    private const string TimedOutSummaryFormat = "{0} CLI probe timed out. Refresh status to retry.";
     private const string ModelPathVariablesLabel = "Model path variables";
     private const string ConfiguredModelPathLabel = "Configured model path";
+    private const string OpenCliActionLabel = "Open CLI";
+    private const string OpenCliActionSummary = "CLI detected on PATH.";
+    private const string InstallActionLabel = "Install";
+    private const string InstallActionSummary = "Install the CLI, then refresh settings.";
+    private const string TimedOutActionSummary = "CLI detected on PATH, but the readiness probe timed out.";
+    private static readonly TimeSpan ProviderProbeTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan RedirectDrainTimeout = TimeSpan.FromSeconds(1);
     private const string VersionSeparator = "version";
@@ -23,6 +30,9 @@ internal static class AgentProviderStatusSnapshotReader
         System.Text.CompositeFormat.Parse(MissingCliSummaryFormat);
     private static readonly System.Text.CompositeFormat ReadySummaryCompositeFormat =
         System.Text.CompositeFormat.Parse(ReadySummaryFormat);
+    private static readonly System.Text.CompositeFormat TimedOutSummaryCompositeFormat =
+        System.Text.CompositeFormat.Parse(TimedOutSummaryFormat);
+    private static readonly IReadOnlyList<ProviderLocalModelRecord> EmptyLocalModelRecords = Array.Empty<ProviderLocalModelRecord>();
 
     public static async Task<IReadOnlyList<ProviderStatusProbeResult>> BuildAsync(
         LocalAgentSessionDbContext dbContext,
@@ -34,24 +44,25 @@ internal static class AgentProviderStatusSnapshotReader
             .ToDictionaryAsync(
                 preference => (AgentProviderKind)preference.ProviderKind,
                 cancellationToken);
+        var localModelsByProvider = (await dbContext.ProviderLocalModels
+                .AsNoTracking()
+                .ToListAsync(cancellationToken))
+            .GroupBy(record => (AgentProviderKind)record.ProviderKind)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ProviderLocalModelRecord>)group.ToArray());
         var providerKinds = Enum.GetValues<AgentProviderKind>();
-
-        return await Task.Run(
-            async () =>
-            {
-                List<ProviderStatusProbeResult> results = new(providerKinds.Length);
-                foreach (var providerKind in providerKinds)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    results.Add(await BuildProviderStatusAsync(
-                        providerKind,
-                        GetProviderPreference(providerKind, preferences),
-                        cancellationToken).ConfigureAwait(false));
-                }
-
-                return (IReadOnlyList<ProviderStatusProbeResult>)results;
-            },
-            cancellationToken).ConfigureAwait(false);
+        var probeTasks = providerKinds
+            .Select(providerKind => ProbeProviderAsync(
+                providerKind,
+                GetProviderPreference(providerKind, preferences),
+                GetLocalModels(providerKind, localModelsByProvider),
+                cancellationToken))
+            .ToArray();
+        var results = await Task.WhenAll(probeTasks)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return results;
     }
 
     private static ProviderPreferenceRecord GetProviderPreference(
@@ -64,19 +75,30 @@ internal static class AgentProviderStatusSnapshotReader
             {
                 ProviderKind = (int)kind,
                 IsEnabled = false,
+                LocalModelPath = null,
                 UpdatedAt = DateTimeOffset.MinValue,
             };
+    }
+
+    private static IReadOnlyList<ProviderLocalModelRecord> GetLocalModels(
+        AgentProviderKind kind,
+        Dictionary<AgentProviderKind, IReadOnlyList<ProviderLocalModelRecord>> localModelsByProvider)
+    {
+        return localModelsByProvider.TryGetValue(kind, out var localModels)
+            ? localModels
+            : EmptyLocalModelRecords;
     }
 
     private static async ValueTask<ProviderStatusProbeResult> BuildProviderStatusAsync(
         AgentProviderKind providerKind,
         ProviderPreferenceRecord preference,
+        IReadOnlyList<ProviderLocalModelRecord> localModels,
         CancellationToken cancellationToken)
     {
         var isBuiltIn = providerKind.IsBuiltIn();
         var commandName = providerKind.GetCommandName();
         var displayName = providerKind.GetDisplayName();
-        var defaultModelName = isBuiltIn || providerKind.IsLocalModelProvider()
+        var defaultModelName = isBuiltIn
             ? providerKind.GetDefaultModelName()
             : string.Empty;
         var installCommand = providerKind.GetInstallCommand();
@@ -99,31 +121,63 @@ internal static class AgentProviderStatusSnapshotReader
         if (OperatingSystem.IsBrowser() && !isBuiltIn)
         {
             details.Add(new ProviderDetailDescriptor("Install command", installCommand));
-            actions.Add(new ProviderActionDescriptor("Install", "Run this on desktop.", installCommand));
+            actions.Add(new ProviderActionDescriptor("Install", "Run this on desktop.", installCommand, ProviderActionKind.CopyCommand));
             status = AgentProviderStatus.Unsupported;
             statusSummary = BrowserStatusSummary;
             canCreateAgents = preference.IsEnabled;
         }
         else if (providerKind.IsLocalModelProvider())
         {
-            var configuration = LocalModelProviderConfigurationReader.Read(providerKind);
+            var configuration = await LocalModelProviderConfigurationReader.ReadAsync(
+                providerKind,
+                localModels,
+                preference.LocalModelPath,
+                cancellationToken).ConfigureAwait(false);
             details.Add(new ProviderDetailDescriptor(
                 ModelPathVariablesLabel,
                 string.Join(", ", configuration.EnvironmentVariableNames)));
             actions.Add(new ProviderActionDescriptor(
-                "Set model path",
+                providerKind.GetLocalModelPickerLabel(),
                 providerKind.GetLocalModelSetupSummary(),
-                configuration.SetupCommand));
+                string.Empty,
+                providerKind.GetLocalModelPickerActionKind()));
 
-            if (!string.IsNullOrWhiteSpace(configuration.ModelPath))
+            var configuredModelPaths = FormatDetailValues(configuration.ConfiguredModelPaths);
+            if (!string.IsNullOrWhiteSpace(configuredModelPaths))
             {
-                details.Add(new ProviderDetailDescriptor(ConfiguredModelPathLabel, configuration.ModelPath));
+                details.Add(new ProviderDetailDescriptor(
+                    configuration.ConfiguredModelPaths.Count > 1
+                        ? "Configured model paths"
+                        : ConfiguredModelPathLabel,
+                    configuredModelPaths));
+            }
+
+            var detectedRuntimeTypes = FormatDetailValues(configuration.DetectedRuntimeTypes);
+            if (!string.IsNullOrWhiteSpace(detectedRuntimeTypes))
+            {
+                details.Add(new ProviderDetailDescriptor(
+                    providerKind.GetLocalModelDetectedRuntimeTypeLabel(),
+                    detectedRuntimeTypes));
+            }
+
+            var supportedRuntimeTypes = FormatSupportedModels(configuration.SupportedRuntimeTypes);
+            if (!string.IsNullOrWhiteSpace(supportedRuntimeTypes))
+            {
+                details.Add(new ProviderDetailDescriptor(
+                    providerKind.GetLocalModelSupportedRuntimeTypesLabel(),
+                    supportedRuntimeTypes));
             }
 
             if (!configuration.IsReady)
             {
-                status = AgentProviderStatus.RequiresSetup;
-                statusSummary = providerKind.GetLocalModelMissingSummary();
+                suggestedModelName = configuration.SuggestedModelName ?? string.Empty;
+                supportedModelNames = configuration.SupportedModelNames;
+                status = string.IsNullOrWhiteSpace(configuration.ModelPath)
+                    ? AgentProviderStatus.RequiresSetup
+                    : AgentProviderStatus.Error;
+                statusSummary = string.IsNullOrWhiteSpace(configuration.ValidationErrorMessage)
+                    ? providerKind.GetLocalModelMissingSummary()
+                    : configuration.ValidationErrorMessage;
                 canCreateAgents = false;
             }
             else
@@ -131,12 +185,8 @@ internal static class AgentProviderStatusSnapshotReader
                 suggestedModelName = ResolveSuggestedModel(
                     defaultModelName,
                     configuration.SuggestedModelName,
-                    []);
-                supportedModelNames = ResolveSupportedModels(
-                    defaultModelName,
-                    suggestedModelName,
-                    [],
-                    configuration.SuggestedModelName is null ? [] : [configuration.SuggestedModelName]);
+                    configuration.SupportedModelNames);
+                supportedModelNames = configuration.SupportedModelNames;
                 details.AddRange(CreateProviderDetails(installedVersion, suggestedModelName, supportedModelNames));
                 statusSummary = providerKind.GetLocalModelReadySummary();
                 canCreateAgents = true;
@@ -148,7 +198,7 @@ internal static class AgentProviderStatusSnapshotReader
             if (string.IsNullOrWhiteSpace(executablePath))
             {
                 details.Add(new ProviderDetailDescriptor("Install command", installCommand));
-                actions.Add(new ProviderActionDescriptor("Install", "Install the CLI, then refresh settings.", installCommand));
+                actions.Add(new ProviderActionDescriptor(InstallActionLabel, InstallActionSummary, installCommand, ProviderActionKind.CopyCommand));
                 status = AgentProviderStatus.RequiresSetup;
                 statusSummary = string.Format(System.Globalization.CultureInfo.InvariantCulture, MissingCliSummaryCompositeFormat, displayName);
                 canCreateAgents = false;
@@ -162,7 +212,7 @@ internal static class AgentProviderStatusSnapshotReader
                     installedVersion = ReadVersion(executablePath, ["--version"]);
                 }
 
-                actions.Add(new ProviderActionDescriptor("Open CLI", "CLI detected on PATH.", $"{commandName} --version"));
+                actions.Add(new ProviderActionDescriptor(OpenCliActionLabel, OpenCliActionSummary, $"{commandName} --version", ProviderActionKind.CopyCommand));
                 suggestedModelName = ResolveSuggestedModel(
                     defaultModelName,
                     metadata.SuggestedModelName,
@@ -196,6 +246,93 @@ internal static class AgentProviderStatusSnapshotReader
                 suggestedModelName,
                 supportedModelNames,
                 installedVersion,
+                preference.IsEnabled,
+                canCreateAgents,
+                details,
+                actions),
+            executablePath);
+    }
+
+    private static async Task<ProviderStatusProbeResult> ProbeProviderAsync(
+        AgentProviderKind providerKind,
+        ProviderPreferenceRecord preference,
+        IReadOnlyList<ProviderLocalModelRecord> localModels,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await Task.Run(
+                    async () => await BuildProviderStatusAsync(providerKind, preference, localModels, cancellationToken).ConfigureAwait(false),
+                    CancellationToken.None)
+                .WaitAsync(ProviderProbeTimeout, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TimeoutException)
+        {
+            return CreateTimedOutProviderStatus(providerKind, preference);
+        }
+    }
+
+    private static ProviderStatusProbeResult CreateTimedOutProviderStatus(
+        AgentProviderKind providerKind,
+        ProviderPreferenceRecord preference)
+    {
+        var commandName = providerKind.GetCommandName();
+        var displayName = providerKind.GetDisplayName();
+        var suggestedModelName = providerKind.GetDefaultModelName();
+        IReadOnlyList<string> supportedModelNames = string.IsNullOrWhiteSpace(suggestedModelName)
+            ? Array.Empty<string>()
+            : [suggestedModelName];
+        var executablePath = ResolveExecutablePath(commandName);
+        var actions = new List<ProviderActionDescriptor>();
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            actions.Add(new ProviderActionDescriptor(
+                InstallActionLabel,
+                InstallActionSummary,
+                providerKind.GetInstallCommand(),
+                ProviderActionKind.CopyCommand));
+        }
+        else
+        {
+            actions.Add(new ProviderActionDescriptor(
+                OpenCliActionLabel,
+                TimedOutActionSummary,
+                $"{commandName} --version",
+                ProviderActionKind.CopyCommand));
+        }
+
+        var details = CreateProviderDetails(
+            installedVersion: null,
+            suggestedModelName,
+            supportedModelNames);
+        var status = AgentProviderStatus.Error;
+        var statusSummary = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            TimedOutSummaryCompositeFormat,
+            displayName);
+        var canCreateAgents = false;
+        if (!preference.IsEnabled)
+        {
+            status = AgentProviderStatus.Disabled;
+            statusSummary = $"{DisabledStatusSummary} {statusSummary}";
+        }
+
+        return new ProviderStatusProbeResult(
+            new ProviderStatusDescriptor(
+                AgentSessionDeterministicIdentity.CreateProviderId(commandName),
+                providerKind,
+                displayName,
+                commandName,
+                status,
+                statusSummary,
+                suggestedModelName,
+                supportedModelNames,
+                null,
                 preference.IsEnabled,
                 canCreateAgents,
                 details,
@@ -339,6 +476,15 @@ internal static class AgentProviderStatusSnapshotReader
         return remaining > 0
             ? $"{summary} (+{remaining} more)"
             : summary;
+    }
+
+    private static string FormatDetailValues(IReadOnlyList<string> values)
+    {
+        return string.Join(
+            Environment.NewLine,
+            values
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     private static string? ResolveExecutablePath(string commandName)

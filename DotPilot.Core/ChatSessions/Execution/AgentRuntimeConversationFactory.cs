@@ -9,6 +9,8 @@ using ManagedCode.CodexSharpSDK.Extensions.AI;
 using ManagedCode.GeminiSharpSDK.Configuration;
 using ManagedCode.GeminiSharpSDK.Extensions.AI;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.GitHub.Copilot;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,6 +27,8 @@ internal sealed class AgentRuntimeConversationFactory(
     AgentSessionStorageOptions storageOptions,
     AgentExecutionLoggingMiddleware executionLoggingMiddleware,
     LocalAgentSessionStateStore sessionStateStore,
+    LocalAgentChatHistoryStore chatHistoryStore,
+    IDbContextFactory<LocalAgentSessionDbContext> dbContextFactory,
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
     ILogger<AgentRuntimeConversationFactory> logger)
@@ -61,8 +65,7 @@ internal sealed class AgentRuntimeConversationFactory(
         ArgumentNullException.ThrowIfNull(agentRecord);
 
         var useTransientConversation = ShouldUseTransientRuntimeConversation(agentRecord);
-        var historyProvider = new FolderChatHistoryProvider(
-            serviceProvider.GetRequiredService<LocalAgentChatHistoryStore>());
+        var historyProvider = new FolderChatHistoryProvider(chatHistoryStore);
         var descriptor = CreateExecutionDescriptor(agentRecord);
         var agent = await CreateAgentAsync(agentRecord, descriptor, historyProvider, sessionId, cancellationToken);
         if (useTransientConversation)
@@ -101,6 +104,23 @@ internal sealed class AgentRuntimeConversationFactory(
 
         AgentRuntimeConversationFactoryLog.SessionSaved(logger, sessionId, runtimeContext.Agent.Id);
         return sessionStateStore.SaveAsync(runtimeContext.Agent, runtimeContext.Session, sessionId, cancellationToken);
+    }
+
+    public async ValueTask CloseAsync(
+        AgentProfileRecord? agentRecord,
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        var agentId = agentRecord?.Id ?? Guid.Empty;
+        AgentRuntimeConversationFactoryLog.CloseStarted(logger, sessionId, agentId);
+
+        if (agentRecord is not null && ShouldAttemptProviderSessionTeardown(agentRecord))
+        {
+            await TryCloseProviderSessionAsync(agentRecord, sessionId, cancellationToken);
+        }
+
+        await DeleteLocalArtifactsAsync(sessionId, cancellationToken);
+        AgentRuntimeConversationFactoryLog.SessionClosed(logger, sessionId, agentId);
     }
 
     private bool ShouldUseTransientRuntimeConversation(AgentProfileRecord agentRecord)
@@ -146,7 +166,12 @@ internal sealed class AgentRuntimeConversationFactory(
                 agentRecord,
                 descriptor,
                 ShouldUseFolderChatHistory(descriptor.ProviderKind) ? historyProvider : null,
-                CreateChatClient(descriptor.ProviderKind, agentRecord.Name, sessionId, agentRecord.ModelName)),
+                await CreateChatClientAsync(
+                    descriptor.ProviderKind,
+                    agentRecord.Name,
+                    sessionId,
+                    agentRecord.ModelName,
+                    cancellationToken)),
         };
 
         return executionLoggingMiddleware.AttachAgentRunLogging(agent, descriptor);
@@ -163,15 +188,23 @@ internal sealed class AgentRuntimeConversationFactory(
             agentRecord.ModelName);
     }
 
+    private static bool ShouldAttemptProviderSessionTeardown(AgentProfileRecord agentRecord)
+    {
+        ArgumentNullException.ThrowIfNull(agentRecord);
+
+        return (AgentProviderKind)agentRecord.ProviderKind == AgentProviderKind.GitHubCopilot;
+    }
+
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Performance",
         "CA1859:Use concrete types when possible for improved performance",
         Justification = "The runtime conversation factory intentionally preserves the IChatClient abstraction across provider-backed chat clients.")]
-    private IChatClient CreateChatClient(
+    private async ValueTask<IChatClient> CreateChatClientAsync(
         AgentProviderKind providerKind,
         string agentName,
         SessionId sessionId,
-        string modelName)
+        string modelName,
+        CancellationToken cancellationToken)
     {
         if (providerKind == AgentProviderKind.Debug)
         {
@@ -238,13 +271,13 @@ internal sealed class AgentRuntimeConversationFactory(
 
         if (providerKind == AgentProviderKind.Onnx)
         {
-            var modelPath = ResolveLocalModelPath(providerKind);
+            var modelPath = await ResolveLocalModelPathAsync(providerKind, modelName, cancellationToken);
             return new OnnxRuntimeGenAIChatClient(modelPath);
         }
 
         if (providerKind == AgentProviderKind.LlamaSharp)
         {
-            var modelPath = ResolveLocalModelPath(providerKind);
+            var modelPath = await ResolveLocalModelPathAsync(providerKind, modelName, cancellationToken);
             var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
             return new LlamaLocalChatClient(
                 modelPath,
@@ -324,6 +357,53 @@ internal sealed class AgentRuntimeConversationFactory(
             description: descriptor.ProviderDisplayName);
     }
 
+    private async ValueTask TryCloseProviderSessionAsync(
+        AgentProfileRecord agentRecord,
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        AIAgent? agent = null;
+        try
+        {
+            var historyProvider = new FolderChatHistoryProvider(chatHistoryStore);
+            var descriptor = CreateExecutionDescriptor(agentRecord);
+            agent = await CreateAgentAsync(agentRecord, descriptor, historyProvider, sessionId, cancellationToken);
+            var session = await sessionStateStore.TryLoadAsync(agent, sessionId, cancellationToken);
+            if (session is not GitHubCopilotAgentSession copilotSession ||
+                string.IsNullOrWhiteSpace(copilotSession.SessionId))
+            {
+                return;
+            }
+
+            var copilotClient = agent.GetService<CopilotClient>();
+            if (copilotClient is null)
+            {
+                return;
+            }
+
+            await copilotClient.DeleteSessionAsync(copilotSession.SessionId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            AgentRuntimeConversationFactoryLog.ProviderSessionTeardownFailed(
+                logger,
+                exception,
+                sessionId,
+                agentRecord.Id);
+        }
+        finally
+        {
+            if (agent is not null)
+            {
+                await DisposeAgentAsync(agent);
+            }
+        }
+    }
+
     private string ResolvePlaygroundDirectory(SessionId sessionId)
     {
         var directory = AgentSessionStoragePaths.ResolvePlaygroundDirectory(storageOptions, sessionId);
@@ -331,23 +411,48 @@ internal sealed class AgentRuntimeConversationFactory(
         return directory;
     }
 
+    private async ValueTask DeleteLocalArtifactsAsync(
+        SessionId sessionId,
+        CancellationToken cancellationToken)
+    {
+        await sessionStateStore.DeleteAsync(sessionId, cancellationToken);
+        await chatHistoryStore.DeleteAsync(sessionId, cancellationToken);
+        await LocalStorageDeletion.DeleteDirectoryIfExistsAsync(
+            AgentSessionStoragePaths.ResolvePlaygroundDirectory(storageOptions, sessionId),
+            cancellationToken);
+    }
+
     private static bool ShouldUseFolderChatHistory(AgentProviderKind providerKind)
     {
         return providerKind is AgentProviderKind.Debug or AgentProviderKind.Onnx or AgentProviderKind.LlamaSharp;
     }
 
-    private static string ResolveLocalModelPath(AgentProviderKind providerKind)
+    private async ValueTask<string> ResolveLocalModelPathAsync(
+        AgentProviderKind providerKind,
+        string modelName,
+        CancellationToken cancellationToken)
     {
-        var configuration = LocalModelProviderConfigurationReader.Read(providerKind);
-        if (configuration.IsReady && !string.IsNullOrWhiteSpace(configuration.ModelPath))
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var preference = await dbContext.ProviderPreferences
+            .FirstOrDefaultAsync(record => record.ProviderKind == (int)providerKind, cancellationToken);
+        var localModels = await dbContext.ProviderLocalModels
+            .Where(record => record.ProviderKind == (int)providerKind)
+            .ToArrayAsync(cancellationToken);
+        var configuration = await LocalModelProviderConfigurationReader.ReadAsync(
+            providerKind,
+            localModels,
+            preference?.LocalModelPath,
+            cancellationToken).ConfigureAwait(false);
+        var resolvedModelPath = configuration.ResolveModelPath(modelName);
+        if (configuration.IsReady && !string.IsNullOrWhiteSpace(resolvedModelPath))
         {
-            return configuration.ModelPath;
+            return resolvedModelPath;
         }
 
         throw new InvalidOperationException(
             string.Format(
                 CultureInfo.InvariantCulture,
-                "{0} is not configured. Set {1} before starting a local session.",
+                "{0} is not configured. Choose a local model in Settings or set {1} before starting a local session.",
                 providerKind.GetDisplayName(),
                 configuration.PrimaryEnvironmentVariableName));
     }
@@ -392,6 +497,19 @@ internal sealed class AgentRuntimeConversationFactory(
         foreach (var extension in pathext)
         {
             yield return Path.Combine(searchPath, commandName + extension);
+        }
+    }
+
+    private static async ValueTask DisposeAgentAsync(AIAgent agent)
+    {
+        switch (agent)
+        {
+            case IAsyncDisposable asyncDisposable:
+                await asyncDisposable.DisposeAsync();
+                break;
+            case IDisposable disposable:
+                disposable.Dispose();
+                break;
         }
     }
 }

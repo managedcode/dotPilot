@@ -61,6 +61,52 @@ public sealed class ChatModelTests
     }
 
     [Test]
+    public async Task SendMessageShowsPersistedTranscriptErrorWhenLocalLlamaRuntimeFails()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(ChatModelTests));
+        var brokenModelPath = commandScope.WriteLlamaSharpModelFile("broken-mistral.gguf", architecture: "mistral");
+        await using var fixture = await CreateFixtureAsync();
+        var agent = (await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Mutable Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Be deterministic before the provider swap."),
+            CancellationToken.None))
+            .ShouldSucceed();
+        _ = (await fixture.WorkspaceState.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.LlamaSharp, brokenModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.LlamaSharp, true),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
+
+        await model.StartNewSession(CancellationToken.None);
+        _ = (await fixture.WorkspaceState.UpdateAgentAsync(
+            new UpdateAgentProfileCommand(
+                agent.Id,
+                "Mutable Agent",
+                AgentProviderKind.LlamaSharp,
+                "broken-mistral",
+                "Use the selected local llama model.",
+                "Mutable agent now points to a local llama model."),
+            CancellationToken.None)).ShouldSucceed();
+        await model.ComposerText.SetAsync("trigger the broken llama model", CancellationToken.None);
+
+        await model.SendMessage(CancellationToken.None);
+
+        (await model.FeedbackMessage).Should().Contain("Failed to load model");
+        (await model.FeedbackMessage).Should().NotBe("Sending message...");
+        var activeSession = await model.ActiveSession;
+        activeSession.Should().NotBeNull();
+        activeSession!.Messages.Should().Contain(message =>
+            message.Kind == SessionStreamEntryKind.Error &&
+            message.Content.Contains("LlamaSharp failed before responding", StringComparison.Ordinal) &&
+            message.Content.Contains("Failed to load model", StringComparison.Ordinal));
+    }
+
+    [Test]
     public async Task StartNewSessionUsesNewestCustomAgentWhenCustomNameSortsAfterSystemAgent()
     {
         await using var fixture = await CreateFixtureAsync();
@@ -338,6 +384,43 @@ public sealed class ChatModelTests
         activeSession!.Title.Should().Be("Requested Session");
         (await model.SelectedChat).Should().NotBeNull();
         (await model.SelectedChat)!.Id.Should().Be(firstSession.Session.Id);
+    }
+
+    [Test]
+    public async Task CloseSelectedSessionRemovesTheCurrentSessionAndSelectsTheNextAvailableSession()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var agent = (await fixture.WorkspaceState.CreateAgentAsync(
+            new CreateAgentProfileCommand(
+                "Closer Agent",
+                AgentProviderKind.Debug,
+                "debug-echo",
+                "Stay deterministic for session close verification."),
+            CancellationToken.None)).ShouldSucceed();
+        var firstSession = (await fixture.WorkspaceState.CreateSessionAsync(
+            new CreateSessionCommand("Remaining Session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        var secondSession = (await fixture.WorkspaceState.CreateSessionAsync(
+            new CreateSessionCommand("Closing Session", agent.Id),
+            CancellationToken.None)).ShouldSucceed();
+        var model = ActivatorUtilities.CreateInstance<ChatModel>(fixture.Provider);
+        await model.SelectedChat.UpdateAsync(
+            _ => new SessionSidebarItem(secondSession.Session.Id, secondSession.Session.Title, secondSession.Session.Preview),
+            CancellationToken.None);
+
+        await model.CloseSelectedSession(CancellationToken.None);
+
+        var selectedChat = await model.SelectedChat;
+        selectedChat.Should().NotBeNull();
+        selectedChat!.Id.Should().Be(firstSession.Session.Id);
+        selectedChat.Title.Should().Be(firstSession.Session.Title);
+        (await model.ActiveSession).Should().NotBeNull();
+        (await model.ActiveSession)!.Title.Should().Be(firstSession.Session.Title);
+        (await model.FeedbackMessage).Should().Be("Closed the selected session.");
+
+        var workspace = (await fixture.WorkspaceState.GetWorkspaceAsync(CancellationToken.None)).ShouldSucceed();
+        workspace.Sessions.Should().ContainSingle(session => session.Id == firstSession.Session.Id);
+        workspace.Sessions.Should().NotContain(session => session.Id == secondSession.Session.Id);
     }
 
     private static async Task<TestFixture> CreateFixtureAsync()

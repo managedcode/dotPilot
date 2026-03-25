@@ -31,6 +31,44 @@ public sealed class ShellViewModelTests
     }
 
     [Test]
+    public async Task StartupOverlayCollapsesAfterTheInitialHydrationAttemptFails()
+    {
+        var rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "DotPilot.Tests",
+            nameof(ShellViewModelTests),
+            Guid.NewGuid().ToString("N"));
+        var databasePath = Path.Combine(rootPath, "dotpilot-agent-sessions.db");
+        Directory.CreateDirectory(rootPath);
+        Directory.CreateDirectory(databasePath);
+
+        try
+        {
+            await using var fixture = CreateFixture(new AgentSessionStorageOptions
+            {
+                DatabasePath = databasePath,
+            });
+            var viewModel = fixture.Provider.GetRequiredService<ShellViewModel>();
+            var hydration = fixture.Provider.GetRequiredService<IStartupWorkspaceHydration>();
+
+            viewModel.StartupOverlayVisibility.Should().Be(Visibility.Visible);
+
+            await hydration.EnsureHydratedAsync(CancellationToken.None);
+
+            hydration.IsReady.Should().BeFalse();
+            hydration.HasCompletedInitialAttempt.Should().BeTrue();
+            viewModel.StartupOverlayVisibility.Should().Be(Visibility.Collapsed);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public async Task LiveSessionIndicatorAppearsWhileStreamingAndCollapsesAfterCompletion()
     {
         await using var fixture = CreateFixture();
@@ -79,12 +117,12 @@ public sealed class ShellViewModelTests
         viewModel.LiveSessionIndicatorVisibility.Should().Be(Visibility.Collapsed);
     }
 
-    private static TestFixture CreateFixture()
+    private static TestFixture CreateFixture(AgentSessionStorageOptions? storageOptions = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
-        services.AddAgentSessions(new AgentSessionStorageOptions
+        services.AddAgentSessions(storageOptions ?? new AgentSessionStorageOptions
         {
             UseInMemoryDatabase = true,
             InMemoryDatabaseName = Guid.NewGuid().ToString("N"),

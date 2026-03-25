@@ -243,7 +243,7 @@ public sealed class AgentBuilderModelTests
     public async Task HandleProviderSelectionChangedUsesOnnxProviderKindParameterWhenNoProviderOptionIsProvided()
     {
         using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
-        commandScope.WriteOnnxModelDirectory();
+        commandScope.WriteOnnxModelDirectory("granite-vision-onnx");
 
         await using var fixture = await CreateFixtureAsync();
         (await fixture.WorkspaceState.UpdateProviderAsync(
@@ -256,9 +256,37 @@ public sealed class AgentBuilderModelTests
         await model.HandleProviderSelectionChanged(AgentProviderKind.Onnx, CancellationToken.None);
 
         (await model.BuilderProviderDisplayName).Should().Be("ONNX Runtime GenAI");
-        (await model.BuilderSuggestedModelName).Should().Be("phi-4-mini-instruct-onnx");
+        (await model.BuilderSuggestedModelName).Should().Be("granite-vision-onnx");
         (await model.SelectedProvider).Should().NotBeNull();
         (await model.SelectedProvider)!.Kind.Should().Be(AgentProviderKind.Onnx);
+    }
+
+    [Test]
+    public async Task HandleProviderSelectionChangedShowsEveryAddedOnnxModelInTheDropdown()
+    {
+        using var commandScope = CodexCliTestScope.Create(nameof(AgentBuilderModelTests));
+        var firstModelPath = commandScope.WriteOnnxModelDirectory("granite-vision-onnx", modelType: "granite");
+        var secondModelPath = commandScope.WriteOnnxModelDirectory("qwen3-text-onnx", modelType: "qwen3");
+
+        await using var fixture = await CreateFixtureAsync();
+        _ = (await fixture.WorkspaceState.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.Onnx, firstModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        _ = (await fixture.WorkspaceState.SetLocalModelPathAsync(
+            new SetLocalModelPathCommand(AgentProviderKind.Onnx, secondModelPath),
+            CancellationToken.None)).ShouldSucceed();
+        (await fixture.WorkspaceState.UpdateProviderAsync(
+            new UpdateProviderPreferenceCommand(AgentProviderKind.Onnx, true),
+            CancellationToken.None)).ShouldSucceed();
+
+        var model = ActivatorUtilities.CreateInstance<AgentBuilderModel>(fixture.Provider);
+
+        await model.BuildManually(CancellationToken.None);
+        await model.HandleProviderSelectionChanged(AgentProviderKind.Onnx, CancellationToken.None);
+
+        (await model.BuilderSuggestedModelName).Should().Be("qwen3-text-onnx");
+        (await model.BuilderSupportedModelNames).Should().ContainInOrder("qwen3-text-onnx", "granite-vision-onnx");
+        (await model.ModelName).Should().Be("qwen3-text-onnx");
     }
 
     [Test]

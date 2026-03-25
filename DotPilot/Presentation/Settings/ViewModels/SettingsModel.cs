@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Data;
-using Windows.ApplicationModel.DataTransfer;
 
 namespace DotPilot.Presentation;
 
@@ -34,6 +33,7 @@ public partial record SettingsModel
 
     private readonly IAgentWorkspaceState workspaceState;
     private readonly IOperatorPreferencesStore operatorPreferencesStore;
+    private readonly ILocalModelPathPicker localModelPathPicker;
     private readonly WorkspaceProjectionNotifier workspaceProjectionNotifier;
     private readonly ILogger<SettingsModel> logger;
     private AsyncCommand? _refreshCommand;
@@ -47,11 +47,13 @@ public partial record SettingsModel
     public SettingsModel(
         IAgentWorkspaceState workspaceState,
         IOperatorPreferencesStore operatorPreferencesStore,
+        ILocalModelPathPicker localModelPathPicker,
         WorkspaceProjectionNotifier workspaceProjectionNotifier,
         ILogger<SettingsModel> logger)
     {
         this.workspaceState = workspaceState;
         this.operatorPreferencesStore = operatorPreferencesStore;
+        this.localModelPathPicker = localModelPathPicker;
         this.workspaceProjectionNotifier = workspaceProjectionNotifier;
         this.logger = logger;
         workspaceProjectionNotifier.Changed += OnWorkspaceProjectionChanged;
@@ -251,33 +253,6 @@ public partial record SettingsModel
         {
             SettingsModelLog.Failure(logger, exception);
             await StatusMessage.SetAsync(exception.Message, cancellationToken);
-        }
-    }
-
-    public async ValueTask ExecuteProviderAction(ProviderActionItem? action, CancellationToken cancellationToken)
-    {
-        if (action is null)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(action.Command))
-        {
-            await StatusMessage.SetAsync(action.Summary, cancellationToken);
-            return;
-        }
-
-        try
-        {
-            var dataPackage = new DataPackage();
-            dataPackage.SetText(action.Command);
-            Clipboard.SetContent(dataPackage);
-            Clipboard.Flush();
-            await StatusMessage.SetAsync($"Copied command: {action.Command}", cancellationToken);
-        }
-        catch (Exception)
-        {
-            await StatusMessage.SetAsync($"Run this command in your terminal: {action.Command}", cancellationToken);
         }
     }
 
@@ -534,7 +509,7 @@ public partial record SettingsModel
                 .Select(detail => new ProviderDetailItem(detail.Label, detail.Value))
                 .ToArray(),
             provider.Actions
-                .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command))
+                .Select(action => new ProviderActionItem(action.Label, action.Summary, action.Command, action.Kind))
                 .ToArray(),
             ProviderEntryAutomationIdPrefix + provider.Kind,
             selectedProvider is not null &&
@@ -576,7 +551,8 @@ public partial record SettingsModel
         {
             if (!string.Equals(left[index].Label, right[index].Label, StringComparison.Ordinal) ||
                 !string.Equals(left[index].Summary, right[index].Summary, StringComparison.Ordinal) ||
-                !string.Equals(left[index].Command, right[index].Command, StringComparison.Ordinal))
+                !string.Equals(left[index].Command, right[index].Command, StringComparison.Ordinal) ||
+                left[index].Kind != right[index].Kind)
             {
                 return false;
             }
