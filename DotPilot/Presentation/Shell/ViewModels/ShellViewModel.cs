@@ -7,7 +7,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 {
     private const string StartupTitleValue = "Preparing local runtime";
     private const string StartupSummaryValue =
-        "Loading workspace state and detecting installed CLI providers.";
+        "Loading workspace state and detecting installed CLI providers in the background.";
     private const string LiveSessionIndicatorTitleValue = "Live session active";
     private const string LiveSessionSummaryFormat = "Running {0} in {1}.";
     private const string SleepPreventionSummaryFormat = "Keeping this machine awake while {0} runs in {1}.";

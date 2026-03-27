@@ -198,37 +198,36 @@
 
     <Grid x:Name="StartupSplashScreen"
           AutomationProperties.AutomationId="StartupSplashScreen"
-          Visibility="{Binding StartupOverlayVisibility}">
-      <Border Background="{StaticResource AppShellBackgroundBrush}"
-              Opacity="0.76" />
+          Visibility="{Binding StartupOverlayVisibility}"
+          IsHitTestVisible="False">
       <Border Style="{StaticResource GlassPanelStyle}"
-              Width="420"
-              MaxWidth="420"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center"
-              Padding="24">
-        <StackPanel Spacing="14">
+              Width="360"
+              MaxWidth="360"
+              Margin="0,22,22,0"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Padding="16,14">
+        <StackPanel Spacing="10">
           <StackPanel Orientation="Horizontal"
-                      Spacing="14">
-            <ProgressRing Width="28"
-                          Height="28"
+                      Spacing="12">
+            <ProgressRing Width="20"
+                          Height="20"
                           IsActive="True" />
             <StackPanel Spacing="4">
               <TextBlock x:Name="StartupSplashTitleText"
-                         FontSize="20"
+                         FontSize="16"
                          FontWeight="SemiBold"
                          Text="{Binding StartupTitle}" />
               <TextBlock x:Name="StartupSplashSummaryText"
+                         MaxWidth="292"
                          Foreground="{StaticResource AppMutedTextBrush}"
                          Text="{Binding StartupSummary}"
                          TextWrapping="WrapWholeWords" />
             </StackPanel>
           </StackPanel>
 
-          <Rectangle Style="{StaticResource SectionDividerStyle}" />
-
           <TextBlock Foreground="{StaticResource AppSecondaryTextBrush}"
-                     Text="This runs once at startup and the app reuses the hydrated provider snapshot until you refresh it."
+                     Text="You can keep using the app while the startup snapshot warms up."
                      TextWrapping="WrapWholeWords" />
         </StackPanel>
       </Border>
