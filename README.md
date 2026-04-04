@@ -15,6 +15,22 @@
 
 [Website](https://dotpilot.managed-code.com) · [Downloads](#downloads) · [Getting Started](#getting-started) · [YouTube](https://www.youtube.com/@Managed-Code) · [Issues](https://github.com/managedcode/dotPilot/issues)
 
+
+<h2 align="center">🚀 Build In Public</h2>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=eku3ja2eYHc&list=PLIyi2UvDCig2aKbgG_8K2aE6SGSN4facy">
+    <img src="https://img.youtube.com/vi/eku3ja2eYHc/maxresdefault.jpg" width="600" alt="Watch on YouTube" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/@managedcode">
+    <img src="https://img.shields.io/badge/YouTube-Subscribe-red?style=for-the-badge&logo=youtube" />
+  </a>
+</p>
+
+
 ---
 
 </div>
