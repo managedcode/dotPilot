@@ -19,7 +19,7 @@
     <PackageVersion Include="ManagedCode.CodexSharpSDK.Extensions.AI" Version="1.1.0" />
     <PackageVersion Include="ManagedCode.GeminiSharpSDK.Extensions.AgentFramework" Version="0.0.1-rc4" />
     <PackageVersion Include="ManagedCode.GeminiSharpSDK.Extensions.AI" Version="0.0.1" />
-    <PackageVersion Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.12.2" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.13.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc4" />
     <PackageVersion Include="Microsoft.Agents.AI.GitHub.Copilot" Version="1.0.0-preview.260311.1" />
