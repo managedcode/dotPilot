@@ -21,9 +21,9 @@
     <PackageVersion Include="ManagedCode.GeminiSharpSDK.Extensions.AI" Version="0.0.1" />
     <PackageVersion Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.12.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc4" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0" />
     <PackageVersion Include="Microsoft.Agents.AI.GitHub.Copilot" Version="1.0.0-preview.260311.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc4" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.0.1" />
     <PackageVersion Include="NUnit" Version="4.5.1" />
     <PackageVersion Include="NUnit3TestAdapter" Version="6.2.0" />
